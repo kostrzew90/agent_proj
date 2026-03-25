@@ -1,0 +1,159 @@
+================================================================================
+EU VEHICLE DAMAGE/HISTORY SOURCES — ACTIONABLE SUMMARY
+================================================================================
+
+RESEARCH COMPLETED: 2026-03-01
+SOURCES TESTED: 7 EU/International vehicle history providers
+
+================================================================================
+RESULTS AT A GLANCE
+================================================================================
+
+BLOCKED BY CLOUDFLARE (Don't waste time):
+  ✗ autodna.com
+  ✗ totalcar.hu
+  ✗ statvin (already disabled in VINhunter)
+  ✗ bidfax (already disabled in VINhunter)
+  ✗ autoastat (already disabled in VINhunter)
+
+FREEMIUM (Accessible but paywall):
+  ~ carvertical.com — Free preview only, full report paid
+  ~ otomoto.pl (Polish) — Free preview, registration required for full history
+  ~ vin-info.com — Basic VIN decoder only, no damage history in free tier
+
+UNREACHABLE:
+  ✗ bezwypadkowy.com — Network error (possibly inactive)
+
+WRONG CATEGORY:
+  ✗ check24.de — Insurance comparison tool, not damage history
+
+================================================================================
+WHAT'S ACTUALLY FREE & ACTIONABLE
+================================================================================
+
+1. NHTSA APIS (United States) — FREE, NO AUTH, WORKING ✓
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Status: Already integrated in VINhunter (nhtsa.py, nhtsa_recalls.py, 
+           nhtsa_complaints.py, nhtsa_safety.py)
+   
+   Endpoints:
+   - https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVin/{vin}
+   - https://api.nhtsa.gov/SafetyRatings/{year}/{make}/{model}
+   - https://api.nhtsa.dot.gov/complaints
+   - https://api.nhtsa.dot.gov/recalls
+   
+   Data Available:
+   - VIN decoding: 28+ fields (make, model, year, engine, etc.)
+   - Recalls: Safety-related recalls with descriptions
+   - Complaints: Consumer complaints with descriptions
+   - Safety ratings: NHTSA crash test stars and ratings
+   
+   Limitation: US market focus (but global VIN acceptance)
+   
+   ACTION: Keep using as-is. Fully functional.
+
+================================================================================
+PAID API OPTIONS (If budget available)
+================================================================================
+
+2. AutoRef.eu — EUROPEAN DATA, API-BASED ✓
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Cost: €20/5000 queries OR 50 free queries/month
+   Region: European
+   Data: Full vehicle history including damage/accident reports
+   
+   Current Status: Skeleton plugin exists (autoref.py)
+                   Not yet configured
+   
+   ACTION:
+   1. Register at https://autoref.eu/en/contact
+   2. Get API key
+   3. Add to .env: AUTOREF_API_KEY=your_key
+   4. Test: docker compose up -d --build vinhunter-backend
+   5. Scan a VIN via API to verify integration
+
+3. Vincario API — DAMAGE SPECIALIST, PAY-PER-USE ✓
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Cost: $0.25 per decode
+   Region: European
+   Data: Damage history, accident reports, valuation
+   
+   Current Status: Skeleton plugin exists (vincario.py)
+                   Not yet configured
+   
+   ACTION:
+   1. Register at https://vincario.com
+   2. Get API credentials (key + secret)
+   3. Add to .env: VINCARIO_API_KEY=key, VINCARIO_SECRET_KEY=secret
+   4. Test: docker compose up -d --build vinhunter-backend
+   5. Scan a VIN via API to verify integration
+
+================================================================================
+WHAT'S NOT ACTIONABLE
+================================================================================
+
+DO NOT ATTEMPT:
+- Cloudflare sources (bidfax, autodna, totalcar.hu, statvin, autoastat)
+  Reason: CF detects headless browsers regardless of user agent, stealth 
+          libraries, or browser choice. Requires expensive CF bypass service.
+
+- Registration-gated sources (carvertical, otomoto) without automated login
+  Reason: Would require credential storage and password scraping (unreliable)
+
+- vin-info.com (basic decoder only)
+  Reason: No damage data in free tier; registration required for history
+
+================================================================================
+VINHUNTER PROJECT — NEXT STEPS
+================================================================================
+
+IMMEDIATE:
+  1. Keep existing NHTSA plugins as-is (they work)
+  2. Keep CF-disabled plugins disabled (bidfax, autoastat, statvin, etc.)
+  3. Do NOT attempt to bypass Cloudflare
+
+SHORT TERM (1-2 weeks):
+  1. Test AutoRef plugin (requires registration)
+  2. Test Vincario plugin (requires registration)
+  3. Evaluate cost vs. data quality for each
+
+MEDIUM TERM (optional):
+  1. Consider Polish market data (otomoto.pl)
+  2. Evaluate free preview scraping from carvertical (minimal data)
+  3. Monitor if any CF-protected sites add API endpoints
+
+================================================================================
+BOTTOM LINE
+================================================================================
+
+REALITY CHECK: EU free damage history databases DO NOT EXIST
+
+All major sources (autodna, carvertical, bidfax, totalcar) either:
+- Use Cloudflare (impossible to bypass without expensive services)
+- Require paid subscription
+- Provide only teaser data in free tier
+
+YOUR OPTIONS:
+1. NHTSA (US) — Already using, free, good quality
+2. AutoRef.eu — €20/5000 queries, European data
+3. Vincario — $0.25/query, damage specialist
+4. Manually browse one-off VINs on carvertical or autodna
+
+RECOMMENDATION: Current NHTSA setup is best ROI for free data.
+If you need EU-specific damage history, budget for AutoRef or Vincario.
+
+================================================================================
+DETAILED REPORTS
+================================================================================
+
+For in-depth technical analysis, see:
+- EU_DAMAGE_SOURCES_REPORT.md (executive summary with findings)
+- TECHNICAL_FINDINGS.md (detailed technical analysis per source)
+
+Test scripts (can be deleted):
+- test_eu_sources.py
+- test_eu_sources_detailed.py
+- test_actual_queries.py
+- inspect_responses.py
+
+================================================================================

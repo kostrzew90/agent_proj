@@ -1,0 +1,11 @@
+Wymuś dociekliwość przy planowaniu
+
+AskUserQuestionTool
+
+Użyj tego narzędzia, aby Claude Code był dociekliwy podczas budowania planu.
+
+Przykład promptu:
+
+Przeczytaj @[wstaw nazwę pliku] i przeprowadź ze mną szczegółowy wywiad używając AskUserQuestionTool o dosłownie wszystko: implementację techniczną, UI & UX, obawy, kompromisy, itd.
+
+Upewnij się, że pytania nie są oczywiste, bądź bardzo dociekliwy i kontynuuj wywiad aż do końca, potem zapisz specyfikację do pliku.

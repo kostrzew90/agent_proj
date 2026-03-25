@@ -1,0 +1,83 @@
+# AI-Aware Repo — Main configuration
+# Override any setting via environment variables (prefix: none, flat keys)
+
+database:
+  host: localhost
+  port: 5435
+  user: ai_repo
+  password: ai_repo_pass
+  name: ai_repo
+
+ollama:
+  url: http://localhost:11434
+  embed_model: nomic-embed-text
+  llm_model: qwen2.5-coder:3b
+  embed_batch_size: 32
+  timeout: 120
+
+llm:
+  provider: ollama          # ollama | anthropic
+  temperature: 0.3
+  max_tokens: 2048
+
+api:
+  host: 0.0.0.0
+  port: 8100
+
+indexing:
+  default_repo_path: "."
+  default_repo_id: default
+  ignore_patterns:
+    - "node_modules"
+    - ".venv"
+    - "venv"
+    - "__pycache__"
+    - ".git"
+    - "dist"
+    - "build"
+    - ".egg-info"
+    - ".tox"
+    - ".mypy_cache"
+    - ".pytest_cache"
+  supported_extensions:
+    - ".py"
+    - ".yaml"
+    - ".yml"
+    - ".sql"
+    - ".md"
+    - ".txt"
+    - ".json"
+    - ".toml"
+    - ".cfg"
+    - ".ini"
+    - ".env"
+    - ".sh"
+    - ".bash"
+    - ".dockerfile"
+    - ".js"
+    - ".ts"
+    - ".jsx"
+    - ".tsx"
+    - ".go"
+    - ".rs"
+    - ".java"
+
+retrieval:
+  top_k: 10
+  semantic_top_n: 50
+  keyword_top_n: 50
+  rrf_k: 60
+  context_max_tokens: 4096
+  graph_expansion_depth: 1
+
+memory:
+  auto_bootstrap: true
+  default_confidence: 0.8
+
+plugins:
+  directory: plugins
+  vendor_directory: plugins/_vendor
+  allow_network: false
+  allowlist:
+    - plugin-logs
+    - plugin-template

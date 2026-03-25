@@ -1,0 +1,60 @@
+2) Architektura “AI-aware repo” (rozbita na klocki)
+2.1. Warstwy systemu
+
+A) Repo Ingestion
+
+skan repo (git-aware)
+
+filtry (ignorowanie: node_modules, dist, .venv, binarki)
+
+normalizacja (usuwanie sekretów, maskowanie .env)
+
+chunking (kod + config + docs)
+
+B) Index & Graph Build
+
+embeddingi chunków → chunks.embedding
+
+ekstrakcja symboli (funkcje, klasy, endpointy, migracje, joby) → symbols
+
+graf zależności:
+
+importy
+
+wywołania
+
+relacje “config → usługa”
+
+relacje “API endpoint → handler → DB query”
+
+C) Persistent Project Memory
+
+fakty “jak to działa naprawdę” (entrypointy, architektura, decyzje, SLO, ograniczenia)
+
+decyzje architektoniczne (ADR-lite)
+
+mapy: “moduł → odpowiedzialność”
+
+to nie jest “chat history”, tylko baza wiedzy o projekcie
+
+D) Semantic Layer
+
+“intencje” ponad kodem:
+
+„gdzie jest logika VAT / płatności / autoryzacji”
+
+„który serwis jest źródłem prawdy”
+
+„jakie są side-effecty”
+
+to warstwa, która łączy retrieval + graph + memory
+
+E) AI Co-Architect Interface
+
+CLI (szybkie pytania)
+
+API (dla OpenWebUI/n8n/IDE)
+
+“explain change” / “impact analysis”:
+
+co się zepsuje, gdzie są zależności, jak testować

@@ -1,0 +1,7 @@
+name: plugin-logs
+version: "0.1.0"
+description: Log event analysis tools for ai-repo
+entrypoint: __init__.py
+permissions:
+  network: false
+  capabilities: []

@@ -1,0 +1,67 @@
+services:
+  # ============================================================
+  # PostgreSQL + pgvector
+  # ============================================================
+  rag-postgres:
+    image: pgvector/pgvector:pg16
+    container_name: rag-postgres
+    restart: unless-stopped
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_USER: ${RAG_DB_USER:-rag}
+      POSTGRES_PASSWORD: ${RAG_DB_PASSWORD:-ragpass}
+      POSTGRES_DB: ${RAG_DB_NAME:-rag}
+    volumes:
+      - rag-postgres-data:/var/lib/postgresql/data
+      - ./db-init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${RAG_DB_USER:-rag} -d ${RAG_DB_NAME:-rag}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================================
+  # Redis (Celery broker + cache)
+  # ============================================================
+  rag-redis:
+    image: redis:7-alpine
+    container_name: rag-redis
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    volumes:
+      - rag-redis-data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================================
+  # LangFuse (self-hosted tracing)
+  # ============================================================
+  rag-langfuse:
+    image: langfuse/langfuse:2
+    container_name: rag-langfuse
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      DATABASE_URL: postgresql://${RAG_DB_USER:-rag}:${RAG_DB_PASSWORD:-ragpass}@rag-postgres:5432/${LANGFUSE_DB_NAME:-langfuse}
+      NEXTAUTH_URL: http://localhost:3001
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-changeme-langfuse-secret}
+      SALT: ${LANGFUSE_SALT:-changeme-langfuse-salt}
+      TELEMETRY_ENABLED: "false"
+    depends_on:
+      rag-postgres:
+        condition: service_healthy
+
+volumes:
+  rag-postgres-data:
+  rag-redis-data:
+
+networks:
+  default:
+    name: rag-network

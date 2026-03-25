@@ -1,0 +1,152 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: ai-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=n8n
+      - POSTGRES_PASSWORD=n8npass
+      - POSTGRES_DB=n8n
+      - TZ=Europe/Warsaw
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./db-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U n8n -d n8n"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=n8n
+      - DB_POSTGRESDB_USER=n8n
+      - DB_POSTGRESDB_PASSWORD=n8npass
+      - GENERIC_TIMEZONE=Europe/Warsaw
+      - TZ=Europe/Warsaw
+    volumes:
+      - n8n_data:/home/node/.n8n
+
+  openwebui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: openwebui
+    restart: unless-stopped
+    ports:
+      - "3000:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Postgres jako baza OpenWebUI:
+      - DATABASE_URL=postgresql://openwebui:tata@postgres:5432/openwebui
+      - DATABASE_URL=postgresql://openwebui:tata@postgres:5432/openwebui
+      - VECTOR_DB=pgvector
+      - PGVECTOR_DB_URL=postgresql://openwebui:tata@postgres:5432/openwebui
+
+      # Połączenie do Ollama działającej NATYWNIE na Windows (host):
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+
+      - TZ=Europe/Warsaw
+    volumes:
+      # Trzymaj dane aplikacji (np. pliki, cache) w volume:
+      - openwebui_data:/app/backend/data
+     
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: dozzle
+    restart: unless-stopped
+    ports:
+      - "9999:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      DOZZLE_LEVEL: info
+      DOZZLE_NO_ANALYTICS: "true"
+
+  crawl4ai:
+    image: unclecode/crawl4ai:latest
+    container_name: crawl4ai
+    restart: unless-stopped
+    ports:
+      - "11235:11235"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - CRAWL4AI_API_TOKEN=your_secret_token_here
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=crawl4ai
+      - DB_USER=n8n
+      - DB_PASSWORD=n8npass
+      - TZ=Europe/Warsaw
+    shm_size: 1g
+
+  youtube-mcp:
+    build:
+      context: ./mcp-servers/youtube
+      dockerfile: Dockerfile
+    container_name: youtube-mcp
+    restart: unless-stopped
+    ports:
+      - "8765:8765"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - YT_DB_HOST=postgres
+      - YT_DB_PORT=5432
+      - YT_DB_USER=n8n
+      - YT_DB_PASSWORD=n8npass
+      - YT_DB_NAME=n8n
+      - OLLAMA_URL=http://192.168.8.188:11434
+      - EMBEDDING_MODEL=qwen3-embedding:0.6b
+      - TZ=Europe/Warsaw
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # ==========================================================================
+  # OSINT Tracker - Phone & Email verification + Maigret (3000+ services)
+  # Dokumentacja: mcp_tracker.md
+  # ==========================================================================
+  osint-tracker:
+    build:
+      context: ./mcp-servers/osint-tracker
+      dockerfile: Dockerfile
+    container_name: osint-tracker
+    restart: unless-stopped
+    ports:
+      - "8766:8766"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - OSINT_DB_HOST=postgres
+      - OSINT_DB_PORT=5432
+      - OSINT_DB_USER=n8n
+      - OSINT_DB_PASSWORD=n8npass
+      - OSINT_DB_NAME=n8n
+      - NUMVERIFY_API_KEY=${NUMVERIFY_API_KEY:-}
+      - ABSTRACTAPI_KEY=${ABSTRACTAPI_KEY:-}
+      - HIBP_API_KEY=${HIBP_API_KEY:-}
+      - HUNTER_API_KEY=${HUNTER_API_KEY:-}
+      - TZ=Europe/Warsaw
+
+
+volumes:
+  pg_data:
+  n8n_data:
+  openwebui_data:

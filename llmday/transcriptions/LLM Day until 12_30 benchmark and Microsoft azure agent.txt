@@ -1,0 +1,2116 @@
+# Transkrypcja: LLM Day until 12_30 benchmark and Microsoft azure agent.m4a
+# Model: tiny (faster-whisper CPU - szybki)
+# Rozmiar: 25.1MB
+# Dlugosc: 3034.1s
+
+============================================================
+
+[51.7s -> 59.1s]
+i w clampach narzowy obywatuje do klasy,
+
+[59.1s -> 64.4s]
+na dwóch three się z控制 комstywnych.
+
+[64.4s -> 76.0s]
+Wskupyjki z tym, że powinnę tam w sensu minężni w ten sposób i pośredni okreń.
+
+[76.0s -> 81.1s]
+i pokysenia na komputeru byli należy na samochodzie.
+
+[81.1s -> 84.2s]
+Wkrótcie też, czy w tym, co się to są na tym,
+
+[84.2s -> 87.3s]
+a na razie z bardzo znaliwania w schytu.
+
+[87.3s -> 90.2s]
+I to są w tym, że w LLM,
+
+[90.2s -> 94.6s]
+w tym, że w Kylskach Ikomersu na zbyt,
+
+[94.6s -> 97.4s]
+w tym, że w tym, że w tym,
+
+[97.4s -> 102.8s]
+w tym, w tym, że w tym,
+
+[102.8s -> 105.6s]
+z tym, w co widzangamy,
+
+[105.6s -> 107.5s]
+w tym, w tym, że w tym,
+
+[107.5s -> 113.5s]
+Więc we're doing post-training, fintyning, Laura,
+
+[113.5s -> 115.0s]
+also prompt optimizacją,
+
+[115.0s -> 118.0s]
+so many different things for the e-commerce domain.
+
+[118.0s -> 121.8s]
+I then we're also evaluating models,
+
+[121.8s -> 125.7s]
+general models, e-commerce,
+
+[125.7s -> 127.1s]
+the main problem we're doing,
+
+[127.1s -> 132.7s]
+but also, like, for the use cases,
+
+[132.7s -> 134.2s]
+also we're doing evaluation.
+
+[134.2s -> 136.3s]
+And the last one is the optimizacją,
+
+[136.3s -> 139.3s]
+so we're also looking at the inference
+
+[139.3s -> 142.1s]
+because deployment between those things.
+
+[142.1s -> 145.7s]
+And today I will talk only about the evaluation,
+
+[145.7s -> 147.7s]
+because this is the thing with a new one.
+
+[147.7s -> 160.5s]
+I already found the metrics for measuring performance,
+
+[160.5s -> 164.1s]
+and this one is the traditional metrics.
+
+[164.1s -> 167.1s]
+I don't like the exact ones.
+
+[180.7s -> 191.1s]
+I don't know, this is a very, very,
+
+[191.1s -> 195.3s]
+I just need to do some things.
+
+[195.3s -> 196.3s]
+I just need to do some things.
+
+[196.3s -> 197.3s]
+I just need to do some things.
+
+[197.3s -> 199.3s]
+I just need to do some things.
+
+[199.3s -> 200.3s]
+I just need to do some things.
+
+[200.3s -> 203.4s]
+But those are the other benchmarks, also subject to one.
+
+[203.4s -> 207.5s]
+I don't know, I don't know if you'll follow this one.
+
+[207.5s -> 210.5s]
+This is going, using SPG, some other things.
+
+[210.5s -> 212.5s]
+I don't know if you need to do that.
+
+[212.5s -> 215.7s]
+I really can run in a basic one.
+
+[215.7s -> 222.2s]
+And only recently, the model started to get by here.
+
+[222.2s -> 224.2s]
+And because it's a bit of a mention,
+
+[224.2s -> 228.2s]
+it's not only we measure LMS,
+
+[228.2s -> 230.2s]
+so there is models, but also agents.
+
+[230.2s -> 233.2s]
+Because the learning, which agent use,
+
+[233.2s -> 235.2s]
+sometimes results in better works.
+
+[235.2s -> 238.7s]
+And here we can test for both,
+
+[238.7s -> 241.7s]
+like, coursework, better, old.com,
+
+[241.7s -> 248.3s]
+or visit the codex, even for the same model.
+
+[248.3s -> 251.3s]
+And in this, like, a harbour with this of the problem
+
+[251.3s -> 253.3s]
+of how to create a benchmark, because sure,
+
+[253.3s -> 255.3s]
+we can write all the scripts.
+
+[255.3s -> 256.3s]
+And it's fine, I think.
+
+[256.3s -> 257.3s]
+We have not that.
+
+[257.3s -> 260.3s]
+But it's much better when we already have a framework
+
+[260.3s -> 263.3s]
+for creating benchmarks.
+
+[263.3s -> 264.3s]
+Some kind of structure.
+
+[264.3s -> 267.3s]
+And also, going to reality in a way.
+
+[267.3s -> 270.3s]
+It's simple and for you, because we don't
+
+[270.3s -> 272.4s]
+really start creating on the scripts,
+
+[272.4s -> 273.4s]
+but also for others.
+
+[273.4s -> 275.4s]
+So they can easily run your scripts.
+
+[275.4s -> 279.1s]
+Before I visited everyone,
+
+[279.1s -> 283.9s]
+I wrote their own stuff,
+
+[283.9s -> 285.9s]
+and it was like much harder to write.
+
+[285.9s -> 287.9s]
+Also, we didn't transfer faster on our own stuff.
+
+[287.9s -> 289.9s]
+We'll come by bench.
+
+[289.9s -> 291.9s]
+But then the next two benchmarks we created,
+
+[291.9s -> 293.9s]
+was already already harbour.
+
+[293.9s -> 296.9s]
+And then also we created previous rounds,
+
+[296.9s -> 300.9s]
+and it was easier for us to run the software test on mods.
+
+[300.9s -> 303.9s]
+And before, like before,
+
+[303.9s -> 308.2s]
+it's like there are two things that we have a computer
+
+[308.2s -> 312.3s]
+that we have to do with code.
+
+[312.3s -> 315.3s]
+And here there is a key.
+
+[315.3s -> 318.3s]
+Like it's open router and the key.
+
+[318.3s -> 321.3s]
+So that's easy to use models for those providers,
+
+[321.3s -> 323.3s]
+from various providers.
+
+[323.3s -> 329.8s]
+And it looks like an image in this room.
+
+[329.8s -> 331.8s]
+Very hard to help you.
+
+[331.8s -> 335.0s]
+And then I'll give you my device to interact.
+
+[335.0s -> 358.6s]
+Is it readable?
+
+[358.6s -> 359.6s]
+Or, you know, like,
+
+[359.6s -> 362.6s]
+I don't think this or should be, I guess.
+
+[362.6s -> 366.3s]
+Cool.
+
+[366.3s -> 367.3s]
+Okay.
+
+[367.3s -> 369.3s]
+So I'm basically going to walk through
+
+[369.3s -> 372.3s]
+the anatomy of a harbour test.
+
+[372.3s -> 373.3s]
+So how does it look?
+
+[373.3s -> 378.8s]
+What each piece of a task definition is possible for?
+
+[378.8s -> 381.8s]
+So basically, a harbour task is a directory.
+
+[381.8s -> 384.8s]
+A convention here being that the task name
+
+[384.8s -> 387.8s]
+is also the directory name,
+
+[387.8s -> 391.8s]
+which you have all these task files.
+
+[391.8s -> 395.8s]
+Also, if you ever clone publicly available benchmark,
+
+[395.8s -> 398.8s]
+you are going to find a lot of boilerplate.
+
+[398.8s -> 401.8s]
+Because within harbour there's so far,
+
+[401.8s -> 404.8s]
+there's no templating engine or anything like.
+
+[404.8s -> 408.8s]
+So each task essentially has a lot of these files,
+
+[408.8s -> 411.2s]
+just repeated.
+
+[411.2s -> 414.2s]
+That doesn't just the current state of the project.
+
+[414.2s -> 419.3s]
+So I'm going to walk through all these files here.
+
+[419.3s -> 421.3s]
+First one being the task.tumnel.
+
+[421.3s -> 424.3s]
+Essentially, this is a task metadata.
+
+[424.3s -> 427.3s]
+You can put any fields you want here and put them.
+
+[427.3s -> 430.3s]
+Here we have things like author name.
+
+[430.3s -> 434.3s]
+It also made some tax or labels for your tasks.
+
+[434.3s -> 438.3s]
+But also some properties which might be required
+
+[438.3s -> 441.3s]
+for specific ground types, such as CPU limits
+
+[441.3s -> 444.3s]
+or timeout you would have for your agents,
+
+[444.3s -> 446.3s]
+executing your tasks.
+
+[446.3s -> 450.2s]
+The next thing is the instruction.ending.
+
+[450.2s -> 455.2s]
+So with harbour, you are required to provide this specific file,
+
+[455.2s -> 458.2s]
+which contains the actual instruction for the free agents
+
+[458.2s -> 461.2s]
+of the actual assignment for this task.
+
+[461.2s -> 465.3s]
+This case we are simply calling the agent
+
+[465.3s -> 468.3s]
+to just compile a bullet program.
+
+[468.3s -> 471.3s]
+It's all in markdown files,
+
+[471.3s -> 474.3s]
+so there's no problems with having that definition
+
+[474.3s -> 479.3s]
+in your pipeline code and worrying about formatting that much.
+
+[479.3s -> 482.3s]
+By default, harbour's execution harness
+
+[482.3s -> 485.3s]
+is based on your local running Docker containers.
+
+[485.3s -> 489.3s]
+So we specify our environment in such form
+
+[489.3s -> 494.3s]
+we have a Docker file, which essentially builds the container image
+
+[494.3s -> 497.3s]
+and the task is running in that container.
+
+[497.3s -> 502.3s]
+Additionally, in case your task requires any other files
+
+[502.3s -> 505.3s]
+and you also put them in this directory,
+
+[505.3s -> 509.3s]
+maybe source code or anything that needs to be accomplished
+
+[509.3s -> 514.3s]
+to anything that needs to be done for the task to be accomplished.
+
+[514.3s -> 520.5s]
+There's a challenge that you might also require a more complex environment.
+
+[520.5s -> 524.5s]
+So if you would like to bring up even more containers with a task
+
+[524.5s -> 526.5s]
+or enforce network isolation,
+
+[526.5s -> 530.5s]
+I can do it by placing Docker compose in this directory.
+
+[530.5s -> 539.4s]
+So the next thing is test harbour framework requires you to include
+
+[539.4s -> 544.7s]
+a test.sh script, which essentially runs a test script.
+
+[544.7s -> 550.7s]
+Once agent plane, the task is finished, harbour is going to run a test suite.
+
+[550.7s -> 555.7s]
+So this is like an entry point for your tasks, for tests.
+
+[555.7s -> 559.7s]
+You can use from here, you can basically use any testing
+
+[559.7s -> 561.7s]
+to you want to use.
+
+[561.7s -> 564.7s]
+I will use it in my example later on.
+
+[564.7s -> 568.7s]
+After the task is finished, the whole test directory is in
+
+[568.7s -> 571.7s]
+copy to the container and the script is called.
+
+[571.7s -> 577.7s]
+The expectation from the framework is that the test.sh script is going
+
+[577.7s -> 582.7s]
+to produce a remote file, which will contain task grading
+
+[582.7s -> 584.7s]
+and an actual results.
+
+[584.7s -> 590.7s]
+So as you can see here, like this all elements are very sort of loose,
+
+[590.7s -> 594.7s]
+and there's not much, there's a structure to it,
+
+[594.7s -> 599.8s]
+but it's a lot of flexibility and a lot of room for anything
+
+[599.8s -> 602.8s]
+that you might want to put there.
+
+[602.8s -> 605.8s]
+This is completely optional element for each task,
+
+[605.8s -> 610.8s]
+but pay attention that whenever you would like to write a task
+
+[610.8s -> 612.8s]
+or publicly available benchmark,
+
+[612.8s -> 616.8s]
+typically you are going to, you will be required
+
+[616.8s -> 619.8s]
+to also provide a solution to your task.
+
+[619.8s -> 623.8s]
+So the expectation here is that once harbour
+
+[623.8s -> 627.9s]
+spins up the environment, all the same script is being copied
+
+[627.9s -> 631.9s]
+and it should essentially bring the container to this state
+
+[631.9s -> 633.9s]
+where all the tests pass.
+
+[633.9s -> 638.1s]
+And I'm also going to show how it looks in my example.
+
+[638.1s -> 643.5s]
+So yeah, let's write now.
+
+[643.5s -> 645.5s]
+I'm going to show you our example task.
+
+[645.5s -> 649.5s]
+We are going to run it and see how it works.
+
+[649.5s -> 655.1s]
+But first, I will actually walk through this example task.
+
+[655.1s -> 661.5s]
+Again, one by one, I want to tell you what do we have to do here.
+
+[661.5s -> 665.5s]
+So of course, we have our metadata file, just over name, email,
+
+[665.5s -> 668.5s]
+and some environments, properties,
+
+[668.5s -> 673.2s]
+read these scripts as well.
+
+[673.2s -> 677.7s]
+This example task is simply to compile a go program,
+
+[677.7s -> 679.7s]
+which lives in the out directory.
+
+[679.7s -> 684.7s]
+We have some specific requirements that you want the executable.
+
+[684.7s -> 705.6s]
+So we have our task instruction.
+
+[705.6s -> 713.7s]
+So basically, compile it to the list.
+
+[713.7s -> 715.7s]
+We have our task instruction.
+
+[715.7s -> 717.7s]
+So basically, compile it to the list.
+
+[717.7s -> 719.7s]
+We also have the list.
+
+[719.7s -> 722.9s]
+Let's move to the environment.
+
+[722.9s -> 726.7s]
+The environment is just a simple Docker container.
+
+[726.7s -> 727.7s]
+We load the base image.
+
+[727.7s -> 729.7s]
+We install a go-like compiler.
+
+[729.7s -> 733.7s]
+We, of course, copy our source file, which is here.
+
+[733.7s -> 735.7s]
+Just a simple scope program.
+
+[735.7s -> 738.0s]
+Can you imagine?
+
+[738.0s -> 743.6s]
+Our solution is just to change directory
+
+[743.6s -> 746.7s]
+and go build main.go file.
+
+[746.7s -> 748.7s]
+That's what is to give it.
+
+[748.7s -> 750.8s]
+And it has the stage script.
+
+[750.8s -> 754.8s]
+So in this case, I want to show you something more complex.
+
+[754.8s -> 757.8s]
+We are basically using PyTest tasks,
+
+[757.8s -> 762.0s]
+and which are defined in the separate file.
+
+[762.0s -> 765.0s]
+We install all the PyTest dependencies.
+
+[765.0s -> 768.0s]
+And at the end, depending on the PyTest exit code,
+
+[768.0s -> 771.0s]
+we produce daily more file with the task grading.
+
+[771.0s -> 774.2s]
+But here we go for just a zero or one.
+
+[774.2s -> 777.2s]
+But you can use float numbers as well.
+
+[777.2s -> 781.2s]
+You can also create a reward.json file.
+
+[781.2s -> 785.2s]
+And have more complex grading,
+
+[785.2s -> 788.2s]
+except by step grading of a specific task.
+
+[788.2s -> 791.2s]
+And with regards to the test itself,
+
+[791.2s -> 795.2s]
+I chose PyTest because it's just way cleaner
+
+[795.2s -> 798.2s]
+and way more convenient than an even cure batch.
+
+[798.2s -> 802.2s]
+So simple assertion that the binary exist.
+
+[802.2s -> 804.3s]
+It says, it's a cuteable.
+
+[804.3s -> 811.5s]
+That's it.
+
+[811.5s -> 815.5s]
+I have my older brother, he exported here.
+
+[815.5s -> 817.5s]
+No, I'm going to run it.
+
+[817.5s -> 822.2s]
+I'm actually going to wait the formulation.
+
+[822.2s -> 823.2s]
+No.
+
+[823.2s -> 825.7s]
+OK.
+
+[825.7s -> 828.7s]
+So right now, I will run this example task.
+
+[828.7s -> 833.7s]
+As you can see here, I'm just passing the path to the task.
+
+[833.7s -> 840.4s]
+Task is running right now.
+
+[840.4s -> 843.4s]
+And it's also main notice,
+
+[843.4s -> 847.4s]
+that there's a new directory here called jobs.
+
+[847.4s -> 850.4s]
+This directory contains all the necessary data
+
+[850.4s -> 852.4s]
+about the task run.
+
+[852.4s -> 857.3s]
+So you can see all the agent logs,
+
+[857.3s -> 861.3s]
+the trial log, so we are going to see,
+
+[861.3s -> 865.3s]
+so we are going to see a specific agent
+
+[865.3s -> 867.3s]
+steps that are being taken.
+
+[867.3s -> 869.3s]
+And in a meantime,
+
+[869.3s -> 874.2s]
+we can also run this UI,
+
+[874.2s -> 877.2s]
+hardware review.
+
+[877.2s -> 879.2s]
+We just need to pass a,
+
+[879.2s -> 883.2s]
+as an argument we just need to pass the path to the jobs file.
+
+[883.2s -> 885.2s]
+So as you can see here,
+
+[885.2s -> 888.2s]
+we have some agent trajectories.
+
+[888.2s -> 893.2s]
+There's a prompt and all the data that essentially
+
+[893.2s -> 895.2s]
+captures what agent has executed.
+
+[895.2s -> 899.2s]
+By the way, this whole format is also part of the hardware
+
+[899.2s -> 900.2s]
+framework.
+
+[900.2s -> 903.2s]
+This is actually called the agent trajectory
+
+[903.2s -> 904.2s]
+interchange format.
+
+[904.2s -> 906.2s]
+This is also a thing that,
+
+[906.2s -> 908.2s]
+guys, at a lot of institutions,
+
+[908.2s -> 912.2s]
+the hardware features wanted to standardize.
+
+[912.2s -> 914.2s]
+And it's open-standard.
+
+[914.2s -> 916.2s]
+There's RFC for it,
+
+[916.2s -> 917.2s]
+so as you can see,
+
+[917.2s -> 919.2s]
+it's constantly being updated recently
+
+[919.2s -> 922.2s]
+for the multiple trajectories.
+
+[922.2s -> 925.0s]
+But in order to see how it works,
+
+[925.0s -> 928.0s]
+you can actually use the UI.
+
+[928.0s -> 931.0s]
+And it was like following,
+
+[931.0s -> 934.5s]
+if you have our job,
+
+[934.5s -> 938.3s]
+let's see our example task.
+
+[938.3s -> 943.0s]
+And here we have our agent performing our task.
+
+[943.0s -> 944.0s]
+So basically,
+
+[944.0s -> 946.0s]
+we can create a step by step.
+
+[946.0s -> 947.0s]
+What happened?
+
+[947.0s -> 949.0s]
+What the reason it was,
+
+[949.0s -> 952.0s]
+you can see on this command executions here.
+
+[952.0s -> 955.2s]
+And also we can command execution output.
+
+[955.2s -> 959.1s]
+How much time did it do?
+
+[959.1s -> 964.3s]
+And also there's a lot from the verifier,
+
+[964.3s -> 968.5s]
+so you can also see that all the tasks
+
+[968.5s -> 972.5s]
+are being successfully executed and passed.
+
+[972.5s -> 981.7s]
+So one note about the agent.
+
+[981.7s -> 983.7s]
+So I used a default.
+
+[983.7s -> 985.7s]
+I used the terminus 2 agent,
+
+[985.7s -> 989.7s]
+and just passed the model model name.
+
+[989.7s -> 991.7s]
+This is the terminus 2.
+
+[991.7s -> 997.7s]
+It's just the default LM agent used within the hardware framework.
+
+[997.7s -> 999.7s]
+Of course there are different agents.
+
+[999.7s -> 1001.7s]
+This one is actually quite nice,
+
+[1001.7s -> 1007.7s]
+because it reaches the LM API via LM library.
+
+[1007.7s -> 1011.7s]
+So you can just specify pretty much all the models
+
+[1011.7s -> 1014.7s]
+that you would like either via LM router
+
+[1014.7s -> 1018.7s]
+or just directly to with specific providers API.
+
+[1018.7s -> 1023.7s]
+And it has all the basic tasks that you need to need
+
+[1023.7s -> 1025.7s]
+for the task to be in help,
+
+[1025.7s -> 1028.7s]
+such as executing master commands, et cetera.
+
+[1028.7s -> 1032.7s]
+Of course you can use a different agent.
+
+[1032.7s -> 1034.7s]
+You can use plot code.
+
+[1034.7s -> 1037.7s]
+Just remember that you need to specify
+
+[1037.7s -> 1042.7s]
+the API key separately, because it just won't execute
+
+[1042.7s -> 1045.8s]
+the plot code directly.
+
+[1045.8s -> 1048.8s]
+That's just the way it's HTTP implemented.
+
+[1048.8s -> 1050.8s]
+There's also code tags.
+
+[1050.8s -> 1051.8s]
+Gemini CLI.
+
+[1051.8s -> 1054.8s]
+There's a bunch of different agents here available.
+
+[1054.8s -> 1060.8s]
+And one special agent here is the agent for Oracle.
+
+[1060.8s -> 1065.0s]
+As I've said, you need for it.
+
+[1065.0s -> 1068.0s]
+There's this solution for each task.
+
+[1068.0s -> 1070.0s]
+So it's not the same script.
+
+[1070.0s -> 1073.0s]
+Essentially, what agent Oracle is doing here
+
+[1073.0s -> 1076.0s]
+is that it's just creating this environment.
+
+[1076.0s -> 1078.0s]
+It was the environment being created.
+
+[1078.0s -> 1081.0s]
+It copies the solution script,
+
+[1081.0s -> 1083.0s]
+and it just takes it used to solve the same.
+
+[1083.0s -> 1085.0s]
+So therefore you can see if you're in a solution
+
+[1085.0s -> 1087.0s]
+this also working,
+
+[1087.0s -> 1091.0s]
+and it is providing you the same reward
+
+[1091.0s -> 1094.0s]
+as your normal agent in frontboard.
+
+[1094.0s -> 1098.1s]
+You can see the preview right now.
+
+[1098.1s -> 1105.5s]
+There's a separate run here.
+
+[1105.5s -> 1111.8s]
+I think you can see that it's essentially also
+
+[1111.8s -> 1113.8s]
+all the tasks as right now.
+
+[1113.8s -> 1121.1s]
+In case you would like to run agent in tasks at scale,
+
+[1121.1s -> 1124.1s]
+your local Docker might just not be enough.
+
+[1124.1s -> 1126.1s]
+You'd like to run, let's say,
+
+[1126.1s -> 1129.1s]
+15 tasks and 10 trials each,
+
+[1129.1s -> 1133.1s]
+then you basically run your machine.
+
+[1133.1s -> 1137.1s]
+So you can use a remote environment such as Daytona,
+
+[1137.1s -> 1141.1s]
+which once supported by a cover piece as well.
+
+[1141.1s -> 1146.7s]
+You just need to save a Daytona API key.
+
+[1146.7s -> 1148.7s]
+If you were to create your own tasks,
+
+[1148.7s -> 1152.7s]
+I would highly recommend checking out the terminal bench
+
+[1152.7s -> 1154.7s]
+repository.
+
+[1154.7s -> 1157.7s]
+Right now, having this knowledge that you have,
+
+[1157.7s -> 1161.8s]
+you can simply go to each task and investigate
+
+[1161.8s -> 1162.8s]
+on your own,
+
+[1162.8s -> 1165.8s]
+and you see that the hardware format is here.
+
+[1165.8s -> 1167.8s]
+We have our instruction,
+
+[1167.8s -> 1170.8s]
+a solution for all the terminal bench tasks.
+
+[1170.8s -> 1173.8s]
+So you can write out some tribute to public data.
+
+[1173.8s -> 1175.8s]
+I'll just write it down.
+
+[1175.8s -> 1178.5s]
+So well,
+
+[1178.5s -> 1182.5s]
+and we also would like to encourage you to check out our benchmarks.
+
+[1182.5s -> 1186.3s]
+So there are also public data available.
+
+[1186.3s -> 1189.3s]
+On GitHub, our first part has been compile bench,
+
+[1189.3s -> 1192.3s]
+which focuses on the workshop software
+
+[1192.3s -> 1194.3s]
+with various difficulties.
+
+[1194.3s -> 1197.3s]
+We forced agents to use static linking
+
+[1197.3s -> 1200.3s]
+or use some obscure compilers.
+
+[1200.3s -> 1202.3s]
+We also have an old bench,
+
+[1202.3s -> 1205.3s]
+which focuses on how good LM agents
+
+[1205.3s -> 1208.3s]
+are with instrumenting the existing software
+
+[1208.3s -> 1210.3s]
+with open telemetry.
+
+[1210.3s -> 1213.3s]
+We, this week, we have also released a binary audit,
+
+[1213.3s -> 1217.3s]
+which checks how good agents are with
+
+[1217.3s -> 1220.7s]
+investigating backdoors
+
+[1220.7s -> 1227.8s]
+or any malicious code in the binaries.
+
+[1227.8s -> 1229.8s]
+So also within this repository,
+
+[1229.8s -> 1232.8s]
+which is, you know,
+
+[1232.8s -> 1234.8s]
+if you task ideas for a unit,
+
+[1234.8s -> 1236.8s]
+you can roll your own,
+
+[1236.8s -> 1239.8s]
+and just let it out to be a problem task.
+
+[1239.8s -> 1241.8s]
+And I felt you wanted to also,
+
+[1241.8s -> 1243.8s]
+say, if you were someone else,
+
+[1243.8s -> 1244.8s]
+you could go ahead.
+
+[1244.8s -> 1247.7s]
+And so I need,
+
+[1247.7s -> 1250.7s]
+I need to post during the accounting problems
+
+[1250.7s -> 1252.7s]
+to see how it's constructed
+
+[1252.7s -> 1256.7s]
+and to be some insight into those capabilities.
+
+[1256.7s -> 1258.7s]
+For example, this way on the site firm,
+
+[1258.7s -> 1263.8s]
+in this large room,
+
+[1263.8s -> 1267.8s]
+that in which basically these instructions,
+
+[1267.8s -> 1270.9s]
+that we have,
+
+[1270.9s -> 1272.9s]
+wasn't kind of a bit of a message.
+
+[1272.9s -> 1275.5s]
+At the same time,
+
+[1275.5s -> 1283.3s]
+I don't have a message.
+
+[1283.3s -> 1285.3s]
+And this message,
+
+[1706.2s -> 1709.2s]
+and I have them to implement agents,
+
+[1709.2s -> 1711.2s]
+but also other solutions based on other,
+
+[1711.2s -> 1715.2s]
+and especially with focus on AI and to some extent.
+
+[1715.2s -> 1718.9s]
+Aż, i w tym Whenever they stay to jest w Polsce,
+
+[1718.9s -> 1720.4s]
+to jest w ogóle na bardzo muchwasi.
+
+[1721.1s -> 1724.1s]
+To miejsce mamy przy nierewie,
+
+[1724.1s -> 1728.3s]
+i mamy do mewnątrznych do tego podobać.
+
+[1728.3s -> 1730.9s]
+Dółtej konferyń czy w tym momencie,
+
+[1730.9s -> 1735.3s]
+że się wysztoń i w porządku się poszcz pizza na grę.
+
+[1736.3s -> 1737.6s]
+Zobaczyć, jak w e-resztowieu
+
+[1737.6s -> 1739.6s]
+do Atami Aisylli.
+
+[1740.3s -> 1741.6s]
+Ocega do weekend,
+
+[1741.6s -> 1744.2s]
+ale house tam nie można się wyjąć za te z cheering,
+
+[1744.2s -> 1753.3s]
+Zobaczmy, że wyjął się w tym miejscu, że bym on być bez wstydliwane i jeśli bym powoł się na ten sposób.
+
+[1753.3s -> 1764.0s]
+Zobaczmy, że bym powiedzmy, że w tym miejscu nie wstydliwane, że w tym miejscu bym wstydliwane wstydliwane, czy w tym miejscu nie wstydliwane, że w tym miejscu bym wstydliwane wstydliwane.
+
+[1764.0s -> 1770.0s]
+I then we are specifying how we should work with the termination strategy should be,
+
+[1770.0s -> 1774.0s]
+how should we define the agents and at the end.
+
+[1774.0s -> 1777.0s]
+We also decide, for example, what a point we should think.
+
+[1777.0s -> 1782.0s]
+So should we go no-code, no-code, or the pro-code?
+
+[1782.0s -> 1783.0s]
+Right?
+
+[1783.0s -> 1785.0s]
+And let me just touch upon some of them.
+
+[1785.0s -> 1789.0s]
+If you have any questions, I would be happy to address them at the end.
+
+[1789.0s -> 1792.0s]
+Or I think after the session we also have a post,
+
+[1792.0s -> 1796.0s]
+we have a lunch break, so I will be happy to discuss it with you.
+
+[1796.0s -> 1803.7s]
+Just one or two very general slides about agents.
+
+[1803.7s -> 1806.7s]
+Just to understand what we are talking about here.
+
+[1806.7s -> 1813.1s]
+An agent is an LLM, an LLM that can answer a question,
+
+[1813.1s -> 1817.1s]
+but it's an LLM that normally also has access to,
+
+[1817.1s -> 1820.5s]
+but if they do something for you,
+
+[1820.5s -> 1824.5s]
+it can have some information for you in some data repository.
+
+[1824.5s -> 1828.5s]
+It can connect to the internet to the search for something.
+
+[1828.5s -> 1830.5s]
+It can connect to your forecasting model.
+
+[1830.5s -> 1834.5s]
+It can create a record in the ERP system.
+
+[1834.5s -> 1838.5s]
+So you can send it, it's normal, you're from,
+
+[1838.5s -> 1841.7s]
+I don't know, we also owe it a piece.
+
+[1841.7s -> 1848.4s]
+The agent uses some tools to produce some output that you expected to produce.
+
+[1848.4s -> 1850.7s]
+So let me show you a show of demo.
+
+[1850.7s -> 1858.7s]
+This is an art that I created to show how agents can automate processes.
+
+[1858.7s -> 1864.8s]
+And I imagine that I'm working in bookkeeping in accounting
+
+[1864.8s -> 1868.8s]
+and I receive a lot of invoices everyday.
+
+[1868.8s -> 1870.8s]
+And I have to make sense of them.
+
+[1870.8s -> 1875.8s]
+So I have to check them with my ERP system if they are correct or max.
+
+[1875.8s -> 1881.8s]
+And then I have to input them, record them into our ERP system.
+
+[1881.8s -> 1889.2s]
+As you see, a super simple user interface.
+
+[1889.2s -> 1892.2s]
+And I also created a mockup earping.
+
+[1892.2s -> 1897.2s]
+And you see, you know, you have various invoices here.
+
+[1897.2s -> 1902.2s]
+I created it just to show what the agent can do with it.
+
+[1902.2s -> 1908.0s]
+So you have different invoices here, different lines.
+
+[1908.0s -> 1911.0s]
+And you can edit them here.
+
+[1911.0s -> 1915.0s]
+Because that's what I expect my agent to do in a second.
+
+[1915.0s -> 1922.0s]
+And here you have also, you know, like Fortress Numbers.
+
+[1922.0s -> 1928.1s]
+I will be expecting the agent to add a new invoice that just came in here.
+
+[1928.1s -> 1933.2s]
+So the only thing that I will be doing here, I am meaning to Agnespa,
+
+[1933.2s -> 1939.2s]
+is I think this invoice and clicking stack transformation
+
+[1939.2s -> 1942.2s]
+or something similar. Yeah, process invoice.
+
+[1942.2s -> 1945.2s]
+And afterwards, the agent takes over.
+
+[1945.2s -> 1948.2s]
+It relaxes to the browser.
+
+[1948.2s -> 1951.3s]
+And it should check everything on its own.
+
+[1951.3s -> 1953.3s]
+So I'm not doing the rest.
+
+[1953.3s -> 1955.3s]
+And I don't click here.
+
+[1955.3s -> 1958.3s]
+And just upset with my agent.
+
+[1958.3s -> 1966.5s]
+It opened the browser.
+
+[1966.5s -> 1971.7s]
+And it will check whether the contract associated with the invoice
+
+[1971.7s -> 1975.3s]
+is supposed to add it to it.
+
+[1975.3s -> 1977.3s]
+It relaxes what is in this invoice.
+
+[1977.3s -> 1981.7s]
+Basically, if the invoice makes sense in the context of the contract.
+
+[1981.7s -> 1985.7s]
+So it took some data already from the ERP system.
+
+[1985.7s -> 1991.7s]
+And now it is throwing this added new invoice to my ERP.
+
+[1991.7s -> 2001.7s]
+And extract this information from the invoice.
+
+[2001.7s -> 2006.7s]
+Add it here to the user interface, all my ERP.
+
+[2011.1s -> 2013.1s]
+It's quite chatting.
+
+[2013.1s -> 2016.1s]
+The remark that it's adding is quite long.
+
+[2016.1s -> 2026.4s]
+So let me just leave it up with it.
+
+[2026.4s -> 2029.4s]
+You get the expected data from the invoice.
+
+[2029.4s -> 2032.4s]
+The information extracted from your ERP.
+
+[2032.4s -> 2039.5s]
+Another is this, whether the rules that I define for all my invoices were meant.
+
+[2039.5s -> 2045.5s]
+And you will also see that a new record was created in my ERP system.
+
+[2045.5s -> 2052.0s]
+Actually, I downloaded the proof that the agent made a screenshot with this here.
+
+[2052.0s -> 2060.0s]
+So you see that one complete, business process can be automated using this, using computer using the purchase.
+
+[2060.0s -> 2069.3s]
+If we're thinking about the process of creating the implement in the search agents,
+
+[2069.3s -> 2075.3s]
+then there are a few points that we should focus on, that we should keep in our hearts.
+
+[2075.3s -> 2086.4s]
+And I frequently come across a situation that customers would like to create agents that follow the rules very, very to the world.
+
+[2086.4s -> 2090.4s]
+I mean, they do exactly the same thing every time.
+
+[2090.4s -> 2098.4s]
+And in such situations, the question frequently you can propose, should we be using the agent approach at all.
+
+[2098.4s -> 2108.9s]
+Another thing that I frequently come across is the question, yeah, but it works if my agent commits a error.
+
+[2108.9s -> 2113.1s]
+Agents, all alarms commit errors.
+
+[2113.1s -> 2118.1s]
+We can limit, we can reduce the probability, the risk that they will.
+
+[2118.1s -> 2126.1s]
+However, normally, some risk will always exist, because it exists if we are working with humans, right?
+
+[2126.1s -> 2131.4s]
+Let me show you another example, how you can reduce this risk.
+
+[2131.4s -> 2135.6s]
+This is a simple transition up.
+
+[2135.6s -> 2142.6s]
+It's simply translate texts, you give some texts, you define the languages you want to translate from and still,
+
+[2142.6s -> 2145.6s]
+and you should get the final translation here.
+
+[2145.6s -> 2148.8s]
+Let me speed it up again in a bit.
+
+[2148.8s -> 2151.7s]
+That's what it does.
+
+[2153.8s -> 2160.8s]
+Yeah, we got our translation, but we also got a whole process behind of.
+
+[2160.8s -> 2164.8s]
+So, first, this translation and the show was created.
+
+[2164.8s -> 2168.8s]
+Then another agent took over, it reflected upon the translation.
+
+[2168.8s -> 2171.8s]
+It corrected downstairs from the first translation.
+
+[2171.8s -> 2176.8s]
+And then the final translation was created in this one, right?
+
+[2176.8s -> 2183.8s]
+This way we can improve the quality of our applications.
+
+[2183.8s -> 2192.6s]
+I will show you the whole process, the three versions of the translation, just to show you how it works.
+
+[2192.6s -> 2197.6s]
+Behind the curtain, but normally we're using the app, users who didn't see that.
+
+[2197.6s -> 2204.6s]
+They would just write a few seconds longer for the whole process to run, and they would get to the bus hospital.
+
+[2204.6s -> 2212.1s]
+Let me show you one more thing, how it works.
+
+[2212.1s -> 2217.1s]
+I was here for the previous session, and it was very interesting.
+
+[2217.1s -> 2220.1s]
+It's related also to what I will be showing now.
+
+[2220.1s -> 2226.1s]
+This is just a simple app I created, and it doesn't play a role in this demo.
+
+[2226.1s -> 2230.5s]
+It's only here to show you what I will be testing.
+
+[2230.5s -> 2237.5s]
+So it's an app, a chatbot, that has access to Polish public authorities documents,
+
+[2237.5s -> 2244.5s]
+and it should find tax interpretations, which are most similar to what I used to be from, right?
+
+[2244.5s -> 2248.7s]
+It's using the Aureka website if you know it.
+
+[2248.7s -> 2251.7s]
+So let's imagine we wanted to test that.
+
+[2251.7s -> 2257.7s]
+In the app, the device created, I will need some information to input.
+
+[2257.7s -> 2263.7s]
+I mean, which API are we hitting, or we're targeting here.
+
+[2263.7s -> 2267.8s]
+So I'm showing you here that I copied that.
+
+[2267.8s -> 2271.8s]
+Then I created a few test cases.
+
+[2271.8s -> 2275.8s]
+That's the pairing for the postgen, that's all.
+
+[2275.8s -> 2278.9s]
+To my agents, then the context.
+
+[2278.9s -> 2282.9s]
+So the document base, the text base,
+
+[2282.9s -> 2287.9s]
+based on which the presentation, the answer should be returned,
+
+[2287.9s -> 2291.9s]
+and then the ground truth, so the preferred answer.
+
+[2291.9s -> 2294.9s]
+In this case, I simply copied this.
+
+[2294.9s -> 2300.5s]
+So it's the same, but we're running, wouldn't be right, just to speak with us.
+
+[2300.5s -> 2307.7s]
+Then in this app, I get results for groundedness.
+
+[2307.7s -> 2311.7s]
+Is the response grounded in the documents that we wanted to be grounded in?
+
+[2311.7s -> 2314.7s]
+Relevance is the response relevant.
+
+[2314.7s -> 2318.7s]
+But you can also create your own metrics.
+
+[2318.7s -> 2321.9s]
+Your own results here.
+
+[2321.9s -> 2323.9s]
+For example, GDPR.
+
+[2323.9s -> 2331.6s]
+What is the risk that the response contains, the data, which is GDPR relevant?
+
+[2331.6s -> 2339.6s]
+So in this way, by conducting this test automatically, 100 times 10,000 times,
+
+[2339.6s -> 2343.6s]
+you can find out in what percentage of the test.
+
+[2343.6s -> 2348.6s]
+The answer will contain data that you don't want to contain,
+
+[2348.6s -> 2358.9s]
+or the quality of the response will be lower than you like us to be.
+
+[2358.9s -> 2363.9s]
+Remember that you don't always have to create agents from scratch.
+
+[2363.9s -> 2370.9s]
+Sometimes, when using other, you can use agents that are already inherent,
+
+[2370.9s -> 2375.9s]
+or are already incorporated into some azure services,
+
+[2375.9s -> 2378.9s]
+for example, into azure azure azure azure.
+
+[2378.9s -> 2383.9s]
+So there's a point in functionality, which is called identical approval.
+
+[2383.9s -> 2389.1s]
+And these agents, in time distance from you.
+
+[2389.1s -> 2391.1s]
+And they analyze the query.
+
+[2391.1s -> 2396.1s]
+They find dispassages this test, which are most relevant for the query
+
+[2396.1s -> 2400.1s]
+and they return at the emergent veterans' returnat.
+
+[2400.1s -> 2405.6s]
+We've tested it, of course, before we launch the new functionality.
+
+[2405.6s -> 2410.6s]
+And the improvement that this functionality offers is really high,
+
+[2410.6s -> 2413.6s]
+especially for those questions.
+
+[2413.6s -> 2417.6s]
+For example, users' questions in case of child-consuming voiceball,
+
+[2417.6s -> 2419.6s]
+which are a bit more complex.
+
+[2419.6s -> 2425.6s]
+For example, a user asks, how much does product a cause
+
+[2425.6s -> 2427.6s]
+and what are your opening times?
+
+[2427.6s -> 2430.6s]
+So the declasy crack would have issues
+
+[2430.6s -> 2435.6s]
+as are in this question, because there are two questions, actually.
+
+[2435.6s -> 2440.6s]
+But this functionality makes it easier to this question,
+
+[2440.6s -> 2444.6s]
+which tends to address without creating a more complex process
+
+[2444.6s -> 2446.6s]
+behind the laugh.
+
+[2446.6s -> 2455.0s]
+Let's move on.
+
+[2455.0s -> 2461.0s]
+That the first thing I'm thinking about creating an agentic process
+
+[2461.0s -> 2464.1s]
+is to think about the process.
+
+[2464.1s -> 2467.1s]
+So how should it develop, what would be the steps?
+
+[2467.1s -> 2472.1s]
+And I feel that it's going to do this,
+
+[2472.1s -> 2475.1s]
+thinking about the current process, the human process.
+
+[2475.1s -> 2478.1s]
+Only then we can think about optimizing it,
+
+[2478.1s -> 2481.1s]
+maybe some steps are relevant.
+
+[2481.1s -> 2483.1s]
+In the automated process, for example,
+
+[2483.1s -> 2486.1s]
+maybe there is enough interesting the process.
+
+[2486.1s -> 2489.1s]
+But if you know what the process looks like now,
+
+[2489.1s -> 2491.1s]
+it's about starting a month.
+
+[2491.1s -> 2497.6s]
+And frequency we're talking about agentic AI,
+
+[2497.6s -> 2499.6s]
+there are...
+
+[2499.6s -> 2502.7s]
+Do you think we might get a distinction between the workflows?
+
+[2502.7s -> 2505.7s]
+And real agents?
+
+[2505.7s -> 2507.7s]
+Although in my opinion,
+
+[2507.7s -> 2512.3s]
+we should be more careful here,
+
+[2512.3s -> 2517.4s]
+because there are a lot of steps between the workflows
+
+[2517.4s -> 2519.4s]
+and more deterministic process,
+
+[2519.4s -> 2522.4s]
+and completely autonomous agents.
+
+[2522.4s -> 2525.6s]
+For example, this is a process
+
+[2525.6s -> 2528.6s]
+that diagram created in a lembra,
+
+[2528.6s -> 2533.6s]
+where you see simple process for a co-sender.
+
+[2533.6s -> 2536.6s]
+So let's imagine that we have a co-sender,
+
+[2536.6s -> 2538.6s]
+sorry, not co-sender.
+
+[2538.6s -> 2540.6s]
+And plenty of emails come in,
+
+[2540.6s -> 2543.6s]
+and we want to first categorize them.
+
+[2543.6s -> 2545.6s]
+So is it a business oriented question,
+
+[2545.6s -> 2547.6s]
+or is it a technical question?
+
+[2547.6s -> 2550.6s]
+We want to analyze the sentiment of the email,
+
+[2550.6s -> 2553.6s]
+because the email is very upset
+
+[2553.6s -> 2556.6s]
+to the email you want to forward the email
+
+[2556.6s -> 2559.6s]
+to work here instead of an agent.
+
+[2559.6s -> 2562.6s]
+Based on this two categorizations,
+
+[2562.6s -> 2565.6s]
+you can then decide which agent
+
+[2565.6s -> 2567.6s]
+these are all agents,
+
+[2567.6s -> 2569.6s]
+should take the question.
+
+[2569.6s -> 2572.8s]
+Each of these agents had their own knowledge,
+
+[2572.8s -> 2575.8s]
+so they have access to their own documents,
+
+[2575.8s -> 2577.8s]
+which are different, for example,
+
+[2577.8s -> 2579.8s]
+for commercial questions and technical questions,
+
+[2579.8s -> 2582.8s]
+and they have access to different tools.
+
+[2582.8s -> 2585.8s]
+For example, this one can connect to the internet
+
+[2585.8s -> 2588.8s]
+or our website, which are called, we've published them, right?
+
+[2588.8s -> 2592.8s]
+They can also use different models.
+
+[2592.8s -> 2594.8s]
+For example, this handle general agent
+
+[2594.8s -> 2598.8s]
+is probably quite easy one.
+
+[2598.8s -> 2601.8s]
+I mean, the best level of advice
+
+[2601.8s -> 2603.8s]
+shouldn't be super complex,
+
+[2603.8s -> 2606.8s]
+so we don't need more complex,
+
+[2606.8s -> 2609.8s]
+and therefore more expensive model here.
+
+[2609.8s -> 2612.8s]
+So one thing about agenting process
+
+[2612.8s -> 2615.8s]
+is we need to imagine this path,
+
+[2615.8s -> 2618.8s]
+no matter how much autonomy
+
+[2618.8s -> 2623.2s]
+we want to give to each of the agents.
+
+[2623.2s -> 2626.2s]
+Sometimes you want to do it differently.
+
+[2626.2s -> 2628.2s]
+So we want to have an agent which plays
+
+[2628.2s -> 2632.2s]
+over a manager, which then assigns the tasks to individuals.
+
+[2632.2s -> 2636.2s]
+So we don't have a single path anymore.
+
+[2636.2s -> 2639.2s]
+Instead we want the manager to do the site.
+
+[2639.2s -> 2643.2s]
+And frankly, this is probably most more interesting
+
+[2643.2s -> 2646.2s]
+than the previous one, the previous way of the agents,
+
+[2646.2s -> 2650.2s]
+but most companies want to go this way
+
+[2650.2s -> 2652.2s]
+that they want to have more control,
+
+[2652.2s -> 2656.2s]
+and it also makes sense for most of the places
+
+[2656.2s -> 2658.3s]
+so this time.
+
+[2658.3s -> 2662.4s]
+But just to show you how this piece
+
+[2662.4s -> 2665.3s]
+has showed up,
+
+[2665.3s -> 2667.3s]
+it has been created,
+
+[2667.3s -> 2675.3s]
+show how a manager can coordinate the things
+
+[2675.3s -> 2677.3s]
+to find, for example, something to buy.
+
+[2677.3s -> 2681.3s]
+So I asked it to find me a nice piece of clothing
+
+[2681.3s -> 2683.3s]
+on Amazon Come,
+
+[2683.3s -> 2685.3s]
+and it starts coordinating
+
+[2685.3s -> 2689.3s]
+the orchestrator with web server
+
+[2689.3s -> 2693.3s]
+and with other agents, which is also here.
+
+[2693.3s -> 2694.3s]
+I'm going to need that.
+
+[2694.3s -> 2697.3s]
+And the one clicks on Amazon Come
+
+[2697.3s -> 2701.3s]
+and different suffixes and orchestrators
+
+[2701.3s -> 2703.3s]
+as yeah, that's the correct way of doing that
+
+[2703.3s -> 2705.3s]
+or no go back.
+
+[2705.3s -> 2709.2s]
+And at the end of the company,
+
+[2709.2s -> 2711.2s]
+we need to perform the things.
+
+[2711.2s -> 2717.4s]
+And here you have your code, right?
+
+[2717.4s -> 2719.9s]
+So we don't have a clear path.
+
+[2719.9s -> 2721.9s]
+We don't define it at the beginning.
+
+[2721.9s -> 2723.9s]
+So they can behave differently
+
+[2723.9s -> 2725.9s]
+if they encounter some problem.
+
+[2725.9s -> 2727.9s]
+For example, if Amazon Come
+
+[2727.9s -> 2730.0s]
+or us to,
+
+[2730.0s -> 2734.1s]
+the user to log in with some piece of the norm,
+
+[2734.1s -> 2736.1s]
+if Amazon Come changes the layouts,
+
+[2736.1s -> 2740.4s]
+etc. On the other hand,
+
+[2740.4s -> 2742.4s]
+it consumes more tokens
+
+[2742.4s -> 2746.6s]
+and normally also more in time
+
+[2746.6s -> 2748.6s]
+because they have to think about the whole process.
+
+[2748.6s -> 2753.3s]
+Okay, let's go on.
+
+[2753.3s -> 2755.3s]
+So when it comes to microstat,
+
+[2755.3s -> 2759.3s]
+there are several good ways to do reagents.
+
+[2759.3s -> 2761.3s]
+We have copylos, copylos
+
+[2761.3s -> 2763.3s]
+or things that use employees.
+
+[2763.3s -> 2765.3s]
+You don't have to code anything.
+
+[2765.3s -> 2769.3s]
+Normally, you can customize a bit but not too much.
+
+[2769.3s -> 2771.3s]
+Then you have copylos studio, which is our local solution,
+
+[2771.3s -> 2773.3s]
+and then you have azure helio.
+
+[2773.3s -> 2777.3s]
+And that's what I was specializing in.
+
+[2777.3s -> 2779.3s]
+And this presentation also focuses on
+
+[2779.3s -> 2782.3s]
+but to remember that the previous ones also exist.
+
+[2782.3s -> 2784.3s]
+So for example,
+
+[2784.3s -> 2786.3s]
+if it comes to a researcher,
+
+[2786.3s -> 2788.3s]
+you want to produce a 20%
+
+[2788.3s -> 2792.3s]
+long research paper or something.
+
+[2792.3s -> 2794.3s]
+Okay, some of the authorities
+
+[2794.3s -> 2798.3s]
+is called Microsoft 365 copylos researcher.
+
+[2798.3s -> 2800.3s]
+You give it a topic of researchers
+
+[2800.3s -> 2802.3s]
+for five minutes, and it turns into an answer.
+
+[2802.3s -> 2806.9s]
+Or, you could go to the local copylos studio,
+
+[2806.9s -> 2808.9s]
+right?
+
+[2808.9s -> 2810.9s]
+Or, the way I do it here,
+
+[2810.9s -> 2814.9s]
+I create an app to research a desktop market for me.
+
+[2814.9s -> 2818.9s]
+So I created around five different agents.
+
+[2818.9s -> 2820.9s]
+One of them analyzes the moment
+
+[2820.9s -> 2822.9s]
+of the current situation of this stock.
+
+[2822.9s -> 2824.9s]
+Or some company,
+
+[2824.9s -> 2830.2s]
+the other analyzes the value we need,
+
+[2830.2s -> 2832.2s]
+the price to equity, etc.
+
+[2832.2s -> 2836.2s]
+And they all connect them and produce a report for me
+
+[2836.2s -> 2840.2s]
+to decide whether I want to invest in some company
+
+[2840.2s -> 2842.2s]
+or not with me.
+
+[2842.2s -> 2846.2s]
+So depending on what you are looking for,
+
+[2846.2s -> 2848.2s]
+what result you want to receive,
+
+[2848.2s -> 2852.2s]
+and then select one of the two true ones.
+
+[2852.2s -> 2853.2s]
+No code,
+
+[2853.2s -> 2855.8s]
+no code or no code.
+
+[2855.8s -> 2857.8s]
+Or here.
+
+[2857.8s -> 2862.8s]
+One of the most typical ideas companies have
+
+[2862.8s -> 2864.8s]
+is the one to implement agents,
+
+[2864.8s -> 2868.8s]
+is to use them for the chat with your data.
+
+[2868.8s -> 2871.8s]
+So every company would like to have a place
+
+[2871.8s -> 2874.8s]
+where they want to ask questions like,
+
+[2874.8s -> 2878.8s]
+why did our sales decrease with month?
+
+[2878.8s -> 2882.0s]
+And get a reasonable answer.
+
+[2882.0s -> 2885.0s]
+And it's postponed to do it so many ways.
+
+[2885.0s -> 2888.0s]
+For example, here, this is Microsoft's fabric.
+
+[2888.0s -> 2891.0s]
+There's a functionality called data agent,
+
+[2891.0s -> 2892.0s]
+there.
+
+[2892.0s -> 2896.0s]
+You can use it directly with the fabric,
+
+[2896.0s -> 2898.0s]
+but I also created a user interface,
+
+[2898.0s -> 2903.0s]
+because the functionality is accessing by an API.
+
+[2903.0s -> 2906.0s]
+Like you do, this is up and I don't ask any questions
+
+[2906.0s -> 2910.0s]
+and receive an answer which is based on our data.
+
+[2910.0s -> 2915.1s]
+So to sum up this part of it,
+
+[2915.1s -> 2920.4s]
+it's frequently made sense to think about
+
+[2920.4s -> 2923.4s]
+the organizations as to your organizations.
+
+[2923.4s -> 2924.4s]
+And one hand,
+
+[2924.4s -> 2928.4s]
+it makes sense to give people some good productivity
+
+[2928.4s -> 2932.4s]
+for them to be able to translate things quickly,
+
+[2932.4s -> 2934.4s]
+to create marketing companies,
+
+[2934.4s -> 2939.4s]
+training, materials, etc.
+
+[2939.4s -> 2941.4s]
+And frequently,
+
+[2941.4s -> 2945.4s]
+this follow is played by Microsoft 360 files combined.
+
+[2945.4s -> 2948.0s]
+But on the other hand,
+
+[2948.0s -> 2950.0s]
+frequently we see this info,
+
+[2950.0s -> 2951.0s]
+IT, LAT,
+
+[2951.0s -> 2952.0s]
+efforts,
+
+[2952.0s -> 2954.0s]
+to implement solutions,
+
+[2954.0s -> 2956.0s]
+which are relevant from the point of view
+
+[2956.0s -> 2958.0s]
+of the whole organization,
+
+[2958.0s -> 2960.0s]
+or at least a few things, right?
+
+[2960.0s -> 2963.0s]
+And then we are going the proper way,
+
+[2963.0s -> 2967.5s]
+because low code has all the advantages
+
+[2967.5s -> 2970.9s]
+and disadvantages related to it.
+
+[2970.9s -> 2971.9s]
+I mean,
+
+[2971.9s -> 2975.9s]
+Kobayos Studio is great for various standard pieces,
+
+[2975.9s -> 2978.9s]
+but if you want to implement something very
+
+[2978.9s -> 2980.9s]
+purposeful,
+
+[2980.9s -> 2983.9s]
+that's simply not the solution for that right?
+
+[2983.9s -> 2987.1s]
+Go go the other way.
+
+[2987.1s -> 2988.1s]
+Yeah, precisely.
+
+[2988.1s -> 2989.1s]
+My Microsoft Fundring,
+
+[2989.1s -> 2991.1s]
+the biggest name of the Fundring,
+
+[2991.1s -> 2994.6s]
+is a great solution when it comes to
+
+[2994.6s -> 2997.6s]
+especially securing the governability
+
+[2997.6s -> 2998.6s]
+of your solution,
+
+[2998.6s -> 2999.6s]
+the testability,
+
+[2999.6s -> 3003.6s]
+observability of your solution.
+
+[3003.6s -> 3006.6s]
+It has been developing a lot in the last two years,
+
+[3006.6s -> 3009.6s]
+and it has been given more and more functionality
+
+[3009.6s -> 3011.6s]
+in the testing,
+
+[3011.6s -> 3013.6s]
+tracing,
+
+[3013.6s -> 3014.6s]
+tracing.
+
+[3014.6s -> 3023.1s]
+That's the foundation.
+
+[3023.1s -> 3025.1s]
+Here we have the model catalog,
+
+[3025.1s -> 3028.1s]
+guaranteeing the task of the implementation
+
+[3028.1s -> 3030.2s]
+of the implementation.
+
+[3030.2s -> 3034.0s]
+Of course, you use the classroom model model.
+

@@ -1,0 +1,1498 @@
+# Transkrypcja: LLM Day until 10_10.m4a
+# Długość: 3279.2s
+# Język: pl
+# Model: medium
+
+============================================================
+
+[0.0s -> 7.6s]
+Aby to zrobić, musieliśmy znaleźć, a to jest to, co nazywamy,
+
+[7.6s -> 11.8s]
+minimum viable productem.
+
+[11.8s -> 18.0s]
+Myślę, że w LLM jest tylko to, co jest potrzebne,
+
+[18.0s -> 23.3s]
+dla tego jednego, należnego zadania, LLM czy agent.
+
+[23.3s -> 26.3s]
+I żeby to założyć, oczywiście, pierwsza odpowiedź,
+
+[26.3s -> 28.3s]
+która przychodzi do naszej myśli, jest położenie.
+
+[28.3s -> 31.3s]
+I w 2026 roku, jeśli myślisz o położeniu,
+
+[31.3s -> 34.5s]
+prawdopodobnie myślisz o położeniu wektorów.
+
+[34.5s -> 37.4s]
+I to jest też to, gdzie zaczęliśmy.
+
+[37.4s -> 38.4s]
+O, jedna rzecz wcześniej.
+
+[38.4s -> 40.4s]
+Powiem, jak zaczęliśmy.
+
+[40.4s -> 42.4s]
+Dla tych, którzy nie pamiętają o położeniu wektorów,
+
+[42.4s -> 44.4s]
+opowiem super krótką introdukcję.
+
+[44.4s -> 46.4s]
+Położenie wektorów jest typem położenia,
+
+[46.4s -> 49.4s]
+w którym każdy dokument jest reprezentowany przez wektor
+
+[49.4s -> 51.4s]
+w ramieniu matodimensionu.
+
+[51.4s -> 53.4s]
+Jeśli wyobrażamy, że to jest spacer,
+
+[53.4s -> 56.4s]
+normalnie wektorów mają dużo więcej dymensji niż 3.
+
+[56.4s -> 60.4s]
+Ale można włożyć jakieś rzeczy w położenie wektorów,
+
+[60.4s -> 62.4s]
+do wektora położenia, do daty,
+
+[62.4s -> 64.4s]
+które są reprezentowane przez wektory.
+
+[64.4s -> 67.4s]
+I idea jest, że wektory, które są blisko,
+
+[67.4s -> 69.4s]
+a dokumenty, które są blisko,
+
+[69.4s -> 70.4s]
+semantycznie,
+
+[70.4s -> 72.4s]
+produkują wektory, które są też blisko
+
+[72.4s -> 74.4s]
+w ramieniu matodimensionu.
+
+[74.4s -> 79.0s]
+Więc jeśli mam ten set dokumentów,
+
+[79.0s -> 80.0s]
+a mam ten sprąt,
+
+[80.0s -> 82.0s]
+to moja wektora,
+
+[82.0s -> 84.1s]
+na tej kwarii, wylądzie się gdzieś tam.
+
+[84.1s -> 87.1s]
+I znajdę te dwa elementy.
+
+[87.1s -> 90.1s]
+Myślę, że możecie zobaczyć, jak mocno to jest.
+
+[90.1s -> 93.1s]
+Nie tylko to jest leksyka,
+
+[93.1s -> 95.1s]
+czy ta sama słowa,
+
+[95.1s -> 97.1s]
+ale też to jest semantyczne znaczenie.
+
+[97.1s -> 99.1s]
+Można pracować na mody,
+
+[99.1s -> 101.1s]
+przez języki.
+
+[101.1s -> 103.1s]
+Jest to bardzo mocny rodzaj wektora,
+
+[103.1s -> 105.1s]
+który jest, myślę, bardzo mocny teraz.
+
+[105.1s -> 107.7s]
+Wszystkie wektory.
+
+[107.7s -> 110.7s]
+Ale to jest to, gdzie zaczęliśmy.
+
+[110.7s -> 113.7s]
+Chcieliśmy też zbudować to w ramieniu matodimensionu.com.
+
+[113.7s -> 115.7s]
+W latach to było model,
+
+[115.7s -> 120.0s]
+który był bardzo popularny.
+
+[120.0s -> 122.0s]
+Tak więc wziąliśmy go.
+
+[122.0s -> 124.0s]
+Wziąliśmy tylko pełne dimensiony,
+
+[124.0s -> 126.0s]
+1536.
+
+[126.0s -> 128.1s]
+Dimensionalność jest bardzo ważna.
+
+[128.1s -> 130.1s]
+Jeśli nie wiecie,
+
+[130.1s -> 132.1s]
+powiem wam później,
+
+[132.1s -> 134.1s]
+gdzie jest tak ważne.
+
+[134.1s -> 136.1s]
+Wziąliśmy pełne precyzyjne wektory,
+
+[136.1s -> 138.1s]
+więc pełne 32 wektory.
+
+[138.1s -> 140.9s]
+I włożyliśmy je w datacje wektory.
+
+[140.9s -> 142.9s]
+Wylądziliśmy bardzo małe
+
+[142.9s -> 144.9s]
+wskazówki.
+
+[144.9s -> 146.9s]
+Zrobiliśmy matę,
+
+[146.9s -> 148.9s]
+a to będzie dla nas szkoda finansowa.
+
+[148.9s -> 150.9s]
+Dlaczego?
+
+[150.9s -> 152.9s]
+Mamy miliony finansów w dnia.
+
+[152.9s -> 154.9s]
+Mamy miliony entytutów w dnia.
+
+[154.9s -> 156.9s]
+Mamy miliony zmian w dniu.
+
+[156.9s -> 158.9s]
+To kosztowało nas bardzo dużo
+
+[158.9s -> 161.1s]
+milionów dolarów na rok.
+
+[161.1s -> 163.7s]
+Bardzo dużo.
+
+[163.7s -> 165.7s]
+Najważniejsze było,
+
+[165.7s -> 168.6s]
+że to nawet nie działało bardzo dobrze.
+
+[168.6s -> 170.6s]
+Więc teraz, jeśli wyjdziecie na bieżąco,
+
+[170.6s -> 172.6s]
+prawdopodobnie znacie
+
+[172.6s -> 174.6s]
+ten slajd, ale jeśli nie,
+
+[174.6s -> 176.6s]
+bądźcie ze mną, będzie to bardzo intensywnie.
+
+[176.6s -> 178.6s]
+Zacznęmy...
+
+[178.6s -> 180.6s]
+i zaczynamy myśleć
+
+[180.6s -> 182.6s]
+o różnych rozwiązaniach.
+
+[182.6s -> 184.6s]
+Leksikalskie bieżący,
+
+[184.6s -> 186.6s]
+jak je konfigurować.
+
+[186.6s -> 188.6s]
+Są analizowani, tokanizowani.
+
+[188.6s -> 190.6s]
+Jest fazyna w stemie.
+
+[190.6s -> 192.6s]
+Wektory bieżące.
+
+[192.6s -> 194.6s]
+Differenne algorytmy,
+
+[194.6s -> 196.6s]
+indeksowanie parametrów, skierowanie parametrów.
+
+[196.6s -> 198.6s]
+Są modykowane dla bieżących.
+
+[198.6s -> 200.6s]
+Wszystkie z nich ma mnóstwo dymensji,
+
+[200.6s -> 202.6s]
+które można wybrać.
+
+[202.6s -> 204.6s]
+Możesz je kwalifikować czy nie.
+
+[204.6s -> 206.6s]
+Możesz je złożyć czy używać rozwiązanych rozwiązań.
+
+[236.6s -> 238.9s]
+I wiesz co?
+
+[238.9s -> 240.9s]
+Byliśmy tajemnici.
+
+[240.9s -> 242.9s]
+Zaczęliśmy testować te pomysły
+
+[242.9s -> 245.2s]
+w stakie produkcji.
+
+[245.2s -> 248.6s]
+I znowu,
+
+[248.6s -> 250.8s]
+niestety, straciliśmy się.
+
+[250.8s -> 252.8s]
+Problem był, że nasz stak jest kompleksowy.
+
+[252.8s -> 254.8s]
+Mamy klaskę Kubernetes,
+
+[254.8s -> 256.9s]
+mamy set mikroservices,
+
+[256.9s -> 258.9s]
+mamy streamy Kafka,
+
+[258.9s -> 260.9s]
+z milionami ofentytów.
+
+[260.9s -> 262.9s]
+Partia integracyjnej była bardzo trudna.
+
+[262.9s -> 264.9s]
+I to wziąło nam...
+
+[264.9s -> 266.9s]
+i mamy też OpenSearch, więc jeśli chcemy
+
+[266.9s -> 268.9s]
+stworzyć nowe indycy,
+
+[268.9s -> 270.9s]
+reindeksować datę,
+
+[270.9s -> 272.9s]
+na skale to sporo czasu.
+
+[272.9s -> 275.7s]
+Więc
+
+[275.7s -> 277.7s]
+zaczęliśmy się pytać,
+
+[277.7s -> 279.9s]
+OK, więc jeśli w stakie produkcji
+
+[279.9s -> 281.9s]
+każda interakcja
+
+[281.9s -> 283.9s]
+zajmuje nasz tydzień,
+
+[283.9s -> 285.9s]
+i nikt nie jest bardzo szczęśliwy o rezultatach,
+
+[285.9s -> 287.9s]
+jak możemy znaleźć
+
+[287.9s -> 289.9s]
+najlepsze konfiguracje
+
+[289.9s -> 291.9s]
+łatwiej?
+
+[291.9s -> 293.9s]
+I jak oceniać kwalifikację?
+
+[293.9s -> 295.9s]
+I jak zdobyć rezultaty w minuty
+
+[295.9s -> 297.9s]
+podczas konfiguracji?
+
+[297.9s -> 299.9s]
+I oczywiście jesteśmy także lepszy
+
+[299.9s -> 301.9s]
+stworzyciel, więc może możemy
+
+[301.9s -> 303.9s]
+znaleźć kogoś innego, by to zrobić dla nas.
+
+[303.9s -> 305.9s]
+Wydaje mi się, że to jest
+
+[305.9s -> 308.5s]
+struktura stworzenia staków.
+
+[308.5s -> 310.5s]
+Więc decydujemy, że OK,
+
+[310.5s -> 312.5s]
+zacznijmy od tego, co mamy w produkcji,
+
+[312.5s -> 314.5s]
+ale w Pytopie, lokalnie,
+
+[314.5s -> 316.5s]
+w sposób, w jaki możemy
+
+[316.5s -> 318.5s]
+zdefiniować parametry na bieżąco,
+
+[318.5s -> 320.6s]
+i możemy robić mnóstwo
+
+[320.6s -> 322.6s]
+benchmarków w tym samym czasie,
+
+[322.6s -> 324.6s]
+i używać jakichkolwiek
+
+[324.6s -> 326.6s]
+rezultatów top-K,
+
+[326.6s -> 329.1s]
+które chcielibyśmy skupić.
+
+[329.1s -> 331.1s]
+To jest to, co widzimy jako rezultaty,
+
+[331.1s -> 333.1s]
+to jest jak przykładowy eksperyment,
+
+[333.1s -> 335.1s]
+lepszy jest lepszy w tym przypadku,
+
+[335.1s -> 337.1s]
+ale najważniejsze, to jest to,
+
+[337.1s -> 339.1s]
+co AIS jest, a to był
+
+[339.1s -> 341.7s]
+kluczowy fakt dla nas.
+
+[341.7s -> 343.7s]
+Więc idea była,
+
+[343.7s -> 345.7s]
+że OK, jeśli możemy
+
+[345.7s -> 347.7s]
+to łatwiej zrobić, jeśli
+
+[347.7s -> 349.7s]
+ruszanie to zajmuje sekundę, jeśli
+
+[349.7s -> 351.7s]
+mamy bardzo silne
+
+[351.7s -> 353.7s]
+rozwiązania, gdzie rezultaty
+
+[353.7s -> 355.7s]
+są, na przykład, nasz
+
+[355.7s -> 357.7s]
+główny benchmark, może
+
+[357.7s -> 359.7s]
+z powrotem, możemy
+
+[359.7s -> 361.7s]
+zrobić AIS dla nas.
+
+[361.7s -> 363.7s]
+Więc stworzyliśmy, najpierw
+
+[363.7s -> 365.7s]
+zaczynamy z prostego
+
+[365.7s -> 367.7s]
+AIS flow z Cloud Code,
+
+[367.7s -> 369.7s]
+który stworzy hipotezę, jak
+
+[369.7s -> 371.7s]
+uprawiać bieżąco, planuje
+
+[371.7s -> 373.7s]
+implementację, robi implementację,
+
+[373.7s -> 375.7s]
+sprawdzamy benchmarky
+
+[375.7s -> 377.7s]
+wokół lokalnej implementacji
+
+[377.7s -> 379.9s]
+i robimy to
+
+[379.9s -> 381.9s]
+znowu, jak wiele razy
+
+[381.9s -> 383.9s]
+potrzebne jest, żeby uprawiać
+
+[383.9s -> 385.9s]
+rezultaty. W końcu możemy
+
+[385.9s -> 387.9s]
+zrozumieć rezultaty, mogę wracać
+
+[387.9s -> 389.9s]
+z sali i zobaczyć, co zostało
+
+[389.9s -> 392.0s]
+odkrywane przez AIS. I to
+
+[392.0s -> 394.2s]
+dalej i dalej, i dalej i dalej.
+
+[394.2s -> 396.2s]
+To było kilka miesięcy temu,
+
+[396.2s -> 398.2s]
+ale teraz pewnie wiesz,
+
+[398.2s -> 400.2s]
+że agencje
+
+[400.2s -> 402.2s]
+są w fesji, więc dlaczego
+
+[402.2s -> 404.2s]
+nie zrobić to jeszcze bardziej
+
+[404.2s -> 406.2s]
+kompleksowym? Dlaczego tylko
+
+[406.2s -> 408.2s]
+stworzyć jedną hipotezę w ten
+
+[408.2s -> 410.2s]
+czas? Dlaczego nie stworzyć
+
+[410.2s -> 412.2s]
+jedną hipotezę w ten czas?
+
+[412.2s -> 414.2s]
+Mamy system z agencjami
+
+[414.2s -> 416.2s]
+i koordynatorem, gdzie każdy
+
+[416.2s -> 418.2s]
+agencja może stworzyć i sprawdzić
+
+[418.2s -> 420.2s]
+hipotezy z własnej strony, a koordynator
+
+[420.2s -> 422.2s]
+może sprawdzić różne hipotezy i
+
+[422.2s -> 424.2s]
+rezultaty, spróbować je połączyć i stworzyć
+
+[424.2s -> 426.2s]
+metahipotezę,
+
+[426.2s -> 429.4s]
+jak uprawiać bieżąco.
+
+[429.4s -> 431.4s]
+I robimy to wszystko, nawet zanim
+
+[431.4s -> 433.4s]
+zaczniemy stworzyć rzeczy w produkcji.
+
+[433.4s -> 435.5s]
+I to nam spowoduje
+
+[435.5s -> 437.5s]
+dużo czasu. Więc,
+
+[437.5s -> 439.5s]
+po prostu, żeby pokazać przykład, myślę, że
+
+[439.5s -> 441.5s]
+to jest jedna rzecz, którą mieliśmy.
+
+[441.5s -> 443.5s]
+Powiedziałem wcześniej o tym, jaka jest
+
+[443.5s -> 445.5s]
+dimensionalność wektorów. To jest wielki problem.
+
+[445.5s -> 447.5s]
+Największy koszt wektorów jest
+
+[447.5s -> 449.5s]
+pamięć. Szczególnie teraz,
+
+[449.5s -> 451.5s]
+że prace ruchu są niebezpieczne,
+
+[451.5s -> 453.5s]
+więc jest coraz bardziej cenne.
+
+[453.5s -> 455.5s]
+Chcemy porozmawiać
+
+[455.5s -> 457.7s]
+jak
+
+[457.7s -> 459.7s]
+rezultat będzie wyglądać, jeśli
+
+[459.7s -> 461.7s]
+weźmy silny rynkarz
+
+[461.7s -> 463.7s]
+i porozmawiamy
+
+[463.7s -> 465.7s]
+full precision,
+
+[465.7s -> 467.7s]
+non-quantizowanych wektorów
+
+[467.7s -> 469.7s]
+bianek quantizowanych,
+
+[469.7s -> 471.7s]
+krótkich, więc 256
+
+[471.7s -> 473.7s]
+dimensionów wektorów.
+
+[473.7s -> 475.7s]
+I zakończamy ten sam rynkarz
+
+[475.7s -> 477.7s]
+na końcu rynku.
+
+[477.7s -> 479.7s]
+I wiesz co? Rezultaty
+
+[479.7s -> 481.7s]
+były niezwykłe. Właściwie
+
+[481.7s -> 483.7s]
+krótszy, bardziej
+
+[483.7s -> 485.7s]
+lepszy.
+
+[485.7s -> 488.2s]
+I co to oznacza dla nas?
+
+[488.2s -> 490.5s]
+Mamy
+
+[490.5s -> 492.5s]
+tę redukcję.
+
+[492.5s -> 494.5s]
+Jeśli masz w głowie
+
+[494.5s -> 496.5s]
+to 500
+
+[496.5s -> 498.5s]
+razy
+
+[498.5s -> 500.5s]
+poniżej.
+
+[500.5s -> 502.5s]
+I to jest
+
+[502.5s -> 504.5s]
+demand. Wiesz jak się
+
+[504.5s -> 506.5s]
+czujesz, kiedy widzisz
+
+[506.5s -> 508.5s]
+rezultaty? Tak jak to.
+
+[508.5s -> 510.5s]
+Największy rynkarz
+
+[510.5s -> 512.5s]
+był
+
+[512.5s -> 515.4s]
+coś, co możemy zakończyć.
+
+[515.4s -> 517.4s]
+I możecie się
+
+[517.4s -> 519.4s]
+zapytać, OK, więc wypełniliście
+
+[519.4s -> 521.4s]
+te same rzeczy dwóch razy. To dużo
+
+[521.4s -> 523.4s]
+pracy, prawda? Oczywiście to
+
+[523.4s -> 525.4s]
+prawda. To dużo pracy. Albo to
+
+[525.4s -> 527.4s]
+dużo pracy w 2024.
+
+[527.4s -> 529.4s]
+Ponieważ w 2024
+
+[529.4s -> 531.4s]
+my, jak
+
+[531.4s -> 533.4s]
+wywodnicy, będziemy
+
+[533.4s -> 534.4s]
+implementować rzeczy, kodować,
+
+[534.4s -> 536.4s]
+zabezpieczyć, utrzymać,
+
+[536.4s -> 538.4s]
+stworzyć dokumentację,
+
+[538.4s -> 540.4s]
+przypomnieć sobie, jak
+
+[540.4s -> 542.4s]
+przeczytać kod z powrotem
+
+[542.4s -> 544.4s]
+do projektu w 2 tygodnie.
+
+[544.4s -> 546.4s]
+I to dużo czasu, prawda?
+
+[546.4s -> 548.4s]
+Wszyscy, którzy robili projekt IT,
+
+[548.4s -> 550.4s]
+wiedzą, że to dużo czasu.
+
+[550.4s -> 552.4s]
+Ale w 2026
+
+[552.4s -> 554.4s]
+robienie rzeczy tylko dla
+
+[554.4s -> 556.4s]
+ewaluacji jest bardzo proste.
+
+[556.4s -> 558.4s]
+Bocznik jest zmontowany
+
+[558.4s -> 560.4s]
+przez agencję kodowania AI.
+
+[560.4s -> 562.4s]
+Wszystko, co przedstawiłem,
+
+[562.4s -> 564.4s]
+może być zrobione z kilkoma
+
+[564.4s -> 566.4s]
+sklepami, szczerze. Nie musimy
+
+[566.4s -> 568.4s]
+sprawdzić rezultaty, ponieważ ewaluacja
+
+[568.4s -> 570.4s]
+jest rezultatem. To jest to,
+
+[570.4s -> 572.4s]
+co patrzymy na. I nie musimy
+
+[572.4s -> 574.4s]
+nawet czytać kod.
+
+[574.4s -> 576.4s]
+Albo możemy je czytać na bardzo
+
+[576.4s -> 578.4s]
+wysokim poziomie. To nie jest kod produkcji.
+
+[578.4s -> 581.5s]
+To jest rysunek ewaluacji.
+
+[581.5s -> 583.5s]
+Tak więc, ulepszenia.
+
+[583.5s -> 585.5s]
+Znaleźliśmy, myślę, dwa
+
+[585.5s -> 587.5s]
+lecenie, albo dwa lecenie na dwa
+
+[587.5s -> 590.0s]
+różne rzeczy.
+
+[590.0s -> 592.1s]
+Najpierw, AI
+
+[592.1s -> 593.1s]
+kodowanie naprawdę
+
+[593.1s -> 595.1s]
+zmieniło głowę w naszej
+
+[595.1s -> 597.1s]
+industrie. Nie myślimy
+
+[597.1s -> 599.1s]
+o projektach IT w ten sam sposób,
+
+[599.1s -> 601.1s]
+jak w 2024 roku.
+
+[601.1s -> 603.1s]
+Szukamy
+
+[603.1s -> 605.1s]
+sposobów, by zbudować
+
+[605.1s -> 607.1s]
+rysunek ewaluacji lokalnych,
+
+[607.1s -> 609.1s]
+które mogą być używane
+
+[609.1s -> 611.1s]
+przez AI i przez AI
+
+[611.1s -> 613.1s]
+na szybkie iteracje.
+
+[613.1s -> 615.1s]
+Gdybyśmy mogli to złożyć,
+
+[615.1s -> 617.1s]
+możemy po prostu wierzyć AI
+
+[617.1s -> 619.1s]
+agencjom do tego dla nas.
+
+[619.1s -> 621.1s]
+Więc oni mogą to zrobić,
+
+[621.1s -> 623.1s]
+a my możemy po prostu skupić się
+
+[623.1s -> 626.3s]
+na stworzeniu hipotezów i myśleć
+
+[626.3s -> 628.3s]
+o większym wymiarze.
+
+[628.3s -> 630.3s]
+A drugi lecenie, który
+
+[630.3s -> 632.3s]
+nauczyliśmy się, jest o budowaniu
+
+[632.3s -> 634.4s]
+produktów zamiast AI.
+
+[634.4s -> 636.4s]
+Tak więc, nauczyliśmy się,
+
+[636.4s -> 638.4s]
+że nie jest wystarczająco
+
+[638.4s -> 640.4s]
+wystarczająco duży
+
+[640.4s -> 642.4s]
+podstawowy model.
+
+[642.4s -> 644.4s]
+I po prostu złożyliśmy
+
+[644.4s -> 646.4s]
+prosty wektor. Jeśli chcesz
+
+[646.4s -> 648.4s]
+zrobić to pracę na skali,
+
+[648.4s -> 650.4s]
+niestety musi być bardziej
+
+[650.4s -> 652.4s]
+skuteczny niż to.
+
+[652.4s -> 654.4s]
+Możecie sobie pytać,
+
+[654.4s -> 656.4s]
+czy macie to samo problem?
+
+[656.4s -> 658.4s]
+Czy warto zbierać czas i pieniądze
+
+[658.4s -> 660.4s]
+w dużych podstawowych modelach
+
+[660.4s -> 662.4s]
+i robić to prosto?
+
+[662.4s -> 664.4s]
+Czy jest bardziej ważne
+
+[664.4s -> 666.4s]
+zbudować silne systemy
+
+[666.4s -> 668.4s]
+po pierwsze, aby zbudować
+
+[668.4s -> 671.6s]
+dużo lepszy kontekst pod ELM?
+
+[671.6s -> 673.6s]
+Tak, porozmawiamy dzisiaj.
+
+[673.6s -> 675.6s]
+Jeśli macie to samo problem, czy myśleliście
+
+[675.6s -> 677.6s]
+o tym samym problemie, jeśli widzieliście,
+
+[677.6s -> 679.6s]
+jak AI zmienił się, jak myśleliście
+
+[679.6s -> 681.6s]
+o kodowaniu projektów,
+
+[681.6s -> 683.6s]
+jak zmienił się twoja industria
+
+[683.6s -> 685.6s]
+czy twoje biznesu, czy jeśli
+
+[685.6s -> 687.6s]
+byliście budowlani na systemach
+
+[687.6s -> 689.6s]
+i chcieliście porozmawiać o
+
+[689.6s -> 691.6s]
+różnych części, te sklepy, gdzie mieliśmy
+
+[691.6s -> 693.6s]
+wiele sklepów. Możecie coś zniszczyć,
+
+[693.6s -> 695.6s]
+więc porozmawiajmy.
+
+[695.6s -> 697.6s]
+Możecie mnie znaleźć na LinkedIn,
+
+[697.6s -> 699.6s]
+jest nawet QR-kod, mam nadzieję, że to działa.
+
+[699.6s -> 701.6s]
+Ale możecie też mnie znaleźć tutaj
+
+[701.6s -> 703.6s]
+i po prostu mnie spotkać
+
+[703.6s -> 705.6s]
+na korytarzu.
+
+[705.6s -> 707.6s]
+Będziemy tu cały dzień, więc
+
+[707.6s -> 709.6s]
+zacznijmy porozmawiać. Jestem bardzo
+
+[709.6s -> 711.6s]
+ciekaw, jak
+
+[711.6s -> 713.6s]
+pracujesz w 2026 roku.
+
+[713.6s -> 754.6s]
+W porządku,
+
+[754.6s -> 756.6s]
+stworzyliśmy podstawę
+
+[756.6s -> 758.6s]
+szukania na różne produkty.
+
+[758.6s -> 760.6s]
+Mamy mnóstwo produktów,
+
+[760.6s -> 762.6s]
+które pracują na pracę dla usu.
+
+[762.6s -> 764.6s]
+Najpierw mamy Monday Vibe,
+
+[764.6s -> 766.6s]
+który jest jak replik, ale w środku
+
+[766.6s -> 768.6s]
+jest mnóstwo produktów,
+
+[768.6s -> 770.6s]
+które pracują na pracę dla usu.
+
+[770.6s -> 772.6s]
+Można stworzyć aplikacje, które
+
+[772.6s -> 774.6s]
+pracują na Monday, a Monday Automation
+
+[774.6s -> 776.6s]
+to database i automation engine.
+
+[776.6s -> 778.6s]
+Można złączyć mnóstwo
+
+[778.6s -> 780.6s]
+flowów, mnóstwo toolów,
+
+[780.6s -> 782.6s]
+które pracują na pracę,
+
+[782.6s -> 784.6s]
+kalendarzy, e-mails,
+
+[784.6s -> 786.6s]
+wszystkie te rzeczy razem.
+
+[786.6s -> 788.6s]
+I to też jest
+
+[788.6s -> 790.6s]
+sklepowe dla Ciebie.
+
+[790.6s -> 792.6s]
+Można zrozumieć, jak
+
+[792.6s -> 794.6s]
+pracujesz na pracę dla Ciebie,
+
+[794.6s -> 796.6s]
+a także stworzyć sidekick product,
+
+[796.6s -> 798.6s]
+który jest generalnie pomocy,
+
+[798.6s -> 800.6s]
+które mogą
+
+[800.6s -> 804.0s]
+znalazć
+
+[804.0s -> 806.0s]
+odpowiedzi dla Ciebie,
+
+[806.0s -> 808.0s]
+ale także pracować dla Ciebie.
+
+[808.0s -> 810.0s]
+I my się bardzo sprowadzamy w integracji
+
+[810.0s -> 812.0s]
+w każdej części Monday'a,
+
+[812.0s -> 814.0s]
+więc można złączyć daty,
+
+[814.0s -> 816.0s]
+mnóstwo flowów,
+
+[816.0s -> 821.9s]
+i można używać Monday
+
+[821.9s -> 823.9s]
+jako infrastruktury.
+
+[823.9s -> 825.9s]
+I mnóstwo mnóstwo produktów,
+
+[825.9s -> 827.9s]
+jeśli chcesz używać go z twoim
+
+[827.9s -> 829.9s]
+i to też pracuje bardzo dobrze
+
+[829.9s -> 834.9s]
+z Monday Search.
+
+[834.9s -> 943.9s]
+Czy jeszcze jakieś pytania?
+
+[943.9s -> 967.3s]
+Dzień dobry, witam!
+
+[967.3s -> 973.8s]
+Dzisiaj jesteśmy z Wami,
+
+[973.8s -> 975.8s]
+chcę się z Wami porozmawiać.
+
+[975.8s -> 977.8s]
+Myślę, że to jest masywne
+
+[977.8s -> 979.8s]
+mieć w Warsaw
+
+[979.8s -> 982.0s]
+na dnia.
+
+[982.0s -> 984.0s]
+I mam nadzieję, że to tylko MVP,
+
+[984.0s -> 986.0s]
+bo ta era jest początkiem.
+
+[986.0s -> 988.2s]
+Ale...
+
+[988.2s -> 990.2s]
+No, chodźmy do rzeczy.
+
+[990.2s -> 992.2s]
+Cześć.
+
+[992.2s -> 994.4s]
+Jestem Michael
+
+[994.4s -> 996.4s]
+lub ja też,
+
+[996.4s -> 998.4s]
+jeśli chcesz.
+
+[998.4s -> 1000.4s]
+I grałem z LMS
+
+[1000.4s -> 1003.1s]
+na długo
+
+[1003.1s -> 1006.5s]
+przez 3 dni.
+
+[1006.5s -> 1008.5s]
+I...
+
+[1008.5s -> 1010.5s]
+Byłem wcześniej inżynier
+
+[1010.5s -> 1012.5s]
+na Postocku,
+
+[1012.5s -> 1014.5s]
+gdzie budowaliśmy mnóstwo
+
+[1014.5s -> 1016.5s]
+niesamowitych sprzętu
+
+[1016.5s -> 1018.7s]
+dla kultury.
+
+[1018.7s -> 1020.7s]
+Możeście usłyszeliśmy,
+
+[1020.7s -> 1022.7s]
+może nie,
+
+[1022.7s -> 1024.7s]
+ale to jest
+
+[1024.7s -> 1026.7s]
+całkowicie rzeczy, które robimy.
+
+[1026.7s -> 1028.7s]
+Wspanialiśmy
+
+[1028.7s -> 1030.7s]
+wszelkie rodzaje analizy
+
+[1030.7s -> 1032.7s]
+i sprzętu rola
+
+[1032.7s -> 1034.7s]
+w jednym z nich.
+
+[1034.7s -> 1036.7s]
+Ziel na koniec dnia
+
+[1036.7s -> 1038.7s]
+jest, by pomóc wam
+
+[1038.7s -> 1040.7s]
+zrozumieć
+
+[1040.7s -> 1042.7s]
+jak ludzie
+
+[1042.7s -> 1044.7s]
+używają ich produkty.
+
+[1046.9s -> 1048.9s]
+A więc, żebyście mogli
+
+[1048.9s -> 1051.3s]
+skupić sukcesywnych produktów.
+
+[1051.3s -> 1053.3s]
+I to jest bardzo dużo pracy.
+
+[1053.3s -> 1055.3s]
+Więc...
+
+[1057.6s -> 1059.6s]
+Powiedzcie, że chcesz
+
+[1059.6s -> 1061.6s]
+pomóc ludziom
+
+[1061.6s -> 1063.6s]
+z tym sprzętu rola.
+
+[1063.6s -> 1066.5s]
+Wspanialiśmy
+
+[1066.5s -> 1068.5s]
+pierwszą implementację
+
+[1068.5s -> 1070.5s]
+jakiegoś
+
+[1070.5s -> 1072.5s]
+rodzaju AI
+
+[1072.5s -> 1074.5s]
+lub LMS
+
+[1074.5s -> 1076.5s]
+w naszym aplikacji
+
+[1076.5s -> 1078.7s]
+2,5 lata temu,
+
+[1078.7s -> 1080.7s]
+co jest całkiem szale.
+
+[1080.7s -> 1082.7s]
+SQL Query
+
+[1082.7s -> 1084.8s]
+została zrobiona na precyzyjnym demo.
+
+[1084.8s -> 1086.8s]
+A więc
+
+[1086.8s -> 1088.8s]
+masz
+
+[1088.8s -> 1090.8s]
+jednoletna imputka,
+
+[1090.8s -> 1092.8s]
+masz button, a w końcu
+
+[1092.8s -> 1095.3s]
+masz SQL iOF,
+
+[1095.3s -> 1097.3s]
+zrobiona na precyzyjnym demo.
+
+[1097.3s -> 1099.3s]
+Było to absolutnie niepotrzebne
+
+[1099.3s -> 1101.3s]
+w rzeczywistości.
+
+[1101.3s -> 1103.3s]
+I więc,
+
+[1103.3s -> 1105.6s]
+2,5 lata temu,
+
+[1105.6s -> 1108.3s]
+wszystko się zmieniło
+
+[1108.3s -> 1110.3s]
+i
+
+[1110.3s -> 1112.4s]
+wyłączyliśmy
+
+[1112.4s -> 1114.4s]
+całkowicie
+
+[1114.4s -> 1116.5s]
+interfejs
+
+[1116.5s -> 1118.5s]
+z AI
+
+[1118.5s -> 1120.5s]
+dla naszego wcześniej
+
+[1120.5s -> 1122.5s]
+absolutnie nie
+
+[1122.5s -> 1124.6s]
+aplikacji z AI.
+
+[1124.6s -> 1126.8s]
+I więc,
+
+[1126.8s -> 1128.8s]
+myślę, że
+
+[1128.8s -> 1130.8s]
+było to extremnie
+
+[1130.8s -> 1132.8s]
+interesujące
+
+[1132.8s -> 1134.8s]
+budowanie.
+
+[1134.8s -> 1136.8s]
+A więc możecie mówić, że tylko
+
+[1136.8s -> 1138.8s]
+budowali to, bo przychodzili
+
+[1138.8s -> 1140.8s]
+do swojego home page.
+
+[1140.8s -> 1142.8s]
+Tak, absolutnie. Ale także,
+
+[1142.8s -> 1144.8s]
+bo to jest generalnie potrzebne,
+
+[1144.8s -> 1147.6s]
+i
+
+[1147.6s -> 1149.7s]
+w tej chwili
+
+[1149.7s -> 1151.7s]
+do tej pory procesowali
+
+[1151.7s -> 1153.7s]
+prawie miliony urządzeń,
+
+[1153.7s -> 1155.7s]
+więc nie mówcie o skala PTC,
+
+[1155.7s -> 1157.7s]
+ale każda jest bardzo ważna
+
+[1157.7s -> 1159.7s]
+sprawa,
+
+[1159.7s -> 1161.7s]
+w związku z data
+
+[1161.7s -> 1163.8s]
+analizy, data engineering
+
+[1163.8s -> 1165.8s]
+lub ustawienie
+
+[1165.8s -> 1167.8s]
+czegoś w
+
+[1167.8s -> 1169.8s]
+zrozumieniu
+
+[1169.8s -> 1171.8s]
+jak ludzie używają produktu.
+
+[1171.8s -> 1174.0s]
+Więc to góra między NBP
+
+[1174.0s -> 1176.0s]
+i paid product,
+
+[1176.0s -> 1178.0s]
+paid agent-agent product
+
+[1178.0s -> 1180.0s]
+to 2,5 lata
+
+[1180.0s -> 1182.0s]
+mniej więcej,
+
+[1182.0s -> 1184.1s]
+a więc
+
+[1184.1s -> 1186.1s]
+co się stało w czasie?
+
+[1186.1s -> 1189.4s]
+Dzisiaj chcę opowiedzieć
+
+[1189.4s -> 1191.7s]
+o 10
+
+[1191.7s -> 1193.7s]
+kontaktów
+
+[1193.7s -> 1195.7s]
+z launchingu
+
+[1195.7s -> 1197.7s]
+agent-agentu.
+
+[1197.7s -> 1199.7s]
+Może coś się stało,
+
+[1199.7s -> 1201.7s]
+może coś się stało,
+
+[1201.7s -> 1203.7s]
+może coś się stało.
+
+[1203.7s -> 1207.8s]
+Zobaczmy.
+
+[1207.8s -> 1209.8s]
+Mamy wiele błędów.
+
+[1209.8s -> 1211.8s]
+To jest generalnie
+
+[1211.8s -> 1213.8s]
+błędów.
+
+[1213.8s -> 1215.8s]
+Myślę, że jakieś przyjaciele
+
+[1215.8s -> 1218.0s]
+bardzo dobrze się sprowadzą
+
+[1218.0s -> 1220.0s]
+z tego, co Kuba mówi.
+
+[1220.0s -> 1222.0s]
+Ale ostatecznie,
+
+[1222.0s -> 1224.0s]
+najważniejszą rzeczą
+
+[1224.0s -> 1226.0s]
+była to,
+
+[1226.0s -> 1228.0s]
+że każda sceptika
+
+[1228.0s -> 1230.0s]
+i więc
+
+[1230.0s -> 1232.0s]
+z każdego modelu
+
+[1232.0s -> 1234.0s]
+wyjaśnionego
+
+[1234.0s -> 1236.0s]
+myślałem, że jest lepiej.
+
+[1236.0s -> 1238.0s]
+Zobaczymy jakieś poprawki.
+
+[1238.0s -> 1240.0s]
+I to jest trochę
+
+[1240.0s -> 1242.0s]
+deceptywne,
+
+[1242.0s -> 1244.0s]
+bo na koniec dnia
+
+[1244.0s -> 1246.0s]
+lub na koniec roku,
+
+[1246.0s -> 1248.0s]
+dwa lata temu,
+
+[1248.0s -> 1250.0s]
+modelowe poprawki
+
+[1250.0s -> 1252.0s]
+były absolutnie krityczne
+
+[1252.0s -> 1254.2s]
+do budowania czegoś potrzebnego.
+
+[1254.2s -> 1256.2s]
+I więc ten trend nie stopnie.
+
+[1256.2s -> 1258.2s]
+Wydaje mi się, że
+
+[1258.2s -> 1260.6s]
+to jest taki trend,
+
+[1260.6s -> 1262.6s]
+że skala
+
+[1262.6s -> 1264.6s]
+jest już zakończona,
+
+[1264.6s -> 1266.6s]
+tylko jedna osoba straci.
+

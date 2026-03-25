@@ -1,0 +1,161 @@
+3) Architektura RAG na Ollama (4B–8B) + Postgres (pgvector) zgodna z Twoimi zasadami
+
+Poniżej wersja “produkcyjnie sensowna”, bez pchania się w większe modele — zamiast tego maksymalizujemy retrieval, kontekst i strukturę.
+
+3.1. Komponenty
+
+1) Ollama Inference
+
+model 4B–8B do generacji: szybki, tani, stabilny
+
+osobny model embeddingów (nawet mały) – embeddingi robią największą robotę
+
+2) Postgres + pgvector
+
+jeden storage dla:
+
+chunków + embeddingów
+
+symbol table
+
+grafu zależności (edges)
+
+project memory
+
+logów retrieval
+
+3) Indexer (offline-first)
+
+incremental indexing:
+
+git diff / mtime
+
+kasowanie/aktualizacja tylko zmienionych dokumentów/chunków
+
+4) Graph Builder
+
+parser (minimálně):
+
+import graph
+
+file-to-file dependencies
+
+docelowo:
+
+symbol graph (call edges)
+
+config graph (env var usage, docker compose wiring)
+
+5) Retriever (dual)
+
+semantic topK z pgvector
+
+structural expansion po grafie:
+
+jeśli chunk dotyczy pliku X, dociągnij:
+
+importy
+
+wywoływane moduły
+
+definicje symboli
+
+config powiązany (np. ENV, compose service)
+
+6) Re-ranker (lekki)
+
+score = α * cosine_similarity + β * BM25 + γ * “graph distance bonus”
+
+żadnych dużych rerankerów, tylko sprytna heurystyka
+
+7) Prompt Composer
+
+składa kontekst:
+
+najpierw “project_memory facts”
+
+potem “core chunks”
+
+potem “graph neighbors”
+
+wymusza odpowiedź z:
+
+ścieżkami plików
+
+wskazaniem ryzyk
+
+proponowanymi testami
+
+3.2. Przepływ danych (end-to-end)
+
+Indexing pipeline
+
+scan repo → documents
+
+chunk → chunks (content + linie)
+
+embed chunk → chunks.embedding
+
+extract symbols → symbols
+
+build edges → edges
+
+bootstrap memory (“Project Map”) → project_memory
+
+Query pipeline
+
+user query
+
+pobierz memory facts (top relevant keys lub “core map”)
+
+vector search → topK chunks
+
+graph expansion (1–2 hops)
+
+re-rank
+
+compose prompt + context budget
+
+generate (Ollama; fallback Anthropic jeśli ustawione)
+
+log → retrieval_logs
+
+3.3. Minimalny schemat tabel (praktyczny)
+
+documents(path, hash, mtime, repo_id, type)
+
+chunks(document_id, chunk_index, content, start_line, end_line, embedding vector)
+
+symbols(name, kind, file_path, start_line, end_line, signature, docstring)
+
+edges(src_kind, src_id, dst_kind, dst_id, edge_type, weight)
+
+project_memory(key, value, confidence, updated_at, tags)
+
+retrieval_logs(query, topk, latency_ms, provider_used, context_tokens)
+
+To daje Ci kontekst strukturalny (graph), kontekst semantyczny (embeddings) i kontekst projektowy (memory) — bez gonienia większych modeli.
+
+Alternatywy / warianty (gdy chcesz iść mocniej)
+
+Hybrid search: pgvector + tsvector (Postgres full-text) w jednej kwerendzie.
+
+Repo multi-tenant: repo_id wszędzie + możliwość indeksowania wielu projektów.
+
+Policy layer: reguły “nie zmieniaj X bez ostrzeżenia” (pasuje do Twojego podejścia: nie psuć działających usług).
+
+Plan wdrożenia (praktyczny, bez wywracania stołu)
+
+Postaw docker-compose.ai-repo.yml (postgres+pgvector).
+
+Zrób indexer: documents+chunks+embeddings.
+
+Dodaj symbol extraction (minimum: importy + definicje).
+
+Dodaj graf edges (file import graph).
+
+Dodaj project_memory bootstrap (Project Map).
+
+Zrób query API/CLI z dual retrieval i cytowaniem plików.
+
+Dopiero na końcu: impact analysis (graph distance + “what breaks”).

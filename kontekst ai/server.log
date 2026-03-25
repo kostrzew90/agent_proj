@@ -1,0 +1,13 @@
+21:45:35 INFO     ai_repo.api.server — Mounted static files from C:\Users\DAMA\Documents\docker\n8n\kontekst ai\static
+21:45:35 INFO     chainlit — Loaded .env file
+21:45:37 INFO     ai_repo.api.server — Chainlit mounted at /chat
+INFO:     Started server process [9072]
+INFO:     Waiting for application startup.
+21:45:37 INFO     ai_repo.api.server — Database connected
+21:45:37 INFO     ai_repo.plugins.loader — Loaded plugin: plugin-template
+21:45:37 INFO     ai_repo.api.server — Loaded 1 plugins
+INFO:     Application startup complete.
+ERROR:    [Errno 10048] error while attempting to bind on address ('0.0.0.0', 8100): tylko jedno u¿ycie ka¿dego adresu gniazda (protokó³/adres sieciowy/port) jest normalnie dozwolone
+INFO:     Waiting for application shutdown.
+21:45:37 INFO     ai_repo.api.server — Shutting down
+INFO:     Application shutdown complete.

@@ -1,0 +1,988 @@
+# Transkrypcja: Intel.m4a
+# Długość: 1585.8s
+# Język: pl
+# Model: medium
+
+============================================================
+
+[2.7s -> 93.4s]
+Nie potrzebujesz już clouda, żeby wybrać modely w języku angielskim.
+
+[93.4s -> 95.4s]
+Możesz to wybrać w tym komputerze.
+
+[95.4s -> 99.4s]
+I ja zrobię live demo w 3 sztuczki, więc proszę mnie.
+
+[99.4s -> 102.5s]
+I oczywiście zacznijmy od wyczarowania.
+
+[102.5s -> 104.5s]
+Dlaczego musimy to wypełnić?
+
+[104.5s -> 108.5s]
+Ponieważ oczywiście trening modelu jest tylko pół drogi.
+
+[108.5s -> 109.5s]
+Treńmy na coś.
+
+[109.5s -> 111.5s]
+Treńmy model.
+
+[111.5s -> 113.5s]
+Albo używamy modelu pre-trening.
+
+[113.5s -> 118.5s]
+Aby to wypełnić i używać go w produkcji.
+
+[118.5s -> 120.5s]
+Co są opcje?
+
+[120.5s -> 123.5s]
+Dla wypełnienia oczywiście możemy używać klubu.
+
+[123.5s -> 126.5s]
+Nasz własny klub lub inne eksternalne API.
+
+[126.5s -> 130.5s]
+Gdy mamy bezpośrednio mniej komputacji i wymiany.
+
+[130.5s -> 133.5s]
+Ale w tym samym czasie ryzykujemy się na datę prywatnej.
+
+[133.5s -> 136.5s]
+Zbieramy się z internetem.
+
+[136.5s -> 138.5s]
+Możemy spowodować wyczarowanie.
+
+[138.5s -> 141.5s]
+Szczególnie jeśli internet jest nie perfekcyjny.
+
+[141.5s -> 144.5s]
+I mamy też nieprawdopodobne kosy.
+
+[144.5s -> 150.5s]
+Jest jeszcze jedna droga do wypełniania modelów.
+
+[150.5s -> 152.5s]
+Szczególnie LMS.
+
+[152.5s -> 156.5s]
+Możemy używać localnego API, localnego komputera.
+
+[156.5s -> 158.5s]
+I mamy oczywiście datę prywatną.
+
+[158.5s -> 161.5s]
+Kosy efekcyjne, większy kontrolę,
+
+[161.5s -> 163.5s]
+optymalna konsumpcja energii,
+
+[163.5s -> 166.5s]
+specjalne komputowanie.
+
+[166.5s -> 169.5s]
+Ale w tym samym czasie nie ma bezpośrednich.
+
+[169.5s -> 172.5s]
+Mamy bezpośrednio komputowane zasoby.
+
+[172.5s -> 176.5s]
+Pytanie jest, czy są tak bezpośrednie jak my myślmy?
+
+[176.5s -> 178.5s]
+I przygotowałem demo,
+
+[178.5s -> 182.5s]
+by wypełnić modely językowe na moją laptopę.
+
+[182.5s -> 184.5s]
+I zrobię to przed Wami.
+
+[184.5s -> 186.5s]
+Poczekaj.
+
+[186.5s -> 200.2s]
+Co ja zrobiłem?
+
+[200.2s -> 201.2s]
+Zacząłem to demo.
+
+[201.2s -> 203.2s]
+Wypełniło się localnie na moim komputerze.
+
+[203.2s -> 205.2s]
+Można zobaczyć lokalne kosy tutaj, prawda?
+
+[205.2s -> 207.2s]
+W tym wypowiadaniu,
+
+[207.2s -> 209.2s]
+pokażę wam, co robię.
+
+[209.2s -> 211.2s]
+Ale teraz chcę pokazać coś.
+
+[211.2s -> 213.2s]
+Używam modelu Quinn3, 8 milionów.
+
+[213.2s -> 215.2s]
+Jestem bardzo szczęśliwy,
+
+[215.2s -> 218.2s]
+że Grek wspominał to w poprzednim wypowiedziu.
+
+[218.2s -> 220.2s]
+Ponieważ model jest myślenia,
+
+[220.2s -> 224.2s]
+a ja nie jestem bardzo fanem tego myślenia,
+
+[224.2s -> 226.2s]
+to po prostu nie myślę.
+
+[226.2s -> 229.2s]
+Zobaczymy te rezultaty cały czas.
+
+[229.2s -> 231.2s]
+Zapytajcie mnie,
+
+[231.2s -> 237.8s]
+co są opcjony do wypełniania LLMs.
+
+[237.8s -> 242.2s]
+Zobaczycie teraz odpowiedzialność.
+
+[242.2s -> 246.2s]
+Aby pokazać, że nie skupiam się z jakimiś cloudami,
+
+[246.2s -> 249.2s]
+otwieram to i pokażę wam mój GPU.
+
+[249.2s -> 251.2s]
+I ten GPU,
+
+[251.2s -> 253.2s]
+co jest śmieszne,
+
+[253.2s -> 255.2s]
+to integrowany GPU.
+
+[255.2s -> 257.2s]
+Nie ma żadnej dyskretowej GPU karty.
+
+[257.2s -> 260.2s]
+Jak widać, to Intel Arc 140V,
+
+[260.2s -> 262.2s]
+która jest częścią twojej CPU.
+
+[262.2s -> 265.2s]
+Więc nie używam żadnej dyskretowej GPU karty,
+
+[265.2s -> 269.2s]
+ani żadnej rozwiązania internetowej.
+
+[269.2s -> 271.2s]
+Jak widać,
+
+[271.2s -> 273.2s]
+mamy całkiem dobre odpowiedzialności.
+
+[273.2s -> 274.2s]
+Znaczy,
+
+[274.2s -> 276.2s]
+w porządku,
+
+[276.2s -> 278.2s]
+oczywiście nie jest tak szybko,
+
+[278.2s -> 280.2s]
+jak gdybyś użył CharGPT.
+
+[280.2s -> 282.2s]
+Ale pytanie jest, czy musisz
+
+[282.2s -> 284.2s]
+szybciej grubić?
+
+[284.2s -> 286.2s]
+W większości przypadków,
+
+[286.2s -> 288.4s]
+to jest absolutnie wystarczająco.
+
+[288.4s -> 290.4s]
+Ok, więc czekajmy na to,
+
+[290.4s -> 292.4s]
+zanim to skończy.
+
+[292.4s -> 294.4s]
+A więc możemy zmienić się do modelu Yandere.
+
+[294.4s -> 296.4s]
+Ten model został skupiony
+
+[296.4s -> 298.4s]
+do używania integrowanych GPU,
+
+[298.4s -> 300.4s]
+ale to nie tylko to,
+
+[300.4s -> 302.4s]
+co mam tutaj.
+
+[302.4s -> 304.4s]
+Więc co mam tutaj,
+
+[304.4s -> 306.4s]
+pozwól mi otworzyć znowu Tasks Manager,
+
+[306.4s -> 308.4s]
+zobaczysz,
+
+[308.4s -> 310.8s]
+że mamy CPU
+
+[310.8s -> 313.6s]
+razem z IGPU
+
+[313.6s -> 315.6s]
+i NPU,
+
+[315.6s -> 317.6s]
+które to jest Mural Processing Unit.
+
+[317.6s -> 319.6s]
+Wszystkie te urządzenia
+
+[319.6s -> 321.6s]
+są w tym samym chipie.
+
+[321.6s -> 323.6s]
+Ten chip, który pokazuję ci teraz,
+
+[323.6s -> 325.6s]
+ten mały urząd,
+
+[325.6s -> 327.6s]
+ten nawet z pamięcią,
+
+[327.6s -> 329.6s]
+jest w stanie urządzić
+
+[329.6s -> 331.7s]
+LLMS,
+
+[331.7s -> 333.9s]
+które widać tutaj
+
+[333.9s -> 336.0s]
+na ekranie.
+
+[336.0s -> 338.0s]
+Dobrze, teraz pozwól mi
+
+[338.0s -> 340.0s]
+zmienić...
+
+[340.0s -> 342.0s]
+Oczywiście nie zaznaczam
+
+[342.0s -> 344.0s]
+akurat odpowiedzi,
+
+[344.0s -> 346.0s]
+model to nie mój model,
+
+[346.0s -> 348.0s]
+to QN3, to open-source model,
+
+[348.0s -> 350.0s]
+więc wziąłem go z internetu.
+
+[350.0s -> 352.0s]
+Więc teraz zmieniamy do drugiego,
+
+[352.0s -> 354.0s]
+może zacznę nową rozmowę,
+
+[354.0s -> 356.0s]
+poproszę o to samo.
+
+[356.0s -> 358.0s]
+Zmieniamy do drugiego modelu,
+
+[358.0s -> 360.0s]
+właśnie ten sam model,
+
+[360.0s -> 362.0s]
+ale kompilowany na NPU.
+
+[362.0s -> 364.0s]
+Teraz użyję NPU
+
+[364.0s -> 366.0s]
+i chcę użyć tego samego mode'a,
+
+[366.0s -> 368.7s]
+więc nic.
+
+[374.0s -> 376.3s]
+I jakie są opcje
+
+[376.3s -> 378.3s]
+dla LLM deployment'a?
+
+[382.1s -> 384.1s]
+Zobaczmy.
+
+[384.1s -> 386.1s]
+Nie ma nic ważnego teraz,
+
+[386.1s -> 388.1s]
+GPU powinien być
+
+[388.1s -> 390.1s]
+bez komputacji.
+
+[390.1s -> 392.1s]
+Zmieniamy jeszcze jedną
+
+[392.1s -> 394.1s]
+opcję do NPU
+
+[394.1s -> 396.1s]
+i dostajemy odpowiedź.
+
+[396.1s -> 398.1s]
+A teraz możemy zobaczyć,
+
+[398.1s -> 400.1s]
+że używamy NPU.
+
+[400.1s -> 402.1s]
+Wymiar jest podobny,
+
+[402.1s -> 404.1s]
+więc możemy zobaczyć, że jest
+
+[404.1s -> 406.1s]
+całkiem dobry,
+
+[406.1s -> 408.1s]
+przynajmniej więcej niż 10 tokonów w sekundę.
+
+[408.1s -> 410.1s]
+Dlaczego my mówimy, że 10 tokonów w sekundę
+
+[410.1s -> 412.1s]
+jest dobrym kosztem?
+
+[412.1s -> 414.1s]
+Bo ludzie czytają na obiektie
+
+[414.1s -> 416.1s]
+10 tokonów w sekundę,
+
+[416.1s -> 418.2s]
+więc wszystko, co jest szybciej,
+
+[418.2s -> 420.4s]
+to jest to, że rządzimy na NPU.
+
+[420.4s -> 422.4s]
+Dlaczego mamy dwa
+
+[422.4s -> 424.4s]
+różne opcje, które możemy rządzić na NPU?
+
+[424.4s -> 426.4s]
+Oczywiście, możemy nawet rządzić na CPU,
+
+[426.4s -> 428.4s]
+ale to będzie trochę szybciej,
+
+[428.4s -> 430.4s]
+bo CPU nie jest złożony
+
+[430.4s -> 432.4s]
+do rządzenia inferencji do AI.
+
+[432.4s -> 434.6s]
+GPU, oczywiście,
+
+[434.6s -> 436.6s]
+został stworzony dla grafiki i tak dalej.
+
+[436.6s -> 438.6s]
+NPU jest specjalnie złożony
+
+[438.6s -> 440.6s]
+dla nieru networku
+
+[440.6s -> 442.6s]
+i inferencji,
+
+[442.6s -> 444.6s]
+ponieważ jest dobry
+
+[444.6s -> 446.6s]
+dla matrycy i modyfikacji.
+
+[446.6s -> 448.6s]
+I w tym samym czasie
+
+[448.6s -> 450.6s]
+to trochę mniej potężnego.
+
+[450.6s -> 452.6s]
+Jeśli popatrzymy na potężne używanie
+
+[452.6s -> 454.6s]
+GPU,
+
+[454.6s -> 456.6s]
+bo nie mamy już tego historii,
+
+[456.6s -> 458.6s]
+możemy zobaczyć,
+
+[458.6s -> 460.6s]
+że teraz używamy
+
+[460.6s -> 462.6s]
+około 20 W
+
+[462.6s -> 464.6s]
+rządzimy na NPU.
+
+[464.6s -> 466.6s]
+Jeśli użyjemy GPU, to będzie
+
+[466.6s -> 468.6s]
+5 W więcej, czy coś takiego.
+
+[468.6s -> 470.6s]
+Nie mam tutaj tego data.
+
+[470.6s -> 472.6s]
+Rządzę to jeszcze raz,
+
+[472.6s -> 474.6s]
+więc możecie to zobaczyć.
+
+[474.6s -> 476.6s]
+Zacznijmy od poprzedniego.
+
+[476.6s -> 479.1s]
+To było 20 W.
+
+[479.1s -> 481.1s]
+Kiedy użyliśmy NPU,
+
+[481.1s -> 483.1s]
+w tej chwili
+
+[483.1s -> 485.1s]
+to było 5-6 W.
+
+[485.1s -> 487.1s]
+Kiedy użyliśmy GPU,
+
+[487.1s -> 489.1s]
+powiedzmy,
+
+[489.1s -> 491.1s]
+znowu,
+
+[491.1s -> 495.0s]
+nic nie ma,
+
+[495.0s -> 497.0s]
+bo nie chcę
+
+[497.0s -> 499.0s]
+dłuższej odpowiedzi.
+
+[499.0s -> 501.0s]
+Zobaczymy, że rządzi się na GPU.
+
+[501.0s -> 503.0s]
+Znowu, to było bardzo szybko.
+
+[503.0s -> 505.2s]
+Ok,
+
+[505.2s -> 507.2s]
+zacznijmy od tego.
+
+[507.2s -> 509.2s]
+Zobaczymy
+
+[509.2s -> 511.2s]
+performance
+
+[511.2s -> 513.2s]
+i potężne używanie.
+
+[513.2s -> 515.2s]
+Teraz jest 26-27 W.
+
+[515.2s -> 517.2s]
+Jeśli zbieramy od 7-6 W
+
+[517.2s -> 519.2s]
+w tej chwili,
+
+[519.2s -> 521.2s]
+rządzi się na NPU
+
+[521.2s -> 523.2s]
+13 W więcej,
+
+[523.2s -> 525.2s]
+a na GPU 20 W więcej.
+
+[525.2s -> 527.2s]
+NPU
+
+[527.2s -> 529.2s]
+zajmuje 60%
+
+[529.2s -> 531.2s]
+potężnego GPU.
+
+[531.2s -> 533.2s]
+To jest dobrze,
+
+[533.2s -> 535.2s]
+bo należy o baterię
+
+[535.2s -> 537.2s]
+na przykład.
+
+[537.2s -> 539.2s]
+Dlatego NPU jest dobry
+
+[539.2s -> 541.3s]
+dla takich aplikacji.
+
+[541.3s -> 543.3s]
+Ale oczywiście,
+
+[543.3s -> 545.3s]
+integrowany GPU
+
+[545.3s -> 547.3s]
+można używać.
+
+[547.3s -> 549.4s]
+Wracamy do tekstu,
+
+[549.4s -> 551.4s]
+a potem powiem wam,
+
+[551.4s -> 553.6s]
+co zrobiłem,
+
+[553.6s -> 565.4s]
+aby osiągnąć ten rezultat.
+
+[565.4s -> 567.4s]
+Znaczenie.
+
+[567.4s -> 569.4s]
+To tylko 50%
+
+[569.4s -> 571.4s]
+pracy.
+
+[571.4s -> 573.4s]
+To jest bardzo ważne.
+
+[573.4s -> 575.4s]
+Zatem,
+
+[575.4s -> 577.4s]
+optymizacja jest bardzo ważna.
+
+[577.4s -> 579.7s]
+Oto rozwiązanie. Co zrobiłem?
+
+[579.7s -> 581.7s]
+Użyłem
+
+[581.7s -> 583.7s]
+Intel Core Ultra
+
+[583.7s -> 585.7s]
+z 3 różnych urządzeń,
+
+[585.7s -> 587.7s]
+który już mówiłem.
+
+[587.7s -> 589.7s]
+CPU, dobry dla szybkiej respondy,
+
+[589.7s -> 591.7s]
+GPU dla wysokiej prędkości
+
+[591.7s -> 593.7s]
+i NPU dla silnej efecyjności.
+
+[593.7s -> 596.1s]
+I już pokazano to na GPU i NPU.
+
+[596.1s -> 598.1s]
+A teraz, co potrzebuję?
+
+[598.1s -> 600.1s]
+Muszę też mieć wystarczająco dużo pamięci,
+
+[600.1s -> 602.1s]
+ponieważ robimy model 8V,
+
+[602.1s -> 604.1s]
+więc musimy mieć
+
+[604.1s -> 606.2s]
+około 32 GB
+
+[606.2s -> 608.2s]
+i około 0.32 GB.
+
+[608.2s -> 610.2s]
+Tak, to prawda.
+
+[610.2s -> 612.2s]
+Używaliśmy kwalifikacji.
+
+[612.2s -> 614.2s]
+Mówię trochę później o tym,
+
+[614.2s -> 616.2s]
+więc nie musieliśmy mieć 32 GB.
+
+[616.2s -> 618.2s]
+I to, co mieliśmy,
+
+[618.2s -> 620.2s]
+to było 28 GB.
+
+[620.2s -> 622.2s]
+I jak to jest możliwe?
+
+[622.2s -> 624.2s]
+Zazwyczaj, IGPU
+
+[624.2s -> 626.2s]
+ma tylko pół memory
+
+[626.2s -> 628.2s]
+czy system memory.
+
+[628.2s -> 630.2s]
+Gdybym mógł użyć tylko 16 GB w tym komputerze,
+
+[630.2s -> 632.2s]
+to ja bym mógł
+
+[632.2s -> 634.2s]
+użyć tylko 16 GB.
+
+[634.2s -> 636.2s]
+No, to było prawda
+
+[636.2s -> 638.2s]
+w przeszłości, ale teraz
+
+[638.2s -> 640.2s]
+można zmienić ten behavior
+
+[640.2s -> 642.2s]
+w lepszym samochodzie.
+
+[642.2s -> 644.2s]
+Można zmienić, jak dużo pamięci
+
+[644.2s -> 646.2s]
+jest dedykowany do twojej integracyjnej GPU i NPU.
+
+[646.2s -> 648.2s]
+I można zwiększyć to do 87%.
+
+[648.2s -> 650.2s]
+I bardzo polecam
+
+[650.2s -> 652.2s]
+to zrobić, zwłaszcza jeśli robimy
+
+[652.2s -> 654.2s]
+jakiś AI, ponieważ potrzebujesz
+
+[654.2s -> 656.2s]
+tego pamięci.
+
+[656.2s -> 658.2s]
+A teraz rozmawiamy o
+
+[658.2s -> 660.2s]
+właściwym softwarem. Co ja użyłem,
+
+[660.2s -> 662.2s]
+to było OpenVino Model Server.
+
+[662.2s -> 664.2s]
+To jest część naszej OpenVino Toolkit.
+
+[664.2s -> 666.2s]
+Będę wam wkrótce dowiedzieć.
+
+[666.2s -> 668.2s]
+OpenVino Model Server to
+
+[668.2s -> 670.2s]
+rozwiązanie do usługowania modelów.
+
+[670.2s -> 672.2s]
+To przynosi wam api,
+
+[672.2s -> 674.2s]
+które możecie skończyć
+
+[674.2s -> 676.2s]
+z twojej aplikacji
+
+[676.2s -> 678.2s]
+i możecie dostać odpowiedź.
+
+[678.2s -> 680.2s]
+Na przykład, możesz skończyć
+
+[680.2s -> 682.2s]
+banana-image i dostaniecie
+
+[682.2s -> 684.2s]
+predykcję, że to banana,
+
+[684.2s -> 686.2s]
+ale oczywiście możesz zrobić to samo
+
+[686.2s -> 688.2s]
+z language mode'em. Możesz skończyć
+
+[688.2s -> 690.2s]
+pytania lub komentarze, a możesz dostawać
+
+[690.2s -> 692.2s]
+odpowiedź z stream mode'em
+
+[692.2s -> 694.2s]
+również. I jak
+
+[694.2s -> 696.2s]
+używać OpenVino Model Server?
+
+[696.2s -> 698.2s]
+Co musisz zrobić w dokarze?
+
+[698.2s -> 700.2s]
+Po prostu
+
+[700.2s -> 702.2s]
+dowoduj model z użyciem tego komentarza
+
+[702.2s -> 704.2s]
+i equals quen3ab
+
+[704.2s -> 706.2s]
+w 4, jak już wspomniałem.
+
+[706.2s -> 708.2s]
+Następnie dodajesz model do
+
+[708.2s -> 710.2s]
+konfigu, a następnie
+
+[710.2s -> 712.2s]
+spróbujesz dokarować z obms
+
+[712.2s -> 714.2s]
+z OpenVino Model Server
+
+[714.2s -> 716.2s]
+i to jest to. Dla Windows jest
+
+[716.2s -> 718.2s]
+trochę trudniejsze, bo
+
+[718.2s -> 720.2s]
+wiem, że dokarze nie są
+
+[720.2s -> 722.2s]
+najlepszą rozwiązaniem dla Windows,
+
+[722.2s -> 724.2s]
+więc to nie działa. No więc
+
+[724.2s -> 726.2s]
+to, co przynosimy tutaj, jest
+
+[726.2s -> 728.2s]
+executable obms,
+
+[728.2s -> 730.2s]
+gdy robisz dokładnie to samo. Gdy
+
+[730.2s -> 732.2s]
+podłączysz model, dodajesz
+
+[732.2s -> 734.2s]
+do konfigu i spróbujesz
+
+[734.2s -> 736.5s]
+obms. Ale to jest
+
+[736.5s -> 738.5s]
+wysokość modelów,
+
+[738.5s -> 740.6s]
+wysokość modelów,
+
+[740.6s -> 742.6s]
+ale jak pracuje
+
+[742.6s -> 744.6s]
+konfigurę wewnątrz? Wiemy, że
+
+[744.6s -> 746.6s]
+to jest trudne, ale software
+
+[746.6s -> 748.6s]
+używa OpenVino.
+
+[748.6s -> 750.6s]
+OpenVino jest naszą
+
+[750.6s -> 752.6s]
+rozwiązaniem, a to jest
+
+[752.6s -> 754.6s]
+rozwiązanie open source do
+
+[754.6s -> 756.8s]
+optymizowania i dokończenia AI
+
+[756.8s -> 758.8s]
+konfigury. Zaczęło się w 2018
+
+[758.8s -> 760.8s]
+jako open visual
+
+[760.8s -> 762.8s]
+konfigurę i neural network
+
+[762.8s -> 764.8s]
+optymizacja, ale to było tylko
+
+[764.8s -> 766.8s]
+na początku. W tej chwili supportuje
+
+[766.8s -> 768.8s]
+wszelki rodzaj AI konfigury
+
+[768.8s -> 770.8s]
+audio, język model,
+
+[770.8s -> 772.8s]
+gen. AI, transformacja, cokolwiek, prawda?
+
+[772.8s -> 774.8s]
+I jak wspomniałem, to jest bardzo ważne,
+
+[774.8s -> 776.8s]
+że jest open source, więc można używać w każdym
+
+[776.8s -> 778.8s]
+rodzaju aplikacjach, nawet komersywnych,
+
+[778.8s -> 780.8s]
+i oczywiście jest to licencja
+
+[780.8s -> 782.8s]
+pod Apache 2.0.
+
+[782.8s -> 784.8s]
+Więc jak to używać? Mimo
+
+[784.8s -> 785.8s]
+że możesz używać jakichkolwiek z tych
+
+[785.8s -> 787.8s]
+frameworków, masz model N,
+
+[787.8s -> 789.8s]
+jak PyTorch, TensorFlow, Keras,
+
+[789.8s -> 791.8s]
+ONNX, czy cokolwiek.
+
+[791.8s -> 793.8s]
+Wtedy konwerujesz model do
+
+[793.8s -> 794.8s]
+formatu built in Dino i będziesz mógł
+
+[794.8s -> 796.8s]
+pracować na wersji
+
+[796.8s -> 798.8s]
+Intel hardware, jak CPU,
+
+[798.8s -> 800.8s]
+integrowane GPU,
+
+[800.8s -> 802.8s]
+ale także dyskretne GPU z mental,
+
+[802.8s -> 804.8s]
+NPU i FPGA,
+
+[804.8s -> 806.8s]
+a oczywiście to pracuje
+
+[806.8s -> 808.8s]
+na systemie operacyjnej, Windows, Linux,
+
+[808.8s -> 811.3s]
+Mac. Ale
+
+[811.3s -> 813.3s]
+OpenVino jest
+
+[813.3s -> 815.3s]
+jak toolkit, prawda?
+
+[815.3s -> 817.3s]
+Ale to, co my specyficznie używamy
+
+[817.3s -> 819.3s]
+dla gen.ai, dla język modelów,
+
+[819.3s -> 821.3s]
+jest openvino-gen.ai
+
+[821.3s -> 823.4s]
+pakiet. I mamy
+
+[823.4s -> 825.4s]
+różne pipeline tutaj
+
+[825.4s -> 827.4s]
+na teksie generacji, na rag pipelines,
+

@@ -1,0 +1,8 @@
+**Score:** 0.0154
+
+```
+\- Aplikacja: Python (FastAPI) lub Node (Fastify) – wybierz Python jeśli repo jest pythonowe, inaczej Node. 
+
+\- CLI: komenda `ai\_repo index`, `ai\_repo query`, `ai\_repo graph`, `ai\_repo explain`.
+
+```

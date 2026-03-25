@@ -1,0 +1,28 @@
+# Dependencies & caches
+__pycache__/
+*.pyc
+node_modules/
+.venv/
+venv/
+
+# Secrets
+.env
+*.key
+
+# IDE & tools
+.vscode/
+.idea/
+.claude/
+.chainlit/
+
+# OS
+.DS_Store
+Thumbs.db
+nul
+
+# Large/external dirs
+n8n-docs/
+llmday/*.m4a
+
+# Docker volumes
+postgres-data/

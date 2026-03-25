@@ -1,0 +1,44 @@
+# === Web Framework ===
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+
+# === Database ===
+sqlalchemy[asyncio]==2.0.36
+asyncpg==0.30.0
+psycopg2-binary==2.9.10
+pgvector==0.3.6
+alembic==1.14.1
+
+# === Auth ===
+pyjwt==2.10.1
+bcrypt==4.2.1
+passlib[bcrypt]==1.7.4
+
+# === Config ===
+pydantic-settings==2.7.1
+python-dotenv==1.0.1
+
+# === Task Queue ===
+celery[redis]==5.4.0
+redis==5.2.1
+
+# === Document Processing (Docling) ===
+docling>=2.70.0
+docling-core>=2.0.0
+
+# === Chunking & NLP ===
+tiktoken==0.8.0
+
+# === HTTP Client ===
+httpx==0.28.1
+aiofiles==24.1.0
+
+# === Watch Folder ===
+watchdog==6.0.0
+
+# === LangFuse ===
+langfuse==2.58.0
+
+# === Utilities ===
+orjson==3.10.14

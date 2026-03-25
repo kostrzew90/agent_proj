@@ -1,0 +1,33 @@
+# Streamlit GUI
+streamlit>=1.31.0
+
+# Database
+psycopg2-binary>=2.9.9
+pgvector>=0.2.4
+sqlalchemy>=2.0.25
+
+# Data processing
+pandas>=2.2.0
+numpy>=1.26.3
+
+# Charts
+plotly>=5.18.0
+
+# HTTP requests
+requests>=2.31.0
+httpx>=0.26.0
+
+# Scheduling
+apscheduler>=3.10.4
+
+# GATE.io API
+gate-api>=4.66.0
+
+# Async
+aiohttp>=3.9.3
+
+# Environment
+python-dotenv>=1.0.0
+
+# Typing
+pydantic>=2.5.3

@@ -1,0 +1,7 @@
+# Transkrypcja: Hacker I zyd amazon.m4a
+# Długość: 4271.0s
+# Język: pl
+# Model: large-v3
+
+============================================================
+

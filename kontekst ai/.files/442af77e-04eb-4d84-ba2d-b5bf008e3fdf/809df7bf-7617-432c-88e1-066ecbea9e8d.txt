@@ -1,0 +1,12 @@
+**Score:** 0.0161
+
+```
+Dopiero potem: “plugin install z GitHub” + pin do commita + allowlist permissions.
+
+
+
+
+Czy RAG w tym zadaniu ma sens?
+
+Tak — ale nie jako “magiczne szukanie w logach”, tylko jako warstwa kontekstu dla
+```

@@ -1,0 +1,52 @@
+services:
+  vinhunter-db:
+    image: postgres:16-alpine
+    container_name: vinhunter-db
+    environment:
+      POSTGRES_USER: vinhunter
+      POSTGRES_PASSWORD: vinhunterpass
+      POSTGRES_DB: vinhunter
+    volumes:
+      - vinhunter-db-data:/var/lib/postgresql/data
+      - ./backend/db-init:/docker-entrypoint-initdb.d
+    ports:
+      - "5436:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vinhunter"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  vinhunter-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: vinhunter-backend
+    depends_on:
+      vinhunter-db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://vinhunter:vinhunterpass@vinhunter-db:5432/vinhunter
+      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
+    env_file:
+      - .env
+    volumes:
+      - vinhunter-reports:/app/reports
+      - vinhunter-screenshots:/app/screenshots
+    ports:
+      - "8200:8200"
+
+  vinhunter-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: vinhunter-frontend
+    depends_on:
+      - vinhunter-backend
+    ports:
+      - "3010:80"
+
+volumes:
+  vinhunter-db-data:
+  vinhunter-reports:
+  vinhunter-screenshots:

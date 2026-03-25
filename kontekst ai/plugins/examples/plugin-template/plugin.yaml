@@ -1,0 +1,7 @@
+name: plugin-template
+version: "0.1.0"
+description: Minimal example plugin for ai-repo
+entrypoint: __init__.py
+permissions:
+  network: false
+  capabilities: []

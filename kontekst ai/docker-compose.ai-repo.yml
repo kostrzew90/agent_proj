@@ -1,0 +1,22 @@
+services:
+  ai-repo-postgres:
+    image: pgvector/pgvector:pg16
+    container_name: ai-repo-postgres
+    ports:
+      - "${AI_REPO_DB_PORT:-5435}:5432"
+    environment:
+      POSTGRES_USER: ${AI_REPO_DB_USER:-ai_repo}
+      POSTGRES_PASSWORD: ${AI_REPO_DB_PASSWORD:-ai_repo_pass}
+      POSTGRES_DB: ${AI_REPO_DB_NAME:-ai_repo}
+    volumes:
+      - ai_repo_pgdata:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ai_repo"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  ai_repo_pgdata:

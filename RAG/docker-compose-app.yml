@@ -1,0 +1,65 @@
+services:
+  # ============================================================
+  # FastAPI Backend
+  # ============================================================
+  rag-api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: rag-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      RAG_DB_HOST: rag-postgres
+      RAG_DB_PORT: 5432
+      REDIS_URL: redis://rag-redis:6379/0
+    volumes:
+      - rag-uploads:/data/uploads
+      - rag-watch:/data/watch
+    depends_on:
+      rag-postgres:
+        condition: service_healthy
+      rag-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ============================================================
+  # Celery Worker (document processing)
+  # ============================================================
+  rag-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: rag-worker
+    restart: unless-stopped
+    command: celery -A tasks.celery_app worker --loglevel=info --concurrency=2 -Q default,documents,crawl
+    env_file:
+      - .env
+    environment:
+      RAG_DB_HOST: rag-postgres
+      RAG_DB_PORT: 5432
+      REDIS_URL: redis://rag-redis:6379/0
+    volumes:
+      - rag-uploads:/data/uploads
+      - rag-watch:/data/watch
+    depends_on:
+      rag-postgres:
+        condition: service_healthy
+      rag-redis:
+        condition: service_healthy
+
+volumes:
+  rag-uploads:
+  rag-watch:
+
+networks:
+  default:
+    name: rag-network
+    external: true

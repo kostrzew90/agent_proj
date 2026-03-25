@@ -1,0 +1,10 @@
+**Score:** 0.0159
+
+```
+# Plan: AI-Aware Repo — Pełna implementacja
+
+## Context
+
+Budujemy **samodzielne, czyste narzędzie developerskie** ("AI-aware repo") które:
+- Indeksuje **dowolne** repo do Postgres (pgvector) z embeddi
+```

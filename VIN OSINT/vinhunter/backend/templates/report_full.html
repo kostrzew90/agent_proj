@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VINhunter — Raport {{ scan.vin }}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 2rem 1rem; }
+  h1 { font-size: 1.8rem; font-weight: 700; color: #38bdf8; margin-bottom: 0.25rem; }
+  h2 { font-size: 1.2rem; font-weight: 600; color: #94a3b8; margin: 2rem 0 1rem; border-bottom: 1px solid #1e293b; padding-bottom: 0.5rem; }
+  h3 { font-size: 1rem; font-weight: 600; color: #cbd5e1; margin-bottom: 0.5rem; }
+  .meta { color: #64748b; font-size: 0.85rem; margin-bottom: 2rem; }
+  .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+  .stat { background: #1e293b; border-radius: 8px; padding: 1rem; text-align: center; }
+  .stat .num { font-size: 2rem; font-weight: 700; }
+  .stat .label { font-size: 0.75rem; color: #64748b; text-transform: uppercase; }
+  .green { color: #22c55e; }
+  .red { color: #ef4444; }
+  .yellow { color: #eab308; }
+  .blue { color: #38bdf8; }
+  .vin-data { background: #1e293b; border-radius: 8px; padding: 1.5rem; margin-bottom: 2rem; }
+  .vin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.75rem; }
+  .vin-field { background: #0f172a; border-radius: 6px; padding: 0.75rem; }
+  .vin-field .key { font-size: 0.7rem; text-transform: uppercase; color: #64748b; margin-bottom: 0.25rem; }
+  .vin-field .val { font-size: 0.95rem; font-weight: 500; }
+  .source-card { background: #1e293b; border-radius: 8px; padding: 1.25rem; margin-bottom: 0.75rem; }
+  .source-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; }
+  .badge { font-size: 0.7rem; padding: 0.2rem 0.6rem; border-radius: 9999px; font-weight: 600; }
+  .badge-done { background: #14532d; color: #22c55e; }
+  .badge-error { background: #450a0a; color: #ef4444; }
+  .badge-no_data { background: #1e293b; color: #64748b; border: 1px solid #334155; }
+  .badge-captcha_timeout { background: #422006; color: #f59e0b; }
+  .data-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  .data-table td { padding: 0.4rem 0.6rem; border-bottom: 1px solid #1e293b; }
+  .data-table td:first-child { color: #94a3b8; width: 40%; }
+  .photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.75rem; margin-top: 1rem; }
+  .photo-thumb { background: #1e293b; border-radius: 6px; overflow: hidden; }
+  .photo-thumb img { width: 100%; height: 120px; object-fit: cover; }
+  .photo-thumb .ctx { font-size: 0.7rem; padding: 0.4rem; color: #94a3b8; }
+  details summary { cursor: pointer; list-style: none; }
+  details summary::after { content: " ▼"; font-size: 0.7rem; color: #64748b; }
+  details[open] summary::after { content: " ▲"; }
+  .footer { text-align: center; color: #334155; font-size: 0.75rem; margin-top: 3rem; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>VINhunter — Raport OSINT</h1>
+  <div class="meta">
+    VIN: <strong>{{ scan.vin }}</strong>
+    {% if scan.plate %} &nbsp;·&nbsp; Tablica: <strong>{{ scan.plate }}</strong>{% endif %}
+    &nbsp;·&nbsp; Wygenerowano: {{ generated_at[:19].replace("T"," ") }} UTC
+  </div>
+
+  <div class="summary">
+    <div class="stat"><div class="num blue">{{ total }}</div><div class="label">Źródeł</div></div>
+    <div class="stat"><div class="num green">{{ done }}</div><div class="label">Znaleziono</div></div>
+    <div class="stat"><div class="num yellow">{{ total - done - errors }}</div><div class="label">Brak danych</div></div>
+    <div class="stat"><div class="num red">{{ errors }}</div><div class="label">Błędy</div></div>
+  </div>
+
+  {% if scan.decoded_data %}
+  <h2>Dane pojazdu (VIN Decode)</h2>
+  <div class="vin-data">
+    <div class="vin-grid">
+      {% for key, val in scan.decoded_data.items() %}
+      <div class="vin-field">
+        <div class="key">{{ key.replace("_"," ") }}</div>
+        <div class="val">{{ val }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% for category, results in grouped_results.items() %}
+  <h2>{{ category.replace("_"," ").title() }}</h2>
+  {% for result in results %}
+  <div class="source-card">
+    <div class="source-header">
+      <span><strong>{{ result.source_name }}</strong></span>
+      <span class="badge badge-{{ result.status }}">{{ result.status }}</span>
+      {% if result.execution_time_ms %}<span style="color:#475569;font-size:.75rem;">{{ result.execution_time_ms }}ms</span>{% endif %}
+    </div>
+
+    {% if result.status == "done" and result.data %}
+    <details open>
+      <summary>Wyniki</summary>
+      <table class="data-table" style="margin-top:.75rem">
+        {% for k, v in result.data.items() %}
+        {% if k not in ["mot_tests"] %}
+        <tr><td>{{ k.replace("_"," ") }}</td><td>{{ v }}</td></tr>
+        {% endif %}
+        {% endfor %}
+      </table>
+      {% if result.data.get("mot_tests") %}
+      <details style="margin-top:.75rem">
+        <summary style="color:#94a3b8;font-size:.85rem">Historia MOT ({{ result.data.mot_tests|length }} wpisów)</summary>
+        {% for test in result.data.mot_tests %}
+        <div style="background:#0f172a;border-radius:6px;padding:.75rem;margin:.5rem 0;font-size:.8rem">
+          <strong>{{ test.completedDate[:10] if test.completedDate else "?" }}</strong>
+          — {{ test.testResult }}
+          {% if test.odometerValue %} — {{ test.odometerValue }} {{ test.odometerUnit }}{% endif %}
+          {% if test.defects %}
+          <ul style="margin-top:.4rem;padding-left:1rem;color:#ef4444">
+            {% for d in test.defects %}<li>{{ d.text }}</li>{% endfor %}
+          </ul>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </details>
+      {% endif %}
+    </details>
+    {% elif result.error_message %}
+    <div style="color:#ef4444;font-size:.85rem">{{ result.error_message }}</div>
+    {% endif %}
+  </div>
+  {% endfor %}
+  {% endfor %}
+
+  {% if photos %}
+  <h2>Znalezione zdjęcia ({{ photos|length }})</h2>
+  <div class="photos">
+    {% for photo in photos %}
+    <div class="photo-thumb">
+      <a href="{{ photo.url }}" target="_blank">
+        <img src="{{ photo.thumbnail_url or photo.url }}" alt="foto" loading="lazy" onerror="this.style.display='none'">
+      </a>
+      <div class="ctx">{{ photo.source_name }}{% if photo.context %} — {{ photo.context[:40] }}{% endif %}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="footer">VINhunter &nbsp;·&nbsp; Tylko do użytku osobistego &nbsp;·&nbsp; Dane mogą być nieaktualne — zawsze weryfikuj u źródła</div>
+</div>
+</body>
+</html>

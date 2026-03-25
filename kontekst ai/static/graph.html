@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code Graph — kontekst.ai</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0d1117;
+            color: #c9d1d9;
+            overflow: hidden;
+        }
+        #graph-container {
+            width: 100vw;
+            height: 100vh;
+        }
+        #tooltip {
+            position: absolute;
+            display: none;
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 13px;
+            pointer-events: none;
+            z-index: 100;
+            max-width: 300px;
+        }
+        #tooltip .name { font-weight: 600; color: #58a6ff; }
+        #tooltip .kind { color: #8b949e; margin-left: 6px; }
+        #tooltip .file { color: #7ee787; font-size: 12px; margin-top: 4px; }
+        #controls {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            z-index: 50;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        #controls input {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            color: #c9d1d9;
+            padding: 6px 12px;
+            font-size: 14px;
+            width: 260px;
+            outline: none;
+        }
+        #controls input:focus { border-color: #58a6ff; }
+        #controls button {
+            background: #238636;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            padding: 6px 14px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        #controls button:hover { background: #2ea043; }
+        #legend {
+            position: absolute;
+            bottom: 12px;
+            left: 12px;
+            z-index: 50;
+            display: flex;
+            gap: 14px;
+            font-size: 12px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+        #status {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            z-index: 50;
+            font-size: 12px;
+            color: #8b949e;
+        }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <input type="text" id="symbol-input" placeholder="Enter symbol name..." />
+        <button id="load-btn">Load</button>
+    </div>
+    <div id="graph-container"></div>
+    <div id="tooltip">
+        <span class="name"></span><span class="kind"></span>
+        <div class="file"></div>
+    </div>
+    <div id="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#58a6ff"></div> class</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#7ee787"></div> function</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#f0883e"></div> table</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#bc8cff"></div> service</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#8b949e"></div> import</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#f778ba"></div> module</div>
+    </div>
+    <div id="status">Nodes: 0 | Edges: 0</div>
+
+    <script src="https://cdn.jsdelivr.net/npm/force-graph@1/dist/force-graph.min.js"></script>
+    <script>
+    const COLOR_MAP = {
+        'class':      '#58a6ff',
+        'function':   '#7ee787',
+        'table':      '#f0883e',
+        'service':    '#bc8cff',
+        'import':     '#8b949e',
+        'module':     '#f778ba',
+        'variable':   '#d2a8ff',
+        'entrypoint': '#ffa657',
+    };
+    const DEFAULT_COLOR = '#484f58';
+
+    // Determine API base URL (same origin, no /static prefix)
+    const API_BASE = window.location.origin;
+
+    // Graph data store
+    const graphData = { nodes: [], links: [] };
+    const nodeIds = new Set();
+    const linkKeys = new Set();
+
+    // Init force-graph
+    const container = document.getElementById('graph-container');
+    const Graph = ForceGraph()(container)
+        .graphData(graphData)
+        .nodeLabel(null)
+        .nodeColor(node => COLOR_MAP[node.kind] || DEFAULT_COLOR)
+        .nodeVal(node => node.kind === 'class' ? 6 : (node.kind === 'function' ? 4 : 3))
+        .linkColor(() => '#21262d')
+        .linkDirectionalArrowLength(4)
+        .linkDirectionalArrowRelPos(1)
+        .linkLabel(link => link.edge_type || '')
+        .backgroundColor('#0d1117')
+        .width(window.innerWidth)
+        .height(window.innerHeight)
+        .onNodeHover(handleNodeHover)
+        .onNodeClick(handleNodeClick)
+        .cooldownTicks(80)
+        .d3AlphaDecay(0.02);
+
+    window.addEventListener('resize', () => {
+        Graph.width(window.innerWidth).height(window.innerHeight);
+    });
+
+    // Tooltip
+    const tooltip = document.getElementById('tooltip');
+
+    function handleNodeHover(node, prevNode) {
+        if (node) {
+            tooltip.style.display = 'block';
+            tooltip.querySelector('.name').textContent = node.name;
+            tooltip.querySelector('.kind').textContent = `(${node.kind})`;
+            tooltip.querySelector('.file').textContent =
+                node.file_path ? `${node.file_path}:${node.start_line || '?'}` : '';
+            container.style.cursor = 'pointer';
+        } else {
+            tooltip.style.display = 'none';
+            container.style.cursor = 'default';
+        }
+    }
+
+    container.addEventListener('mousemove', e => {
+        if (tooltip.style.display === 'block') {
+            tooltip.style.left = (e.clientX + 14) + 'px';
+            tooltip.style.top = (e.clientY + 14) + 'px';
+        }
+    });
+
+    // Click node → expand neighbors
+    async function handleNodeClick(node) {
+        if (!node || !node.name) return;
+        await loadSymbol(node.name, 1);
+    }
+
+    // Fetch neighbors from API and merge into graph
+    async function loadSymbol(name, depth = 1) {
+        try {
+            const resp = await fetch(
+                `${API_BASE}/graph/neighbors/${encodeURIComponent(name)}?depth=${depth}`
+            );
+            if (!resp.ok) {
+                console.warn(`Symbol '${name}' not found (${resp.status})`);
+                return;
+            }
+            const neighbors = await resp.json();
+
+            // Add center node if not present
+            if (!nodeIds.has(name)) {
+                graphData.nodes.push({
+                    id: name,
+                    name: name,
+                    kind: 'class',
+                    file_path: '',
+                    start_line: null,
+                });
+                nodeIds.add(name);
+            }
+
+            // Add neighbor nodes + edges
+            for (const n of neighbors) {
+                const nid = n.name;
+                if (!nodeIds.has(nid)) {
+                    graphData.nodes.push({
+                        id: nid,
+                        name: n.name,
+                        kind: n.kind,
+                        file_path: n.file_path,
+                        start_line: n.start_line,
+                    });
+                    nodeIds.add(nid);
+                }
+
+                const linkKey = `${name}->${nid}:${n.edge_type}`;
+                if (!linkKeys.has(linkKey)) {
+                    graphData.links.push({
+                        source: name,
+                        target: nid,
+                        edge_type: n.edge_type,
+                    });
+                    linkKeys.add(linkKey);
+                }
+            }
+
+            Graph.graphData(graphData);
+            updateStatus();
+        } catch (err) {
+            console.error('Failed to load symbol:', err);
+        }
+    }
+
+    function updateStatus() {
+        document.getElementById('status').textContent =
+            `Nodes: ${graphData.nodes.length} | Edges: ${graphData.links.length}`;
+    }
+
+    // Load data from URL params or postMessage
+    function initFromParams() {
+        const params = new URLSearchParams(window.location.search);
+        const symbol = params.get('symbol');
+        const dataParam = params.get('data');
+
+        if (dataParam) {
+            try {
+                const parsed = JSON.parse(decodeURIComponent(dataParam));
+                if (parsed.nodes) {
+                    for (const n of parsed.nodes) {
+                        if (!nodeIds.has(n.id)) {
+                            graphData.nodes.push(n);
+                            nodeIds.add(n.id);
+                        }
+                    }
+                }
+                if (parsed.links) {
+                    for (const l of parsed.links) {
+                        const key = `${l.source}->${l.target}:${l.edge_type || ''}`;
+                        if (!linkKeys.has(key)) {
+                            graphData.links.push(l);
+                            linkKeys.add(key);
+                        }
+                    }
+                }
+                Graph.graphData(graphData);
+                updateStatus();
+            } catch (e) {
+                console.error('Failed to parse data param:', e);
+            }
+        }
+
+        if (symbol) {
+            document.getElementById('symbol-input').value = symbol;
+            loadSymbol(symbol, 1);
+        }
+    }
+
+    // Listen for postMessage from parent (Chainlit iframe)
+    window.addEventListener('message', (event) => {
+        if (event.data && event.data.type === 'graph-data') {
+            const parsed = event.data.payload;
+            if (parsed.nodes) {
+                for (const n of parsed.nodes) {
+                    if (!nodeIds.has(n.id)) {
+                        graphData.nodes.push(n);
+                        nodeIds.add(n.id);
+                    }
+                }
+            }
+            if (parsed.links) {
+                for (const l of parsed.links) {
+                    const key = `${l.source}->${l.target}:${l.edge_type || ''}`;
+                    if (!linkKeys.has(key)) {
+                        graphData.links.push(l);
+                        linkKeys.add(key);
+                    }
+                }
+            }
+            Graph.graphData(graphData);
+            updateStatus();
+        }
+    });
+
+    // UI controls
+    document.getElementById('load-btn').addEventListener('click', () => {
+        const name = document.getElementById('symbol-input').value.trim();
+        if (name) loadSymbol(name, 1);
+    });
+
+    document.getElementById('symbol-input').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            const name = e.target.value.trim();
+            if (name) loadSymbol(name, 1);
+        }
+    });
+
+    // Init
+    initFromParams();
+    </script>
+</body>
+</html>

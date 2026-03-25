@@ -1,0 +1,66 @@
+# Trading Bot Docker Compose
+# Run: docker-compose -f docker-compose-trading.yml up -d
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: trading-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=trading
+      - POSTGRES_PASSWORD=tradingpass
+      - POSTGRES_DB=trading
+      - TZ=Europe/Warsaw
+    ports:
+      - "5433:5432"
+    volumes:
+      - trading_pg_data:/var/lib/postgresql/data
+      - ./db-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trading -d trading"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  trading-app:
+    image: python:3.11-slim
+    container_name: trading-app
+    restart: unless-stopped
+    ports:
+      - "8501:8501"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./trading-app:/app
+    working_dir: /app
+    command: >
+      bash -c "pip install --no-cache-dir -r requirements.txt &&
+      streamlit run app.py --server.address=0.0.0.0 --server.port=8501"
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=trading
+      - DB_PASSWORD=tradingpass
+      - DB_NAME=trading
+      - OLLAMA_URL=http://host.docker.internal:11434
+      - PAPER_TRADING=true
+      - TRADING_ENABLED=false
+      - TZ=Europe/Warsaw
+    env_file:
+      - ./trading-app/.env
+
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: trading-dozzle
+    restart: unless-stopped
+    ports:
+      - "9998:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      DOZZLE_LEVEL: info
+      DOZZLE_NO_ANALYTICS: "true"
+
+volumes:
+  trading_pg_data:

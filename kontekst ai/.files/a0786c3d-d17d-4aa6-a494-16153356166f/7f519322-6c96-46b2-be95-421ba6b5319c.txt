@@ -1,0 +1,12 @@
+**Score:** 0.0156
+
+```
+- code graph (symbols/edges)
+- project memory (facts/decisions)
+- retrieval (semantic + graph)
+- API/CLI
+- MCP server exposing tools
+
+PLUGINS (rozszerzalne, z GitHuba):
+- Mogę dodawać funkcje przez re
+```
