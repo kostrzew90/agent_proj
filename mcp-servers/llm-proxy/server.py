@@ -44,7 +44,31 @@ def _call_openrouter(
     system_prompt: Optional[str],
     max_tokens: int,
 ) -> str:
-    return "NOT IMPLEMENTED YET"
+    api_key = os.environ.get("OPENROUTER_API_KEY")
+    if not api_key:
+        return "ERROR: OPENROUTER_API_KEY not set"
+    try:
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+        response = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": model,
+                "messages": messages,
+                "max_tokens": max_tokens,
+            },
+            timeout=60,
+        )
+        response.raise_for_status()
+        return response.json()["choices"][0]["message"]["content"]
+    except Exception as e:
+        return f"ERROR: {e}"
 
 
 # ---------------------------------------------------------------------------
