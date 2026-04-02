@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS document_chunks (
     document_id INTEGER REFERENCES documents(id) ON DELETE CASCADE,
     chunk_index INTEGER NOT NULL,
     content TEXT NOT NULL,
-    embedding vector(768),  -- dimension TBD after benchmark; 768 is placeholder
+    embedding vector(1024),  -- qwen3-embedding:0.6b = 1024 dimensions
     page_number INTEGER,
     section_title VARCHAR(500),
     chunk_type VARCHAR(50) DEFAULT 'text'
@@ -188,7 +188,7 @@ CREATE TABLE IF NOT EXISTS processing_tasks (
     document_id INTEGER REFERENCES documents(id) ON DELETE CASCADE,
     celery_task_id VARCHAR(255),
     task_type VARCHAR(50) NOT NULL
-        CHECK (task_type IN ('parse', 'chunk', 'embed', 'ocr', 'whisper', 'crawl', 'full_pipeline')),
+        CHECK (task_type IN ('parse', 'chunk', 'embed', 'ocr', 'whisper', 'crawl', 'full_pipeline', 'youtube', 'web_crawl', 'xpost')),
     status VARCHAR(20) DEFAULT 'pending'
         CHECK (status IN ('pending', 'running', 'completed', 'failed')),
     progress FLOAT DEFAULT 0 CHECK (progress >= 0 AND progress <= 1),

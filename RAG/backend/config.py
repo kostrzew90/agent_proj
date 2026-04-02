@@ -32,15 +32,23 @@ class RedisSettings(BaseSettings):
 
 
 class AISettings(BaseSettings):
-    ollama_url: str = "http://192.168.1.100:11434"
-    whisper_url: str = "http://192.168.1.100:8002"
+    ollama_url: str = "http://host.docker.internal:11434"
+    whisper_url: str = "http://host.docker.internal:8002"
 
-    llm_model: str = "qwen3:latest"
-    embedding_model: str = "nomic-embed-text"
-    embedding_dimension: int = 768
-    judge_model: str = "qwen3:0.6b"
+    llm_model: str = "qwen3:1.7b"
+    embedding_model: str = "qwen3-embedding:0.6b"
+    embedding_dimension: int = 1024
+    judge_model: str = "qwen3:1.7b"
 
-    model_config = {"env_prefix": ""}
+    # OpenRouter (optional — overrides Ollama for LLM/judge when set)
+    openrouter_api_key: str = ""
+    openrouter_model: str = "google/gemini-2.0-flash-001"
+    openrouter_judge_model: str = "google/gemini-2.0-flash-001"
+
+    # Groq (optional — fast Whisper API, free tier 7200s/day)
+    groq_api_key: str = ""
+
+    model_config = {"env_prefix": "", "extra": "ignore"}
 
 
 class DoclingSettings(BaseSettings):
@@ -78,11 +86,10 @@ class AuthSettings(BaseSettings):
 
 
 class CrawlSettings(BaseSettings):
-    """mdream web crawler settings."""
-    mdream_image: str = "harlanzw/mdream:latest"
+    """Web crawler settings (trafilatura-based, no external service)."""
     max_depth: int = 3
-    driver: str = "fetch"  # fetch (static) or playwright (JS/SPA)
     max_pages: int = 100
+    timeout: float = 30.0
 
     model_config = {"env_prefix": "CRAWL_", "extra": "ignore"}
 

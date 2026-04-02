@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import aiofiles
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
 from pydantic import BaseModel
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,6 +21,7 @@ from core.database import (
     DocumentFolder, DocumentTag, get_db,
 )
 from api.deps import get_current_user
+from api.rate_limit import limiter
 from core.database import User
 
 router = APIRouter()
@@ -43,6 +44,9 @@ class DocumentResponse(BaseModel):
     processed_at: datetime | None
     folder_ids: list[int] = []
     tag_ids: list[int] = []
+    task_progress: float | None = None
+    task_status: str | None = None
+    task_type: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -86,6 +90,7 @@ def get_file_type(filename: str) -> str:
         "pptx": "pptx", "xlsx": "xlsx",
         "png": "image", "jpg": "image", "jpeg": "image", "tiff": "image", "bmp": "image",
         "mp3": "audio", "wav": "audio", "m4a": "audio", "ogg": "audio", "flac": "audio",
+        "mp4": "mp4", "mkv": "mkv", "avi": "avi", "mov": "mov", "webm": "webm",
     }
     return type_map.get(ext, "unknown")
 
@@ -93,7 +98,9 @@ def get_file_type(filename: str) -> str:
 # === Endpoints ===
 
 @router.post("/upload", response_model=DocumentResponse, status_code=201)
+@limiter.limit("30/minute")
 async def upload_document(
+    request: Request,
     file: UploadFile = File(...),
     folder_id: int | None = Query(None),
     tag_ids: str | None = Query(None, description="Comma-separated tag IDs"),
@@ -285,21 +292,38 @@ async def list_documents(
     count_q = select(func.count()).select_from(query.subquery())
     total = (await db.execute(count_q)).scalar_one()
 
-    # Fetch
+    # Fetch docs
     query = query.order_by(Document.created_at.desc()).limit(limit).offset(offset)
     result = await db.execute(query)
     docs = result.scalars().all()
 
+    # Fetch latest task per document (single query)
+    doc_ids = [d.id for d in docs]
+    tasks_result = await db.execute(
+        select(ProcessingTask)
+        .where(ProcessingTask.document_id.in_(doc_ids))
+        .order_by(ProcessingTask.document_id, ProcessingTask.id.desc())
+        .distinct(ProcessingTask.document_id)
+    ) if doc_ids else None
+    task_map: dict[int, ProcessingTask] = {}
+    if tasks_result:
+        for t in tasks_result.scalars().all():
+            task_map[t.document_id] = t
+
+    def _doc_response(d: Document) -> DocumentResponse:
+        t = task_map.get(d.id)
+        return DocumentResponse(
+            id=d.id, filename=d.filename, file_type=d.file_type,
+            file_size=d.file_size, page_count=d.page_count, status=d.status,
+            source_type=d.source_type, source_url=d.source_url,
+            created_at=d.created_at, processed_at=d.processed_at,
+            task_progress=t.progress if t else None,
+            task_status=t.status if t else None,
+            task_type=t.task_type if t else None,
+        )
+
     return DocumentListResponse(
-        documents=[
-            DocumentResponse(
-                id=d.id, filename=d.filename, file_type=d.file_type,
-                file_size=d.file_size, page_count=d.page_count, status=d.status,
-                source_type=d.source_type, source_url=d.source_url,
-                created_at=d.created_at, processed_at=d.processed_at,
-            )
-            for d in docs
-        ],
+        documents=[_doc_response(d) for d in docs],
         total=total,
     )
 
@@ -343,6 +367,189 @@ async def delete_document(
 
     await db.delete(doc)  # cascades to chunks, tasks, folder/tag relations
     await db.commit()
+
+
+class CrawlRequest(BaseModel):
+    url: str
+    depth: int = 1
+    folder_id: int | None = None
+    tag_ids: list[int] = []
+
+
+class CrawlResponse(BaseModel):
+    document_id: int
+    task_id: int
+    url: str
+    status: str
+
+
+@router.post("/crawl", response_model=CrawlResponse, status_code=202)
+@limiter.limit("10/minute")
+async def crawl_url(
+    http_request: Request,
+    request: CrawlRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Initiate web crawl: fetch URL via mdream → chunk → embed → index."""
+    import hashlib
+
+    # Placeholder hash so we can create the document record before crawling
+    url_hash = hashlib.sha256(request.url.encode()).hexdigest()
+
+    # Check for duplicate by source_url
+    existing = await db.execute(
+        select(Document).where(Document.source_url == request.url, Document.user_id == user.id)
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=409, detail="URL already indexed")
+
+    # Create document record (will be populated by Celery task)
+    doc = Document(
+        user_id=user.id,
+        filename=request.url[:200],
+        file_type="markdown",
+        file_hash=url_hash,
+        status="pending",
+        source_type="web_crawl",
+        source_url=request.url,
+    )
+    db.add(doc)
+    await db.flush()
+
+    # Assign folder/tags
+    if request.folder_id:
+        db.add(DocumentFolder(document_id=doc.id, folder_id=request.folder_id))
+    for tid in request.tag_ids:
+        db.add(DocumentTag(document_id=doc.id, tag_id=tid))
+
+    # Create processing task record
+    task = ProcessingTask(document_id=doc.id, task_type="crawl", status="pending")
+    db.add(task)
+    await db.commit()
+    await db.refresh(task)
+
+    # Dispatch Celery task
+    from tasks.crawl_tasks import crawl_url as celery_crawl
+    celery_result = celery_crawl.delay(request.url, request.depth, user.id, task.id)
+
+    task.celery_task_id = celery_result.id
+    await db.commit()
+
+    return CrawlResponse(document_id=doc.id, task_id=task.id, url=request.url, status="pending")
+
+
+class YouTubeIngestRequest(BaseModel):
+    url: str
+    languages: list[str] = ["pl", "en"]
+    folder_id: int | None = None
+    tag_ids: list[int] = []
+
+
+@router.post("/youtube", response_model=CrawlResponse, status_code=202)
+async def ingest_youtube(
+    request: YouTubeIngestRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Fetch YouTube transcript → chunk → embed → index."""
+    from ingestion.youtube import extract_video_id
+
+    video_id = extract_video_id(request.url)
+    if not video_id:
+        raise HTTPException(status_code=400, detail="Invalid YouTube URL")
+
+    youtube_url = f"https://www.youtube.com/watch?v={video_id}"
+
+    existing = await db.execute(
+        select(Document).where(Document.source_url == youtube_url, Document.user_id == user.id)
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=409, detail="Video already indexed")
+
+    doc = Document(
+        user_id=user.id,
+        filename=youtube_url,  # updated by task once title is fetched
+        file_type="transcript",
+        file_hash=f"yt_{video_id}",
+        status="pending",
+        source_type="youtube",
+        source_url=youtube_url,
+    )
+    db.add(doc)
+    await db.flush()
+
+    if request.folder_id:
+        db.add(DocumentFolder(document_id=doc.id, folder_id=request.folder_id))
+    for tid in request.tag_ids:
+        db.add(DocumentTag(document_id=doc.id, tag_id=tid))
+
+    task = ProcessingTask(document_id=doc.id, task_type="youtube", status="pending")
+    db.add(task)
+    await db.commit()
+    await db.refresh(task)
+
+    from tasks.youtube_ingest_task import ingest_youtube as celery_ingest
+    celery_result = celery_ingest.delay(youtube_url, user.id, task.id, request.languages)
+    task.celery_task_id = celery_result.id
+    await db.commit()
+
+    return CrawlResponse(document_id=doc.id, task_id=task.id, url=youtube_url, status="pending")
+
+
+class XPostIngestRequest(BaseModel):
+    url: str
+    folder_id: int | None = None
+    tag_ids: list[int] = []
+
+
+@router.post("/xpost", response_model=CrawlResponse, status_code=202)
+async def ingest_xpost(
+    request: XPostIngestRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Ingest X/Twitter post → extract GitHub repos → analyze → embed → index."""
+    import re
+    # Validate URL
+    if not re.search(r"(twitter\.com|x\.com)/\w+/status/\d+", request.url):
+        raise HTTPException(status_code=400, detail="Invalid X/Twitter post URL")
+
+    # Check duplicate
+    existing = await db.execute(
+        select(Document).where(Document.source_url == request.url, Document.user_id == user.id)
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=409, detail="Post already indexed")
+
+    doc = Document(
+        user_id=user.id,
+        filename=request.url,
+        file_type="xpost",
+        file_hash=f"xpost_{hash(request.url) & 0xFFFFFFFF:08x}",
+        status="pending",
+        source_type="web_crawl",
+        source_url=request.url,
+    )
+    db.add(doc)
+    await db.flush()
+
+    if request.folder_id:
+        db.add(DocumentFolder(document_id=doc.id, folder_id=request.folder_id))
+    for tid in request.tag_ids:
+        db.add(DocumentTag(document_id=doc.id, tag_id=tid))
+
+    task = ProcessingTask(document_id=doc.id, task_type="xpost", status="pending")
+    db.add(task)
+    await db.commit()
+    await db.refresh(task)
+
+    from tasks.xpost_ingest_task import ingest_xpost as celery_ingest
+    celery_result = celery_ingest.delay(request.url, user.id, task.id)
+    task.celery_task_id = celery_result.id
+    await db.commit()
+
+    return CrawlResponse(document_id=doc.id, task_id=task.id, url=request.url, status="pending")
 
 
 @router.get("/tasks/{task_id}", response_model=TaskStatusResponse)

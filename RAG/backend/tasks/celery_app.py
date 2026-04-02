@@ -23,6 +23,8 @@ celery_app.conf.update(
     task_routes={
         "tasks.document_tasks.*": {"queue": "documents"},
         "tasks.crawl_tasks.*": {"queue": "crawl"},
+        "tasks.youtube_sync_task.*": {"queue": "default"},
+        "tasks.xpost_ingest_task.*": {"queue": "default"},
     },
     task_default_queue="default",
 )
@@ -30,3 +32,7 @@ celery_app.conf.update(
 # Explicitly import task modules so Celery registers them
 import tasks.document_tasks  # noqa: F401
 import tasks.crawl_tasks  # noqa: F401
+import tasks.youtube_sync_task  # noqa: F401
+import tasks.youtube_ingest_task  # noqa: F401
+import tasks.benchmark_tasks  # noqa: F401
+import tasks.xpost_ingest_task  # noqa: F401

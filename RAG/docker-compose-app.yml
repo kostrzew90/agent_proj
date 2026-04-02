@@ -16,6 +16,7 @@ services:
       RAG_DB_HOST: rag-postgres
       RAG_DB_PORT: 5432
       REDIS_URL: redis://rag-redis:6379/0
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
     volumes:
       - rag-uploads:/data/uploads
       - rag-watch:/data/watch
@@ -46,6 +47,9 @@ services:
       RAG_DB_HOST: rag-postgres
       RAG_DB_PORT: 5432
       REDIS_URL: redis://rag-redis:6379/0
+      WHISPER_MODEL_SIZE: tiny
+      WHISPER_BEAM_SIZE: "1"
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
     volumes:
       - rag-uploads:/data/uploads
       - rag-watch:/data/watch
@@ -54,6 +58,48 @@ services:
         condition: service_healthy
       rag-redis:
         condition: service_healthy
+
+  # ============================================================
+  # React Frontend (nginx + Vite build)
+  # ============================================================
+  rag-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: rag-frontend
+    restart: unless-stopped
+    ports:
+      - "3003:80"
+    depends_on:
+      rag-api:
+        condition: service_healthy
+
+  # ============================================================
+  # Flower — Celery task monitoring UI
+  # ============================================================
+  rag-flower:
+    image: mher/flower:2.0
+    container_name: rag-flower
+    restart: unless-stopped
+    command: celery --broker=redis://rag-redis:6379/0 flower --port=5555 --url_prefix=flower
+    ports:
+      - "5556:5555"
+    depends_on:
+      rag-redis:
+        condition: service_healthy
+
+  # ============================================================
+  # mdream — Web crawler + HTML→Markdown converter
+  # ============================================================
+  # NOTE: mdream harlanzw/mdream:latest is a CLI tool, not an HTTP server.
+  # It will fail with "requires interactive input". Disabled for now.
+  # TODO: Find/build an HTTP wrapper for mdream, or use alternative crawling service.
+  # rag-mdream:
+  #   image: harlanzw/mdream:latest
+  #   container_name: rag-mdream
+  #   restart: unless-stopped
+  #   ports:
+  #     - "3002:3000"
 
 volumes:
   rag-uploads:
