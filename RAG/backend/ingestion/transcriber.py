@@ -83,7 +83,7 @@ def _groq_transcribe_file(mp3_path: str, language: str | None = None) -> list[di
             )
 
         if response.status_code == 429:
-            retry_after = int(response.headers.get("Retry-After", 300))
+            retry_after = int(response.headers.get("retry-after", 300))
             if attempt < max_attempts:
                 logger.warning(
                     "Groq API rate limited (429), attempt %d/%d — sleeping %ds before retry",
@@ -182,6 +182,8 @@ def _detect_silences(audio_path: str) -> list[float]:
         "-f", "null", "-",
     ]
     result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0 and "silencedetect" not in result.stderr:
+        logger.warning("_detect_silences: ffmpeg may have failed (rc=%d): %s", result.returncode, result.stderr[:300])
     stderr = result.stderr
 
     starts = [float(m) for m in re.findall(r"silence_start:\s*([\d.]+)", stderr)]
@@ -234,7 +236,7 @@ def _split_at_silences(
             if chunks and remaining < 30.0:
                 # Extend previous chunk to cover the tail
                 prev_start, prev_end = chunks[-1]
-                chunks[-1] = (prev_start, min(duration + overlap_seconds, duration))
+                chunks[-1] = (prev_start, duration)
                 logger.debug("_split_at_silences: tiny tail %.1fs merged into previous chunk", remaining)
             else:
                 chunks.append((chunk_start, duration))
