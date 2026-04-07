@@ -9,6 +9,7 @@ import subprocess
 import tempfile
 import os
 import math
+import time
 from pathlib import Path
 
 import httpx
@@ -50,7 +51,8 @@ def _get_audio_duration(path: str) -> float:
 
 
 def _groq_transcribe_file(mp3_path: str, language: str | None = None) -> list[dict]:
-    """Send a single MP3 file to Groq Whisper API. Returns segments."""
+    """Send a single MP3 file to Groq Whisper API. Returns segments.
+    Retries up to 3 times on HTTP 429 using Retry-After header."""
     api_key = _get_groq_key()
     if not api_key:
         raise RuntimeError("GROQ_API_KEY not set")
@@ -59,38 +61,58 @@ def _groq_transcribe_file(mp3_path: str, language: str | None = None) -> list[di
     if file_size > 25 * 1024 * 1024:
         raise ValueError(f"File too large for Groq API: {file_size / 1024 / 1024:.1f} MB")
 
-    with open(mp3_path, "rb") as f:
-        files = {"file": (os.path.basename(mp3_path), f, "audio/mpeg")}
-        data = {
-            "model": "whisper-large-v3",
-            "response_format": "verbose_json",
-            "timestamp_granularities[]": "segment",
-        }
-        if language:
-            data["language"] = language
+    max_attempts = 3
+    for attempt in range(1, max_attempts + 1):
+        with open(mp3_path, "rb") as f:
+            files = {"file": (os.path.basename(mp3_path), f, "audio/mpeg")}
+            data = {
+                "model": "whisper-large-v3",
+                "response_format": "verbose_json",
+                "timestamp_granularities[]": "segment",
+            }
+            if language:
+                data["language"] = language
 
-        response = httpx.post(
-            GROQ_API_URL,
-            headers={"Authorization": f"Bearer {api_key}"},
-            files=files,
-            data=data,
-            timeout=120.0,
-        )
+            response = httpx.post(
+                GROQ_API_URL,
+                headers={"Authorization": f"Bearer {api_key}"},
+                files=files,
+                data=data,
+                timeout=120.0,
+            )
 
-    if response.status_code != 200:
-        raise RuntimeError(f"Groq API error {response.status_code}: {response.text[:500]}")
+        if response.status_code == 429:
+            retry_after = int(response.headers.get("Retry-After", 300))
+            if attempt < max_attempts:
+                logger.warning(
+                    "Groq API rate limited (429), attempt %d/%d — sleeping %ds before retry",
+                    attempt, max_attempts, retry_after,
+                )
+                time.sleep(retry_after)
+                continue
+            else:
+                raise RuntimeError(
+                    f"Groq API rate limited (429) after {max_attempts} attempts. "
+                    f"Last Retry-After: {retry_after}s"
+                )
 
-    result = response.json()
-    segments = []
-    for seg in result.get("segments", []):
-        text = seg.get("text", "").strip()
-        if text:
-            segments.append({
-                "text": text,
-                "start": seg.get("start", 0),
-                "duration": seg.get("end", 0) - seg.get("start", 0),
-            })
-    return segments
+        if response.status_code != 200:
+            raise RuntimeError(f"Groq API error {response.status_code}: {response.text[:500]}")
+
+        result = response.json()
+        segments = []
+        for seg in result.get("segments", []):
+            text = seg.get("text", "").strip()
+            if text:
+                segments.append({
+                    "text": text,
+                    "start": seg.get("start", 0),
+                    "duration": seg.get("end", 0) - seg.get("start", 0),
+                })
+        return segments
+
+    # Should never reach here
+    raise RuntimeError(f"Groq API failed after {max_attempts} attempts")
 
 
 def _groq_transcribe(audio_path: str, language: str | None = None) -> list[dict]:
