@@ -573,7 +573,7 @@ async def ingest_xpost(
         file_type="xpost",
         file_hash=f"xpost_{hash(request.url) & 0xFFFFFFFF:08x}",
         status="pending",
-        source_type="web_crawl",
+        source_type="xpost",
         source_url=request.url,
     )
     db.add(doc)

@@ -88,14 +88,29 @@ async def fetch_post(url: str) -> XPostData:
         except Exception as e:
             # Fallback: try nitter or basic scrape
             logger.warning("FxTwitter failed (%s), trying Nitter", e)
-            for nitter_host in ["nitter.privacydev.net", "nitter.poast.org"]:
+            nitter_hosts = [
+                "nitter.privacydev.net",
+                "nitter.poast.org",
+                "nitter.lucabased.xyz",
+                "xcancel.com",
+                "nitter.woodland.cafe",
+            ]
+            for nitter_host in nitter_hosts:
                 try:
+                    # Health check: HEAD request with short timeout
+                    try:
+                        health = await client.head(f"https://{nitter_host}", timeout=3.0)
+                        if health.status_code >= 500:
+                            logger.debug("Nitter %s unhealthy (HTTP %d), skipping", nitter_host, health.status_code)
+                            continue
+                    except Exception:
+                        logger.debug("Nitter %s unreachable, skipping", nitter_host)
+                        continue
+
                     nitter_url = f"https://{nitter_host}/{username}/status/{tweet_id}"
-                    resp = await client.get(nitter_url, follow_redirects=True)
+                    resp = await client.get(nitter_url, follow_redirects=True, timeout=10.0)
                     if resp.status_code == 200:
-                        # Basic extraction from HTML
                         text = resp.text
-                        # Find tweet content div
                         match = re.search(r'class="tweet-content[^"]*"[^>]*>(.*?)</div>', text, re.DOTALL)
                         if match:
                             content = re.sub(r"<[^>]+>", " ", match.group(1)).strip()

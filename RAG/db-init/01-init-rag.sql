@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS documents (
     status VARCHAR(20) DEFAULT 'pending'
         CHECK (status IN ('pending', 'processing', 'ready', 'error')),
     source_type VARCHAR(20) DEFAULT 'upload'
-        CHECK (source_type IN ('upload', 'api', 'watch_folder', 'web_crawl')),
+        CHECK (source_type IN ('upload', 'api', 'watch_folder', 'web_crawl', 'youtube', 'xpost')),
     source_url TEXT,
     metadata JSONB DEFAULT '{}',
     error_message TEXT,
