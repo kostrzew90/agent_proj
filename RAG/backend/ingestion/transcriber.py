@@ -9,6 +9,7 @@ import subprocess
 import tempfile
 import os
 import math
+import re
 import time
 from pathlib import Path
 
@@ -162,28 +163,124 @@ def _get_model():
     if _model is None:
         from faster_whisper import WhisperModel
         logger.info("Loading local Whisper model '%s' (first load may take 30-60s)...", _model_size)
-        _model = WhisperModel(_model_size, device="cpu", compute_type="int8")
+        _model = WhisperModel(
+            _model_size,
+            device="cpu",
+            compute_type="int8",
+            cpu_threads=int(os.environ.get("WHISPER_THREADS", "4")),
+        )
         logger.info("Local Whisper model loaded.")
     return _model
 
 
-def _local_transcribe(audio_path: str, language: str | None = None) -> list[dict]:
-    """Transcribe using local faster-whisper (CPU)."""
-    model = _get_model()
+def _detect_silences(audio_path: str) -> list[float]:
+    """Detect silence midpoints in audio using ffmpeg silencedetect filter.
+    Returns list of midpoint timestamps (floats) in seconds."""
+    cmd = [
+        "ffmpeg", "-i", audio_path,
+        "-af", "silencedetect=noise=-35dB:d=0.5",
+        "-f", "null", "-",
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    stderr = result.stderr
 
-    logger.info("Local Whisper: transcribing %s (language=%s)", audio_path, language or "auto")
-    segments, info = model.transcribe(
+    starts = [float(m) for m in re.findall(r"silence_start:\s*([\d.]+)", stderr)]
+    ends = [float(m) for m in re.findall(r"silence_end:\s*([\d.]+)", stderr)]
+
+    midpoints = []
+    for s, e in zip(starts, ends):
+        midpoints.append((s + e) / 2.0)
+
+    logger.debug("_detect_silences: found %d silence gaps → %d midpoints", len(starts), len(midpoints))
+    return midpoints
+
+
+def _split_at_silences(
+    audio_path: str,
+    target_chunk_seconds: float = 300,
+    max_chunk_seconds: float = 600,
+    overlap_seconds: float = 10,
+) -> list[tuple[float, float]]:
+    """Split audio at silence midpoints into (start, end) tuples.
+
+    Strategy:
+    - If duration <= max_chunk_seconds: return single chunk.
+    - Otherwise detect silences and walk through audio, finding the silence
+      closest to target_chunk_seconds but within max_chunk_seconds.
+    - If no silence found in window, hard-split at max_chunk_seconds.
+    - Each chunk end is extended by overlap_seconds (capped at total duration).
+    - Tiny tail chunks (< 30s) are merged into the previous chunk.
+    """
+    duration = _get_audio_duration(audio_path)
+
+    if duration <= max_chunk_seconds:
+        logger.info("_split_at_silences: file %.0fs <= max %.0fs, single chunk", duration, max_chunk_seconds)
+        return [(0.0, duration)]
+
+    silences = _detect_silences(audio_path)
+    logger.info(
+        "_split_at_silences: %.0fs audio → target=%.0fs, max=%.0fs, overlap=%.0fs, %d silence points",
+        duration, target_chunk_seconds, max_chunk_seconds, overlap_seconds, len(silences),
+    )
+
+    chunks: list[tuple[float, float]] = []
+    chunk_start = 0.0
+    min_split_into_chunk = 60.0  # must be at least 60s into a chunk before splitting
+
+    while chunk_start < duration:
+        remaining = duration - chunk_start
+        if remaining <= max_chunk_seconds:
+            # Last chunk — check if it's a tiny tail that should merge
+            if chunks and remaining < 30.0:
+                # Extend previous chunk to cover the tail
+                prev_start, prev_end = chunks[-1]
+                chunks[-1] = (prev_start, min(duration + overlap_seconds, duration))
+                logger.debug("_split_at_silences: tiny tail %.1fs merged into previous chunk", remaining)
+            else:
+                chunks.append((chunk_start, duration))
+            break
+
+        # Find best silence midpoint to split at
+        target_end = chunk_start + target_chunk_seconds
+        hard_end = chunk_start + max_chunk_seconds
+        earliest_split = chunk_start + min_split_into_chunk
+
+        # Gather silence midpoints within (earliest_split, hard_end)
+        candidates = [s for s in silences if earliest_split < s <= hard_end]
+
+        if candidates:
+            # Pick the silence closest to target_end
+            best = min(candidates, key=lambda s: abs(s - target_end))
+            split_at = best
+        else:
+            # Hard split
+            split_at = hard_end
+
+        chunk_end = min(split_at + overlap_seconds, duration)
+        chunks.append((chunk_start, chunk_end))
+        logger.debug(
+            "_split_at_silences: chunk %d [%.1f – %.1f] (split at %.1f + %.1f overlap)",
+            len(chunks), chunk_start, chunk_end, split_at, overlap_seconds,
+        )
+        chunk_start = split_at  # next chunk starts at the split point (before overlap)
+
+    logger.info("_split_at_silences: %d chunks for %.0fs audio", len(chunks), duration)
+    return chunks
+
+
+def _transcribe_single(model, audio_path: str, language: str | None = None) -> list[dict]:
+    """Transcribe a single audio file with faster-whisper. Returns segments."""
+    segments_iter, info = model.transcribe(
         audio_path,
         beam_size=int(os.environ.get("WHISPER_BEAM_SIZE", "5")),
         language=language,
         vad_filter=True,
         word_timestamps=False,
     )
-
     logger.info("Detected language: %s (%.0f%%)", info.language, info.language_probability * 100)
 
     result = []
-    for seg in segments:
+    for seg in segments_iter:
         text = seg.text.strip()
         if text:
             result.append({
@@ -191,9 +288,70 @@ def _local_transcribe(audio_path: str, language: str | None = None) -> list[dict
                 "start": seg.start,
                 "duration": seg.end - seg.start,
             })
-
-    logger.info("Local Whisper done: %d segments", len(result))
     return result
+
+
+def _local_transcribe(audio_path: str, language: str | None = None) -> list[dict]:
+    """Transcribe using local faster-whisper (CPU).
+    Short files (≤ 600s) are transcribed directly.
+    Long files are split at silence boundaries, transcribed in chunks,
+    and overlap segments are deduplicated."""
+    model = _get_model()
+    logger.info("Local Whisper: transcribing %s (language=%s)", audio_path, language or "auto")
+
+    duration = _get_audio_duration(audio_path)
+
+    if duration <= 600:
+        result = _transcribe_single(model, audio_path, language)
+        logger.info("Local Whisper done: %d segments", len(result))
+        return result
+
+    # Long file — VAD-chunked transcription
+    chunks = _split_at_silences(audio_path)
+
+    all_segments: list[dict] = []
+    last_end_time: float = 0.0
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        for idx, (chunk_start, chunk_end) in enumerate(chunks):
+            chunk_duration = chunk_end - chunk_start
+            chunk_wav = os.path.join(tmpdir, f"chunk_{idx}.wav")
+
+            logger.info(
+                "Local Whisper: chunk %d/%d [%.1f – %.1f] (%.1fs)",
+                idx + 1, len(chunks), chunk_start, chunk_end, chunk_duration,
+            )
+
+            # Extract chunk as 16kHz mono WAV
+            cmd = [
+                "ffmpeg", "-y",
+                "-ss", str(chunk_start),
+                "-i", audio_path,
+                "-t", str(chunk_duration),
+                "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1",
+                chunk_wav,
+            ]
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                raise RuntimeError(f"ffmpeg chunk extraction failed: {result.stderr[:500]}")
+
+            chunk_segments = _transcribe_single(model, chunk_wav, language)
+
+            # Offset timestamps and deduplicate overlap
+            for seg in chunk_segments:
+                absolute_start = seg["start"] + chunk_start
+                # Skip segments that fall within the overlap of previous chunk
+                if absolute_start < last_end_time - 0.5:
+                    continue
+                all_segments.append({
+                    "text": seg["text"],
+                    "start": absolute_start,
+                    "duration": seg["duration"],
+                })
+                last_end_time = absolute_start + seg["duration"]
+
+    logger.info("Local Whisper done: %d segments (chunked from %.0fs audio)", len(all_segments), duration)
+    return all_segments
 
 
 # --- Public API ---
