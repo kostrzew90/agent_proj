@@ -34,10 +34,28 @@ SIGKILL (OOM) after 2 min — container memory exhausted
 - Sleep and retry the same chunk, up to 3 attempts
 - Only fall back to local after 3 failed retries
 
-**Local fallback — chunked processing:**
-- Split audio into 20-min chunks via ffmpeg before loading into Whisper
-- Process each chunk sequentially: transcribe → collect segments (with timestamp offset) → free chunk file
-- Prevents OOM: model stays loaded (~1.5 GB RAM), only one chunk in memory at a time
+**Local fallback — VAD-based chunked processing:**
+
+Pipeline:
+```
+audio → silero-vad → speech segments → group into 5-10 min chunks (split at silence gaps)
+      → for each chunk: ffmpeg extract (+ 5-10s overlap) → faster-whisper → segments + offset
+      → merge all segments → full transcript
+```
+
+Key decisions:
+- **silero-vad** (preferred over webrtcvad): more accurate, PyTorch-based, works natively with torchaudio; webrtcvad is faster but lower accuracy and C-dependency
+- **Chunk size**: 5-10 min (not fixed 20 min) — keeps RAM low, faster retry on failure
+- **Overlap**: 5-10s on each chunk boundary — prevents cut-off words at split points
+- **Split at silence**: VAD finds natural pause points → no mid-sentence cuts → better quality
+- `vad_filter=False` in faster-whisper call (VAD already done upstream, no double processing)
+- Prevents OOM: model stays loaded (~1.5 GB RAM), only one 5-10 min chunk in memory at a time
+
+**Dependency added to `requirements.txt`:**
+```
+silero-vad
+```
+(pulls torch if not present; already installed via faster-whisper → no extra download)
 
 **Model: `large-v3-turbo`**
 - Distilled from large-v3: same encoder (1500M params), 4 decoder layers instead of 32
@@ -59,7 +77,7 @@ Set via Windows System Properties → Environment Variables → System variables
 
 ### Expected outcome for 2h10m file
 - Groq processes chunks 1+2 → hits rate limit on chunk 3 → waits ~4.5 min → retries chunk 3 → success
-- If Groq unavailable: 13 × 20-min chunks × ~3 min each ≈ ~40 min total (large-v3-turbo CPU)
+- If Groq unavailable: ~26 × 5-min chunks × ~1.5 min each ≈ ~40 min total (large-v3-turbo CPU, same total time but smaller memory footprint and better quality at boundaries)
 
 ---
 
