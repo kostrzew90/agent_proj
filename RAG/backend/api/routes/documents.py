@@ -369,6 +369,51 @@ async def delete_document(
     await db.commit()
 
 
+@router.post("/{document_id}/reprocess", response_model=DocumentResponse, status_code=202)
+async def reprocess_document(
+    document_id: int,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Reset a stuck/failed document and re-trigger processing."""
+    result = await db.execute(
+        select(Document).where(Document.id == document_id, Document.user_id == user.id)
+    )
+    doc = result.scalar_one_or_none()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if doc.status not in ("error", "processing"):
+        raise HTTPException(status_code=400, detail=f"Cannot reprocess document with status '{doc.status}'")
+
+    # Delete existing chunks
+    from sqlalchemy import delete
+    await db.execute(delete(DocumentChunk).where(DocumentChunk.document_id == document_id))
+
+    # Reset document status
+    doc.status = "pending"
+    doc.error_message = None
+    doc.processed_at = None
+
+    # Create new processing task
+    task = ProcessingTask(document_id=doc.id, task_type="full_pipeline", status="pending")
+    db.add(task)
+    await db.commit()
+    await db.refresh(doc)
+
+    # Dispatch Celery task
+    from tasks.document_tasks import process_document
+    celery_result = process_document.delay(doc.id, task.id)
+    task.celery_task_id = celery_result.id
+    await db.commit()
+
+    return DocumentResponse(
+        id=doc.id, filename=doc.filename, file_type=doc.file_type,
+        file_size=doc.file_size, page_count=doc.page_count, status=doc.status,
+        source_type=doc.source_type, source_url=doc.source_url,
+        created_at=doc.created_at, processed_at=doc.processed_at,
+    )
+
+
 class CrawlRequest(BaseModel):
     url: str
     depth: int = 1

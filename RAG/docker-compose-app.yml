@@ -47,8 +47,9 @@ services:
       RAG_DB_HOST: rag-postgres
       RAG_DB_PORT: 5432
       REDIS_URL: redis://rag-redis:6379/0
-      WHISPER_MODEL_SIZE: tiny
-      WHISPER_BEAM_SIZE: "1"
+      WHISPER_MODEL_SIZE: large-v3-turbo
+      WHISPER_BEAM_SIZE: "5"
+      WHISPER_THREADS: "6"
       GROQ_API_KEY: ${GROQ_API_KEY:-}
     volumes:
       - rag-uploads:/data/uploads
