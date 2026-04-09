@@ -164,7 +164,10 @@ async def websocket_chat(websocket: WebSocket, session_id: str):
             user_message = msg.get("message", "")
             if not user_message:
                 continue
-            response_text = await agent_step(session, user_message)
+            async def send_event(event_type: str, data: dict):
+                await websocket.send_json({"type": event_type, **data})
+
+            response_text = await agent_step(session, user_message, on_event=send_event)
             await websocket.send_json({"type": "response", "content": response_text, "session_id": session.id})
     except WebSocketDisconnect:
         # Trigger reflection on disconnect

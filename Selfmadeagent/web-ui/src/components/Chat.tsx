@@ -27,9 +27,12 @@ export function Chat({ sessionId }: Props) {
         {messages.map((msg, i) => (
           <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-[80%] px-4 py-2 rounded-lg whitespace-pre-wrap ${
-              msg.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-100'
+              msg.role === 'user' ? 'bg-blue-600 text-white' :
+              msg.content.startsWith('[status]') ? 'bg-gray-800 text-gray-400 italic text-sm animate-pulse' :
+              msg.content.startsWith('[tool]') ? 'bg-gray-800 text-yellow-300 font-mono text-xs border-l-2 border-yellow-600' :
+              'bg-gray-700 text-gray-100'
             }`}>
-              {msg.content}
+              {msg.content.replace(/^\[(status|tool)\]\s*/, '')}
             </div>
           </div>
         ))}

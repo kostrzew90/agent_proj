@@ -24,9 +24,37 @@ export function useWebSocket(sessionId: string | null) {
     socket.onmessage = (event) => {
       const data = JSON.parse(event.data)
       if (data.type === 'response') {
+        // Remove any pending status messages and add final response
+        setMessages(prev => [
+          ...prev.filter(m => !m.content.startsWith('[status]') && !m.content.startsWith('[tool]')),
+          {
+            role: 'assistant',
+            content: data.content,
+            timestamp: new Date().toISOString(),
+          }
+        ])
+      } else if (data.type === 'status') {
+        setMessages(prev => {
+          const filtered = prev.filter(m => !m.content.startsWith('[status]'))
+          return [...filtered, {
+            role: 'assistant',
+            content: `[status] ${data.text}`,
+            timestamp: new Date().toISOString(),
+          }]
+        })
+      } else if (data.type === 'tool_start') {
+        setMessages(prev => {
+          const filtered = prev.filter(m => !m.content.startsWith('[status]'))
+          return [...filtered, {
+            role: 'assistant',
+            content: `[tool] Running ${data.tool}(${Object.values(data.args || {}).join(', ').slice(0, 80)})...`,
+            timestamp: new Date().toISOString(),
+          }]
+        })
+      } else if (data.type === 'tool_result') {
         setMessages(prev => [...prev, {
           role: 'assistant',
-          content: data.content,
+          content: `[tool] ${data.tool} ${data.score >= 0.7 ? 'OK' : 'WARN'}: ${(data.preview || '').slice(0, 120)}`,
           timestamp: new Date().toISOString(),
         }])
       }

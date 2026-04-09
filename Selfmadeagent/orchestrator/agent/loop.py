@@ -39,10 +39,16 @@ def _get_working(session_id: str, goal: str | None = None) -> WorkingMemory:
 
 
 @observe(name="agent_step")
-async def agent_step(session: Session, user_message: str) -> str:
+async def agent_step(session: Session, user_message: str, on_event=None) -> str:
     """Run one full agent step with memory + validation."""
+
+    async def emit(event_type: str, data: dict):
+        if on_event:
+            await on_event(event_type, data)
+
     session.messages.append(Message(role="user", content=user_message))
     await add_episode(session.id, "user_message", user_message)
+    await emit("status", {"text": "Thinking..."})
 
     workspace = str(WORKSPACE)
     facts = load_facts(workspace)
@@ -74,6 +80,7 @@ async def agent_step(session: Session, user_message: str) -> str:
         message = choice.message
 
         if not message.tool_calls:
+            await emit("status", {"text": "Composing response..."})
             content = message.content or ""
             session.messages.append(Message(role="assistant", content=content))
             await add_episode(session.id, "response", content, outcome="success")
@@ -111,10 +118,12 @@ async def agent_step(session: Session, user_message: str) -> str:
 
             # Execute
             retry_budget.reset_action()
+            await emit("tool_start", {"tool": tool_name, "args": {k: str(v)[:100] for k, v in args.items()}})
             result = await execute_tool(tool_name, args)
 
             # Evaluate
             score = heuristic_evaluate(tool_name, args, result)
+            await emit("tool_result", {"tool": tool_name, "score": score, "preview": result[:200]})
             working.add_step(
                 action=f"{tool_name}({json.dumps(args, ensure_ascii=False)[:100]})",
                 result_summary=result[:200],
