@@ -61,6 +61,7 @@ def compose_context(
     history: list[dict],
     skill_text: str | None = None,
     memory_text: str | None = None,
+    facts_text: str | None = None,
 ) -> ComposedContext:
     """Compose the final prompt within token budget.
 
@@ -72,6 +73,12 @@ def compose_context(
     5. Older history (trimmed first)
     """
     system = SYSTEM_PROMPT
+
+    # Inject FACTS (guardrails) — always first after system
+    if facts_text:
+        facts_tokens = count_tokens(facts_text)
+        if facts_tokens <= 500:  # FACTS should be short
+            system += f"\n\n## Workspace Rules\n{facts_text}"
 
     # Inject skill and memory into system prompt
     if skill_text:
