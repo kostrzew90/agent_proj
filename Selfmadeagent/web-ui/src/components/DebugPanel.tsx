@@ -16,7 +16,7 @@ export function DebugPanel({ sessionId }: Props) {
     if (sessionId && tab === 'trace') {
       const interval = setInterval(() => {
         fetchTrace(sessionId).then(setTrace).catch(() => {})
-      }, 2000)
+      }, 5000)
       fetchTrace(sessionId).then(setTrace).catch(() => {})
       return () => clearInterval(interval)
     }

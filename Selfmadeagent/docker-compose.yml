@@ -1,0 +1,116 @@
+name: selfmadeagent
+
+services:
+  agent-db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: agent
+      POSTGRES_PASSWORD: agentpass
+      POSTGRES_DB: agent
+    ports:
+      - "${AGENT_DB_PORT:-5436}:5432"
+    volumes:
+      - agent-db-data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agent"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  langfuse-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: langfuse
+      POSTGRES_PASSWORD: langfusepass
+      POSTGRES_DB: langfuse
+    ports:
+      - "${LANGFUSE_DB_PORT:-5433}:5432"
+    volumes:
+      - langfuse-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U langfuse"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  langfuse-server:
+    image: langfuse/langfuse:2
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://langfuse:langfusepass@langfuse-db:5432/langfuse
+      NEXTAUTH_URL: http://localhost:${LANGFUSE_PORT:-3100}
+      NEXTAUTH_SECRET: selfmadeagent-langfuse-secret
+      SALT: selfmadeagent-langfuse-salt
+    ports:
+      - "${LANGFUSE_PORT:-3100}:3000"
+    depends_on:
+      langfuse-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/public/health || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 60s
+
+  claw-core:
+    build:
+      context: ./claw-core
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${CLAW_CORE_PORT:-8180}:8080"
+    volumes:
+      - ${WORKSPACE_HOST_PATH:-C:/Users/DAMA/Documents/docker/n8n}:/workspace
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  orchestrator:
+    build:
+      context: ./orchestrator
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      AGENT_DB_URL: postgresql://agent:agentpass@agent-db:5432/agent
+      CLAW_CORE_URL: http://claw-core:8080
+      LANGFUSE_HOST: http://langfuse-server:3000
+      WORKSPACE_PATH: /workspace
+    ports:
+      - "${ORCHESTRATOR_PORT:-8100}:8000"
+    volumes:
+      - ${WORKSPACE_HOST_PATH:-C:/Users/DAMA/Documents/docker/n8n}:/workspace
+    depends_on:
+      agent-db:
+        condition: service_healthy
+      claw-core:
+        condition: service_healthy
+      langfuse-server:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  web-ui:
+    build:
+      context: ./web-ui
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${WEB_UI_PORT:-3101}:80"
+    depends_on:
+      orchestrator:
+        condition: service_started
+
+volumes:
+  agent-db-data:
+  langfuse-db-data:
