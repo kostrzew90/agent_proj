@@ -1343,6 +1343,24 @@ def _pool_bucket_ts(now: datetime) -> datetime:
     return now.replace(minute=minute_bucket, second=0, microsecond=0)
 
 
+def _pool_is_open(ts: datetime) -> bool:
+    """Return True if the pool is open at the given Warsaw-timezone timestamp.
+
+    Reads open/close hours from /config/pool_hours.csv (weekday 0=Mon … 6=Sun).
+    Falls back to 6–22 every day if the file is missing or unreadable.
+    """
+    hours_path = Path("/config/pool_hours.csv")
+    try:
+        with hours_path.open(encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                if int(row["weekday"]) == ts.weekday():
+                    return int(row["open"]) <= ts.hour < int(row["close"])
+    except Exception:
+        pass
+    return 6 <= ts.hour < 22
+
+
 def _handle_pool_monitor() -> str:
     """Fetch pool occupancy from cr.nieporet.pl, write to CSV + Postgres."""
     from bs4 import BeautifulSoup
@@ -1354,6 +1372,9 @@ def _handle_pool_monitor() -> str:
 
     tz = ZoneInfo("Europe/Warsaw")
     ts = _pool_bucket_ts(datetime.now(tz=tz))
+
+    if not _pool_is_open(ts):
+        return f"Basen zamknięty ({ts.strftime('%H:%M')}) — brak sprawdzenia"
 
     # HTTP fetch — exponential backoff for network/5xx only
     resp = None
@@ -2315,7 +2336,11 @@ def _process_inbox_file(path: Path) -> None:
             # JSON format (legacy)
             msg = json.loads(path.read_text(encoding="utf-8"))
     except Exception as exc:
-        print(f"[bridge] failed to read {path.name}: {exc}", flush=True)
+        print(f"[bridge] failed to read {path.name}: {exc} — moving to processed", flush=True)
+        try:
+            _move_to_processed(path)
+        except Exception:
+            pass
         return
 
     chat_id = msg.get("chat_id")
@@ -2379,6 +2404,13 @@ def main() -> None:
                 if not _running:
                     break
                 _process_inbox_file(path)
+        except OSError as exc:
+            print(f"[bridge] poll loop I/O error (volume issue?): {exc} — sleeping 30s", flush=True)
+            for _ in range(300):
+                if not _running:
+                    break
+                time.sleep(0.1)
+            continue
         except Exception as exc:
             print(f"[bridge] poll loop error: {exc}", flush=True)
 

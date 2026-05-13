@@ -1,0 +1,29 @@
+name: Pool Monitor — Basen Nieporęt
+
+on:
+  schedule:
+    # co 30 min, 4:00–20:30 UTC = 6:00–22:30 Warsaw (CEST +2)
+    - cron: "0,30 4-20 * * *"
+  workflow_dispatch: {}   # ręczne uruchomienie z UI GitHub
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: hermes/scripts/pool_monitor_requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r hermes/scripts/pool_monitor_requirements.txt
+
+      - name: Run pool monitor
+        env:
+          NEON_DSN: ${{ secrets.NEON_POOL_DSN }}
+        run: python hermes/scripts/pool_monitor.py

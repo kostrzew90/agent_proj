@@ -130,6 +130,7 @@ services:
     networks: [hermes-net]
     volumes:
       - ./audit:/audit
+      - ./config:/config:ro
       - ../:/workspace/ro:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"

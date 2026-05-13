@@ -1,0 +1,41 @@
+apiVersion: 1
+datasources:
+  - name: Hermes Postgres
+    uid: hermes-postgres
+    type: postgres
+    access: proxy
+    url: host.docker.internal:5434
+    database: rag
+    user: hermes_ro
+    secureJsonData:
+      password: "306813bb7e49cdd456b53d1e6cfcc1d0"
+    jsonData:
+      sslmode: disable
+      maxOpenConns: 5
+      maxIdleConns: 2
+      connMaxLifetime: 14400
+      postgresVersion: 1500
+      timescaledb: false
+    isDefault: true
+    editable: true
+
+  - name: Neon Pool
+    uid: neon-pool
+    type: postgres
+    access: proxy
+    # URL zostanie nadpisany przez zmienną środowiskową GF_DATASOURCE_NEON_URL
+    # lub ręcznie w Grafana UI po wklejeniu danych z Neon
+    url: "${NEON_POOL_HOST}"
+    database: "${NEON_POOL_DB}"
+    user: "${NEON_POOL_USER}"
+    secureJsonData:
+      password: "${NEON_POOL_PASSWORD}"
+    jsonData:
+      sslmode: require
+      maxOpenConns: 3
+      maxIdleConns: 1
+      connMaxLifetime: 300
+      postgresVersion: 1500
+      timescaledb: false
+    isDefault: false
+    editable: true

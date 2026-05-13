@@ -1,0 +1,334 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {"type": "postgres", "uid": "${datasource}"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 20},
+              {"color": "red", "value": 32}
+            ]
+          },
+          "unit": "short",
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 5, "w": 5, "x": 0, "y": 0},
+      "id": 1,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "textMode": "value_and_name"
+      },
+      "title": "Aktualnie na basenie",
+      "type": "stat",
+      "targets": [
+        {
+          "rawSql": "SELECT recorded_at AS time, people_count AS \"Osoby\" FROM hermes_pool_occupancy WHERE scrape_ok = true ORDER BY recorded_at DESC LIMIT 1",
+          "refId": "A",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "${datasource}"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]},
+          "unit": "short",
+          "mappings": [{"options": {"0": {"text": "OK"}, "1": {"text": "BŁĄD"}}, "type": "value"}]
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 5, "w": 4, "x": 5, "y": 0},
+      "id": 2,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "textMode": "value_and_name"
+      },
+      "title": "Ostatni scrape",
+      "type": "stat",
+      "targets": [
+        {
+          "rawSql": "SELECT recorded_at AS time, CASE WHEN scrape_ok THEN 0 ELSE 1 END AS \"Status\" FROM hermes_pool_occupancy ORDER BY recorded_at DESC LIMIT 1",
+          "refId": "A",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "${datasource}"},
+      "fieldConfig": {
+        "defaults": {"color": {"mode": "palette-classic"}, "unit": "short"},
+        "overrides": []
+      },
+      "gridPos": {"h": 5, "w": 5, "x": 9, "y": 0},
+      "id": 3,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "horizontal",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "textMode": "value_and_name"
+      },
+      "title": "Dziś — min / śr / max",
+      "type": "stat",
+      "targets": [
+        {
+          "rawSql": "SELECT MIN(people_count) AS \"Min\", ROUND(AVG(people_count)) AS \"Śr\", MAX(people_count) AS \"Max\" FROM hermes_pool_occupancy WHERE scrape_ok = true AND recorded_at >= date_trunc('day', now() AT TIME ZONE 'Europe/Warsaw') AT TIME ZONE 'Europe/Warsaw'",
+          "refId": "A",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "${datasource}"},
+      "fieldConfig": {
+        "defaults": {"color": {"mode": "palette-classic"}, "unit": "short"},
+        "overrides": []
+      },
+      "gridPos": {"h": 5, "w": 10, "x": 14, "y": 0},
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "horizontal",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "textMode": "value_and_name"
+      },
+      "title": "Łącznie odczytów / błędów (7 dni)",
+      "type": "stat",
+      "targets": [
+        {
+          "rawSql": "SELECT COUNT(*) FILTER (WHERE scrape_ok) AS \"OK\", COUNT(*) FILTER (WHERE NOT scrape_ok) AS \"Błędy\" FROM hermes_pool_occupancy WHERE recorded_at >= now() - interval '7 days'",
+          "refId": "A",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "${datasource}"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {"lineWidth": 2, "fillOpacity": 12, "spanNulls": false},
+          "min": 0,
+          "softMax": 80,
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "Śr kroczące (3h)"},
+            "properties": [
+              {"id": "custom.lineWidth", "value": 1},
+              {"id": "custom.lineStyle", "value": {"dash": [8, 4], "fill": "dash"}},
+              {"id": "color", "value": {"fixedColor": "orange", "mode": "fixed"}}
+            ]
+          },
+          {
+            "matcher": {"id": "byName", "options": "Błąd scrape"},
+            "properties": [
+              {"id": "custom.drawStyle", "value": "bars"},
+              {"id": "custom.fillOpacity", "value": 80},
+              {"id": "color", "value": {"fixedColor": "red", "mode": "fixed"}},
+              {"id": "custom.barMaxWidth", "value": 4}
+            ]
+          }
+        ]
+      },
+      "gridPos": {"h": 10, "w": 24, "x": 0, "y": 5},
+      "id": 5,
+      "options": {
+        "tooltip": {"mode": "multi", "sort": "none"},
+        "legend": {"displayMode": "list", "placement": "bottom"}
+      },
+      "title": "Obłożenie basenu w czasie",
+      "type": "timeseries",
+      "targets": [
+        {
+          "rawSql": "SELECT recorded_at AS time, people_count AS \"Osoby\" FROM hermes_pool_occupancy WHERE scrape_ok = true ORDER BY recorded_at",
+          "refId": "A",
+          "format": "time_series"
+        },
+        {
+          "rawSql": "SELECT recorded_at AS time, ROUND(AVG(people_count) OVER (ORDER BY recorded_at ROWS BETWEEN 5 PRECEDING AND CURRENT ROW)) AS \"Śr kroczące (3h)\" FROM hermes_pool_occupancy WHERE scrape_ok = true ORDER BY recorded_at",
+          "refId": "B",
+          "format": "time_series"
+        },
+        {
+          "rawSql": "SELECT recorded_at AS time, CASE WHEN scrape_ok = false THEN 2 ELSE NULL END AS \"Błąd scrape\" FROM hermes_pool_occupancy ORDER BY recorded_at",
+          "refId": "C",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "${datasource}"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "continuous-GrYlRd"},
+          "custom": {"lineWidth": 1, "fillOpacity": 70},
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 15},
+      "id": 6,
+      "options": {
+        "calculate": false,
+        "cellGap": 1,
+        "color": {
+          "exponent": 0.5,
+          "fill": "dark-orange",
+          "mode": "scheme",
+          "scale": "exponential",
+          "scheme": "Oranges",
+          "steps": 64
+        },
+        "exemplars": {"color": "rgba(255,0,255,0.7)"},
+        "filterValues": {"le": 1e-9},
+        "legend": {"show": true},
+        "rowsFrame": {"layout": "auto"},
+        "tooltip": {"mode": "single", "showColorScale": false, "yHistogram": false},
+        "yAxis": {"axisPlacement": "left", "decimals": 0, "unit": "short"}
+      },
+      "title": "Wzorce tygodniowe — śr. obłożenie (dzień × godzina)",
+      "type": "heatmap",
+      "targets": [
+        {
+          "rawSql": "SELECT date_trunc('hour', recorded_at AT TIME ZONE 'Europe/Warsaw') AS time, EXTRACT(DOW FROM recorded_at AT TIME ZONE 'Europe/Warsaw')::int AS dow, AVG(people_count)::int AS value FROM hermes_pool_occupancy WHERE scrape_ok = true AND people_count IS NOT NULL GROUP BY 1, 2 ORDER BY 1",
+          "refId": "A",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "${datasource}"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 20},
+              {"color": "red", "value": 32}
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 15},
+      "id": 7,
+      "options": {
+        "displayMode": "gradient",
+        "maxVizHeight": 300,
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "orientation": "horizontal",
+        "reduceOptions": {"calcs": ["mean"], "fields": "", "values": false},
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color"
+      },
+      "title": "Śr. obłożenie wg godziny dnia",
+      "type": "bargauge",
+      "targets": [
+        {
+          "rawSql": "SELECT LPAD(EXTRACT(HOUR FROM recorded_at AT TIME ZONE 'Europe/Warsaw')::text, 2, '0') || ':00' AS metric, ROUND(AVG(people_count)) AS value FROM hermes_pool_occupancy WHERE scrape_ok = true AND people_count IS NOT NULL GROUP BY 1 ORDER BY 1",
+          "refId": "A",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "${datasource}"},
+      "fieldConfig": {
+        "defaults": {"color": {"mode": "palette-classic"}, "unit": "ms"},
+        "overrides": []
+      },
+      "gridPos": {"h": 6, "w": 12, "x": 0, "y": 24},
+      "id": 8,
+      "options": {
+        "tooltip": {"mode": "single"},
+        "legend": {"displayMode": "list", "placement": "bottom"}
+      },
+      "title": "Czas odpowiedzi strony (scrape_ms)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "rawSql": "SELECT recorded_at AS time, scrape_ms AS \"ms\" FROM hermes_pool_occupancy ORDER BY recorded_at",
+          "refId": "A",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "${datasource}"},
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "scrape_ok"}, "properties": [{"id": "custom.width", "value": 80}, {"id": "mappings", "value": [{"options": {"false": {"color": "red", "text": "❌"}, "true": {"color": "green", "text": "✅"}}, "type": "value"}]}, {"id": "custom.displayMode", "value": "color-text"}]},
+          {"matcher": {"id": "byName", "options": "people_count"}, "properties": [{"id": "custom.width", "value": 100}]},
+          {"matcher": {"id": "byName", "options": "scrape_ms"}, "properties": [{"id": "custom.width", "value": 90}, {"id": "unit", "value": "ms"}]}
+        ]
+      },
+      "gridPos": {"h": 6, "w": 12, "x": 12, "y": 24},
+      "id": 9,
+      "options": {"showHeader": true, "sortBy": [{"desc": true, "displayName": "recorded_at"}]},
+      "title": "Ostatnie odczyty",
+      "type": "table",
+      "targets": [
+        {
+          "rawSql": "SELECT recorded_at, people_count, scrape_ok, scrape_ms, error FROM hermes_pool_occupancy ORDER BY recorded_at DESC LIMIT 20",
+          "refId": "A",
+          "format": "table"
+        }
+      ]
+    }
+  ],
+  "refresh": "5m",
+  "schemaVersion": 39,
+  "tags": ["hermes", "pool"],
+  "templating": {
+    "list": [
+      {
+        "current": {"text": "Neon Pool", "value": "neon-pool"},
+        "hide": 0,
+        "includeAll": false,
+        "label": "Źródło danych",
+        "multi": false,
+        "name": "datasource",
+        "options": [],
+        "query": "postgres",
+        "refresh": 1,
+        "type": "datasource"
+      }
+    ]
+  },
+  "time": {"from": "now-7d", "to": "now"},
+  "title": "Basen Nieporęt — Monitor",
+  "uid": "hermes-pool-monitor"
+}
