@@ -74,10 +74,6 @@ def main() -> None:
 
     ts = bucket_ts(datetime.now(tz=TZ))
 
-    if not is_open(ts):
-        print(f"Pool closed at {ts.strftime('%H:%M')} — skipping", flush=True)
-        return
-
     count, ok, ms, error = scrape()
     print(f"Scraped: count={count} ok={ok} ms={ms} error={error}", flush=True)
 
@@ -94,6 +90,9 @@ def main() -> None:
                 error          text
             )
         """)
+        if not is_open(ts):
+            print(f"Pool closed at {ts.strftime('%H:%M')} — skipping insert", flush=True)
+            return
         cur.execute("""
             INSERT INTO hermes_pool_occupancy
                 (recorded_at, people_count, scrape_ok, scrape_ms, error)
