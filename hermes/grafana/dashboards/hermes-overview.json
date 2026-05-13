@@ -1,0 +1,289 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {"type": "postgres", "uid": "hermes-postgres"},
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}}, "overrides": []},
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+      "id": 1,
+      "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+      "title": "Total Sessions",
+      "type": "stat",
+      "targets": [{"rawSql": "SELECT COUNT(*) AS total FROM hermes_session_memory;", "refId": "A", "format": "table"}]
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "hermes-postgres"},
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+      "id": 2,
+      "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+      "title": "Persistent Facts",
+      "type": "stat",
+      "targets": [{"rawSql": "SELECT COUNT(*) AS total FROM hermes_persistent_memory;", "refId": "A", "format": "table"}]
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "hermes-postgres"},
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+      "id": 3,
+      "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+      "title": "Indexed Tabs",
+      "type": "stat",
+      "targets": [{"rawSql": "SELECT COUNT(*) AS total FROM hermes_tabs;", "refId": "A", "format": "table"}]
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "hermes-postgres"},
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+      "id": 4,
+      "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+      "title": "Tab Chunks",
+      "type": "stat",
+      "targets": [{"rawSql": "SELECT COUNT(*) AS total FROM hermes_tab_chunks;", "refId": "A", "format": "table"}]
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "hermes-postgres"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+      "id": 5,
+      "options": {},
+      "title": "Sessions per Day",
+      "type": "timeseries",
+      "fieldConfig": {"defaults": {"custom": {"drawStyle": "bars", "fillOpacity": 50}}, "overrides": []},
+      "targets": [{"rawSql": "SELECT date_trunc('day', ts) AS time, COUNT(*) AS sessions FROM hermes_session_memory WHERE ts > now() - interval '30 days' GROUP BY 1 ORDER BY 1;", "refId": "A", "format": "time_series"}]
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "hermes-postgres"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+      "id": 6,
+      "options": {"legend": {"displayMode": "list", "placement": "right"}},
+      "title": "Tabs by Category",
+      "type": "piechart",
+      "targets": [{"rawSql": "SELECT COALESCE(category, 'uncategorized') AS category, COUNT(*) AS count FROM hermes_tabs GROUP BY 1 ORDER BY 2 DESC;", "refId": "A", "format": "table"}]
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "hermes-postgres"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
+      "id": 7,
+      "options": {},
+      "title": "Avg Latency by Skill (ms)",
+      "type": "barchart",
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}}, "overrides": []},
+      "targets": [{"rawSql": "SELECT skill_name, ROUND(AVG(latency_ms)) AS avg_latency_ms FROM hermes_session_memory WHERE skill_name != '' AND ts > now() - interval '7 days' GROUP BY 1 ORDER BY 2 DESC;", "refId": "A", "format": "table"}]
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "hermes-postgres"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
+      "id": 8,
+      "options": {},
+      "title": "Skill Usage (7 days)",
+      "type": "barchart",
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}}, "overrides": []},
+      "targets": [{"rawSql": "SELECT COALESCE(NULLIF(skill_name, ''), 'plain') AS skill, COUNT(*) AS count FROM hermes_session_memory WHERE ts > now() - interval '7 days' GROUP BY 1 ORDER BY 2 DESC;", "refId": "A", "format": "table"}]
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "hermes-postgres"},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 20},
+      "id": 9,
+      "options": {"showHeader": true, "sortBy": [{"desc": true, "displayName": "ts"}]},
+      "title": "Recent Sessions",
+      "type": "table",
+      "targets": [{"rawSql": "SELECT ts, skill_name, LEFT(user_message, 80) AS message, LEFT(reply, 120) AS reply, latency_ms FROM hermes_session_memory ORDER BY ts DESC LIMIT 20;", "refId": "A", "format": "table"}]
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "hermes-postgres"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 28},
+      "id": 10,
+      "options": {},
+      "title": "Tabs by Domain (top 10)",
+      "type": "barchart",
+      "targets": [{"rawSql": "SELECT domain, COUNT(*) AS count FROM hermes_tabs GROUP BY 1 ORDER BY 2 DESC LIMIT 10;", "refId": "A", "format": "table"}]
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "hermes-postgres"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 28},
+      "id": 11,
+      "options": {"showHeader": true},
+      "title": "Persistent Facts",
+      "type": "table",
+      "targets": [{"rawSql": "SELECT ts, fact, category FROM hermes_persistent_memory ORDER BY ts DESC LIMIT 20;", "refId": "A", "format": "table"}]
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "hermes-postgres"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 8},
+              {"color": "red", "value": 10}
+            ]
+          },
+          "unit": "currencyUSD",
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 36},
+      "id": 12,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "textMode": "auto"
+      },
+      "title": "Weekly Spend ($)",
+      "type": "stat",
+      "targets": [
+        {
+          "rawSql": "SELECT COALESCE(SUM(cost_usd), 0) AS value FROM hermes_llm_costs WHERE ts >= date_trunc('week', now());",
+          "refId": "A",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "hermes-postgres"},
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}}, "overrides": []},
+      "gridPos": {"h": 8, "w": 9, "x": 6, "y": 36},
+      "id": 13,
+      "options": {"legend": {"displayMode": "list", "placement": "right"}},
+      "title": "Cost by Model (last 7d)",
+      "type": "piechart",
+      "targets": [
+        {
+          "rawSql": "SELECT model, SUM(cost_usd) AS value FROM hermes_llm_costs WHERE ts >= now() - interval '7 days' GROUP BY model ORDER BY value DESC;",
+          "refId": "A",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "hermes-postgres"},
+      "fieldConfig": {
+        "defaults": {"custom": {"drawStyle": "bars", "fillOpacity": 80, "stacking": {"group": "A", "mode": "normal"}}},
+        "overrides": []
+      },
+      "gridPos": {"h": 8, "w": 9, "x": 15, "y": 36},
+      "id": 14,
+      "options": {},
+      "title": "Tokens/Day by Tier (30d)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "rawSql": "SELECT date_trunc('day', ts) AS time, tier, SUM(tokens_in + tokens_out) AS tokens FROM hermes_llm_costs WHERE ts >= now() - interval '30 days' GROUP BY 1, 2 ORDER BY 1;",
+          "refId": "A",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "hermes-postgres"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 44},
+      "id": 15,
+      "options": {"showHeader": true, "sortBy": [{"desc": true, "displayName": "cost_usd"}]},
+      "title": "Top Skills by Cost (7d)",
+      "type": "table",
+      "targets": [
+        {
+          "rawSql": "SELECT skill, COUNT(*) AS calls, SUM(cost_usd) AS cost_usd, AVG(latency_ms)::int AS avg_latency_ms FROM hermes_llm_costs WHERE ts >= now() - interval '7 days' AND skill IS NOT NULL GROUP BY skill ORDER BY cost_usd DESC LIMIT 20;",
+          "refId": "A",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "hermes-postgres"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {"lineWidth": 2, "fillOpacity": 10},
+          "min": 0,
+          "max": 40,
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "avg_3h"},
+            "properties": [
+              {"id": "custom.lineWidth", "value": 1},
+              {"id": "custom.lineStyle", "value": {"dash": [6, 3], "fill": "dash"}},
+              {"id": "color", "value": {"fixedColor": "orange", "mode": "fixed"}}
+            ]
+          },
+          {
+            "matcher": {"id": "byName", "options": "scrape_failed"},
+            "properties": [
+              {"id": "custom.drawStyle", "value": "bars"},
+              {"id": "custom.fillOpacity", "value": 60},
+              {"id": "color", "value": {"fixedColor": "red", "mode": "fixed"}}
+            ]
+          }
+        ]
+      },
+      "gridPos": {"h": 10, "w": 24, "x": 0, "y": 52},
+      "id": 16,
+      "options": {"tooltip": {"mode": "multi"}},
+      "title": "Basen Nieporęt — obłożenie",
+      "type": "timeseries",
+      "targets": [
+        {
+          "rawSql": "SELECT recorded_at AS time, people_count FROM hermes_pool_occupancy WHERE scrape_ok = true ORDER BY recorded_at",
+          "refId": "A",
+          "format": "time_series"
+        },
+        {
+          "rawSql": "SELECT recorded_at AS time, AVG(people_count) OVER (ORDER BY recorded_at ROWS BETWEEN 5 PRECEDING AND CURRENT ROW) AS avg_3h FROM hermes_pool_occupancy WHERE scrape_ok = true ORDER BY recorded_at",
+          "refId": "B",
+          "format": "time_series"
+        },
+        {
+          "rawSql": "SELECT recorded_at AS time, CASE WHEN scrape_ok = false THEN 1 ELSE NULL END AS scrape_failed FROM hermes_pool_occupancy ORDER BY recorded_at",
+          "refId": "C",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "hermes-postgres"},
+      "fieldConfig": {
+        "defaults": {"color": {"mode": "continuous-BlPu"}, "unit": "short"},
+        "overrides": []
+      },
+      "gridPos": {"h": 10, "w": 24, "x": 0, "y": 62},
+      "id": 17,
+      "options": {
+        "calculate": false,
+        "cellGap": 2,
+        "color": {"exponent": 0.5, "fill": "dark-orange", "mode": "scheme", "scale": "exponential", "scheme": "Oranges", "steps": 64},
+        "exemplars": {"color": "rgba(255,0,255,0.7)"},
+        "filterValues": {"le": 1e-9},
+        "legend": {"show": true},
+        "rowsFrame": {"layout": "auto"},
+        "tooltip": {"mode": "single", "showColorScale": false, "yHistogram": false},
+        "yAxis": {"axisPlacement": "left", "decimals": 0, "unit": "short"}
+      },
+      "title": "Basen — wzorce tygodniowe (śr. obłożenie)",
+      "type": "heatmap",
+      "targets": [
+        {
+          "rawSql": "SELECT date_trunc('hour', recorded_at AT TIME ZONE 'Europe/Warsaw') AS time, EXTRACT(DOW FROM recorded_at AT TIME ZONE 'Europe/Warsaw')::int AS dow, AVG(people_count)::int AS value FROM hermes_pool_occupancy WHERE scrape_ok = true AND people_count IS NOT NULL GROUP BY 1, 2 ORDER BY 1",
+          "refId": "A",
+          "format": "table"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["hermes"],
+  "templating": {"list": []},
+  "time": {"from": "now-7d", "to": "now"},
+  "title": "Hermes Agent Overview",
+  "uid": "hermes-overview"
+}
