@@ -11,17 +11,15 @@ CREATE TABLE IF NOT EXISTS hermes_pool_occupancy (
     error        TEXT
 );
 
--- Index for time-series queries (latest readings first)
-CREATE INDEX IF NOT EXISTS idx_pool_occupancy_time
-    ON hermes_pool_occupancy (recorded_at DESC);
-
--- Deduplication strategy: application inserts with 1-minute window check
--- Query: SELECT * FROM hermes_pool_occupancy
---        WHERE recorded_at > now() - interval '1 minute'
---        ORDER BY recorded_at DESC LIMIT 1
--- If exists, skip INSERT; else proceed with upsert or insert new row
-
+-- _handle_pool_monitor() always inserts bucketed timestamps (00/30 min) — ON CONFLICT DO NOTHING handles retries
 -- Ochrona przed duplikatami przy restarcie/retry
 -- recorded_at is always bucketed to exact 00/30-min boundaries by _pool_bucket_ts()
 CREATE UNIQUE INDEX IF NOT EXISTS uq_pool_occupancy_bucket
     ON hermes_pool_occupancy (recorded_at);
+
+-- ---------------------------------------------------------------------------
+-- Grants
+-- ---------------------------------------------------------------------------
+GRANT SELECT ON hermes_pool_occupancy TO hermes_ro;
+GRANT INSERT ON hermes_pool_occupancy TO hermes_ingest;
+GRANT USAGE, SELECT ON SEQUENCE hermes_pool_occupancy_id_seq TO hermes_ingest;
