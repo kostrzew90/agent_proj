@@ -1,0 +1,272 @@
+version: "3.9"
+
+services:
+
+  hermes:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hermes
+    restart: unless-stopped
+    labels: ["hermes=true"]
+    networks:
+      - hermes-net
+    volumes:
+      - ../:/workspace/ro:ro
+      - ./workspace-rw:/workspace/rw
+      - ./audit:/audit
+      - ./policy.yaml:/etc/hermes/policy.yaml:ro
+      - hermes-home:/home/hermes
+    environment:
+      HERMES_POLICY_FILE: /etc/hermes/policy.yaml
+      OLLAMA_LAPTOP_URL: http://host.docker.internal:11434
+      OLLAMA_MAC_URL: http://100.73.220.16:11434
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID}
+      WEEKLY_BUDGET_USD: ${WEEKLY_BUDGET_USD:-10}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 4g
+    healthcheck:
+      test: ["CMD", "test", "-f", "/home/hermes/.hermes-installed"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+
+  mcp-postgres-ro:
+    build:
+      context: ../mcp-servers/postgres-ro
+    container_name: mcp-postgres-ro
+    restart: unless-stopped
+    labels: ["hermes=true"]
+    networks: [hermes-net]
+    volumes: ["./audit:/audit"]
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    expose: ["8000"]
+    environment:
+      HERMES_AUDIT_DIR: /audit
+      PG_N8N_DSN: ${PG_N8N_DSN}
+      PG_RAG_DSN: ${PG_RAG_DSN}
+      PG_AGENT_DSN: ${PG_AGENT_DSN}
+      PG_LANGFUSE_DSN: ${PG_LANGFUSE_DSN:-}
+      PG_AIREPO_DSN: ${PG_AIREPO_DSN:-}
+      MCP_TRANSPORT: sse
+      MCP_PORT: 8000
+
+  mcp-fs-safe:
+    build:
+      context: ../mcp-servers/fs-safe
+    container_name: mcp-fs-safe
+    restart: unless-stopped
+    labels: ["hermes=true"]
+    networks:
+      - hermes-net
+    volumes:
+      - ../:/workspace/ro:ro
+      - ./audit:/audit
+    expose: ["8000"]
+    environment:
+      HERMES_AUDIT_DIR: /audit
+      FS_ROOT: /workspace/ro
+      MCP_TRANSPORT: sse
+      MCP_PORT: 8000
+
+  telegram-watcher:
+    build:
+      context: ./telegram-watcher
+    container_name: hermes-telegram-watcher
+    restart: unless-stopped
+    labels: ["hermes=true"]
+    networks: [hermes-net]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./audit:/audit
+      # Bind-mount overrides the COPY'd fallback at runtime.
+      - ./scripts/killswitch.sh:/app/killswitch.sh:ro
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID}
+      HERMES_AUDIT_DIR: /audit
+
+  hermes-llm-proxy:
+    container_name: hermes-llm-proxy
+    build: ../mcp-servers/llm-proxy
+    restart: unless-stopped
+    networks:
+      - hermes-net
+      - rag-network
+    environment:
+      MCP_TRANSPORT: sse
+      MCP_HOST: 0.0.0.0
+      MCP_PORT: 8000
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      OLLAMA_MAC_URL: http://100.73.220.16:11434
+      OLLAMA_LAPTOP_URL: http://host.docker.internal:11434
+      WEEKLY_BUDGET_USD: ${WEEKLY_BUDGET_USD:-10}
+      AUDIT_DIR: /app/audit
+      HERMES_AUDIT_DIR: /app/audit
+      PG_DSN: postgresql://hermes_ingest:${HERMES_INGEST_PASSWORD}@rag-postgres:5432/rag
+    volumes:
+      - ./audit:/app/audit
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    labels:
+      hermes: "true"
+
+  hermes-bridge:
+    build:
+      context: ./bridge
+    container_name: hermes-bridge
+    restart: unless-stopped
+    labels: ["hermes=true"]
+    networks: [hermes-net]
+    volumes:
+      - ./audit:/audit
+      - ../:/workspace/ro:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      HERMES_AUDIT_DIR: /audit
+      HERMES_RECALL_DSN: postgresql://rag:ragpass@host.docker.internal:5434/rag
+      OLLAMA_URL: http://host.docker.internal:11434
+      EMBEDDING_MODEL: qwen3-embedding:0.6b
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID}
+      BRAVE_API_KEY: ${BRAVE_API_KEY:-}
+      N8N_WEBHOOK_URL: ${N8N_WEBHOOK_URL:-}
+      LLM_PROXY_URL: http://hermes-llm-proxy:8000/sse
+    depends_on:
+      - hermes-llm-proxy
+
+  hermes-ingest:
+    build:
+      context: ./hermes-ingest
+    container_name: hermes-ingest
+    restart: unless-stopped
+    labels: ["hermes=true"]
+    networks: [hermes-net]
+    volumes: ["./audit:/audit"]
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    environment:
+      HERMES_INGEST_WRITE_DSN: ${HERMES_INGEST_WRITE_DSN}
+      MCP_CHROME_RO_URL: http://chrome-readonly-mcp:8000/sse
+      OLLAMA_MAC_URL: http://100.73.220.16:11434
+      OLLAMA_LAPTOP_URL: http://host.docker.internal:11434
+      EMBEDDING_MODEL: qwen3-embedding:0.6b
+      INGEST_INTERVAL_SEC: "3600"
+      MAX_TABS_PER_CYCLE: "10"
+      AUDIT_DIR: /audit
+    depends_on:
+      - chrome-readonly-mcp
+
+  chrome-readonly-mcp:
+    build:
+      context: ./chrome-readonly-mcp
+    container_name: chrome-readonly-mcp
+    restart: unless-stopped
+    labels: ["hermes=true"]
+    networks: [hermes-net]
+    volumes: ["./audit:/audit"]
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    expose: ["8000"]
+    environment:
+      CDP_BASE_URL: http://host.docker.internal:9223
+      CDP_HOST_HEADER: localhost
+      AUDIT_DIR: /audit
+      MCP_TRANSPORT: sse
+      MCP_PORT: "8000"
+
+  browser-mcp:
+    build:
+      context: ./browser-mcp
+    container_name: browser-mcp
+    restart: unless-stopped
+    labels: ["hermes=true"]
+    networks: [hermes-net]
+    volumes: ["./audit:/audit"]
+    expose: ["8000"]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      CDP_BASE_URL: http://host.docker.internal:9223
+      CDP_HOST_HEADER: localhost
+      AUDIT_DIR: /audit
+      MCP_TRANSPORT: sse
+      MCP_PORT: "8000"
+
+  chrome-hermes:
+    image: lscr.io/linuxserver/chromium:latest
+    container_name: chrome-hermes
+    restart: unless-stopped
+    labels: ["hermes=true"]
+    networks: [hermes-net]
+    ports:
+      - "6080:3000"      # noVNC web UI (HTTP) — host:6080 → container:3000
+    expose:
+      - "9222"            # CDP endpoint, dostępny tylko w sieci hermes-net
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: "Europe/Warsaw"
+      CHROME_CLI: "--remote-debugging-address=0.0.0.0 --remote-debugging-port=9222 --remote-allow-origins=* --no-sandbox --disable-dev-shm-usage"
+    volumes:
+      - ./chrome-profile:/config
+    shm_size: "2gb"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: 2g
+
+  # Chromium binds CDP to 127.0.0.1:9222 only (security hardening, ignores
+  # --remote-debugging-address=0.0.0.0). This sidecar shares chrome-hermes's
+  # network namespace and forwards 0.0.0.0:9223 -> 127.0.0.1:9222 so other
+  # containers in hermes-net can reach CDP via chrome-hermes:9223.
+  chrome-hermes-cdp:
+    image: alpine/socat:latest
+    container_name: chrome-hermes-cdp
+    restart: unless-stopped
+    labels: ["hermes=true"]
+    network_mode: "service:chrome-hermes"
+    depends_on:
+      - chrome-hermes
+    command: TCP-LISTEN:9223,fork,reuseaddr TCP:127.0.0.1:9222
+
+  grafana:
+    image: grafana/grafana:10.4.13
+    container_name: hermes-grafana
+    restart: unless-stopped
+    labels: ["hermes=true"]
+    networks: [hermes-net]
+    ports:
+      - "3400:3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: hermes
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/hermes-overview.json
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+
+volumes:
+  hermes-home:
+  grafana-data:
+
+networks:
+  hermes-net:
+    driver: bridge
+    internal: false
+  rag-network:
+    external: true
+    name: rag-network
