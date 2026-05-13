@@ -20,3 +20,8 @@ CREATE INDEX IF NOT EXISTS idx_pool_occupancy_time
 --        WHERE recorded_at > now() - interval '1 minute'
 --        ORDER BY recorded_at DESC LIMIT 1
 -- If exists, skip INSERT; else proceed with upsert or insert new row
+
+-- Ochrona przed duplikatami przy restarcie/retry
+-- recorded_at is always bucketed to exact 00/30-min boundaries by _pool_bucket_ts()
+CREATE UNIQUE INDEX IF NOT EXISTS uq_pool_occupancy_bucket
+    ON hermes_pool_occupancy (recorded_at);
