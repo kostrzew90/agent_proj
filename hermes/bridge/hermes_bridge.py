@@ -122,9 +122,9 @@ _CRON_JOBS: dict[str, dict] = {
     "pool-monitor": {
         "interval_s": 1800,
         "run_at_hour": None,
-        "enabled": True,
+        "enabled": False,
         "last_run": 0.0,
-        "description": "Basen Nieporęt — liczba osób co 30 min",
+        "description": "Basen Nieporęt — liczba osób co 30 min (wyłączony — przejęty przez GitHub Actions → Neon)",
         "notify": "silent",
     },
 }
