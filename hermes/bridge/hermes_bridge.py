@@ -51,13 +51,14 @@ _running: bool = True
 # ---------------------------------------------------------------------------
 
 _CRON_CHAT_ID: str = os.environ.get("TELEGRAM_CHAT_ID", "")
+_LEGACY_ENABLED: bool = os.environ.get("HERMES_ENABLE_LEGACY_CRONS") == "1"
 
 # Each entry: skill_name → {interval_s, hour (optional, for daily), enabled, last_run}
 _CRON_JOBS: dict[str, dict] = {
     "scan-rss": {
         "interval_s": 86400,
         "run_at_hour": 8,
-        "enabled": True,
+        "enabled": _LEGACY_ENABLED,
         "last_run": 0.0,
         "description": "Job board scan (daily 8:00)",
         "notify": "always",
@@ -65,15 +66,15 @@ _CRON_JOBS: dict[str, dict] = {
     "crypto-arbitrage": {
         "interval_s": 3600,
         "run_at_hour": None,
-        "enabled": True,
+        "enabled": _LEGACY_ENABLED,
         "last_run": 0.0,
         "description": "Gate.io vs Binance spread check (hourly)",
-        "notify": "on_alert",  # only notify when spread > threshold
+        "notify": "on_alert",
     },
     "auto-todo": {
         "interval_s": 21600,
         "run_at_hour": None,
-        "enabled": True,
+        "enabled": _LEGACY_ENABLED,
         "last_run": 0.0,
         "description": "Extract TODOs from recent Chrome tabs (every 6h)",
         "notify": "always",
@@ -81,22 +82,51 @@ _CRON_JOBS: dict[str, dict] = {
     "classify-tabs": {
         "interval_s": 21600,
         "run_at_hour": None,
-        "enabled": True,
+        "enabled": _LEGACY_ENABLED,
         "last_run": 0.0,
         "description": "Classify uncategorized Chrome tabs (every 6h)",
-        "notify": "silent",  # just log, no Telegram
+        "notify": "silent",
     },
     "daily-digest": {
         "interval_s": 86400,
         "run_at_hour": 7,
-        "enabled": True,
+        "enabled": _LEGACY_ENABLED,
         "last_run": 0.0,
         "description": "Daily activity summary (7:00)",
         "notify": "always",
     },
-    "recompute-importance": {"interval_s": 21600, "run_at_hour": None, "enabled": True, "last_run": 0.0, "description": "Recompute tab importance scores (every 6h)", "notify": "silent"},
-    "check-confirmations": {"interval_s": 21600, "run_at_hour": None, "enabled": True, "last_run": 0.0, "description": "Notify about pending domain confirmations (every 6h)", "notify": "on_alert"},
-    "review-learn": {"interval_s": 10800, "run_at_hour": None, "enabled": True, "last_run": 0.0, "description": "Review code + ask ChatGPT for improvements (every 3h) — RAG/Selfmadeagent/VIN OSINT only, full text on disk, Telegram gets summary", "notify": "always"},
+    "recompute-importance": {
+        "interval_s": 21600,
+        "run_at_hour": None,
+        "enabled": _LEGACY_ENABLED,
+        "last_run": 0.0,
+        "description": "Recompute tab importance scores (every 6h)",
+        "notify": "silent",
+    },
+    "check-confirmations": {
+        "interval_s": 21600,
+        "run_at_hour": None,
+        "enabled": _LEGACY_ENABLED,
+        "last_run": 0.0,
+        "description": "Notify about pending domain confirmations (every 6h)",
+        "notify": "on_alert",
+    },
+    "review-learn": {
+        "interval_s": 10800,
+        "run_at_hour": None,
+        "enabled": _LEGACY_ENABLED,
+        "last_run": 0.0,
+        "description": "Review code + ask for improvements (every 3h)",
+        "notify": "always",
+    },
+    "pool-monitor": {
+        "interval_s": 1800,
+        "run_at_hour": None,
+        "enabled": True,
+        "last_run": 0.0,
+        "description": "Basen Nieporęt — liczba osób co 30 min",
+        "notify": "silent",
+    },
 }
 
 _cron_lock = threading.Lock()
@@ -1440,6 +1470,8 @@ def _cron_execute_skill(skill_name: str) -> str:
         return _handle_test_rag()
     if skill_name in ("test-trading", "test-selfmadeagent"):
         return _handle_service_health(skill_name)
+    if skill_name == "pool-monitor":
+        return _handle_pool_monitor()
     return f"[cron] skill '{skill_name}' not supported for cron."
 
 
