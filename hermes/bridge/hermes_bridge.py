@@ -1328,7 +1328,7 @@ def _handle_pool_monitor() -> str:
     # HTTP fetch — exponential backoff for network/5xx only
     resp = None
     error_text: str | None = None
-    t0 = time.time()
+    t0 = time.monotonic()
 
     for delay in [0, 1, 3]:
         if delay:
@@ -1348,7 +1348,7 @@ def _handle_pool_monitor() -> str:
                 error_text = str(exc)
                 break
 
-    scrape_ms = int((time.time() - t0) * 1000)
+    scrape_ms = int((time.monotonic() - t0) * 1000)
 
     # Parse
     people_count: int | None = None
@@ -1390,17 +1390,19 @@ def _handle_pool_monitor() -> str:
     try:
         conn = psycopg2.connect(_RECALL_DSN)
         conn.autocommit = True
-        cur = conn.cursor()
-        cur.execute(
-            """
-            INSERT INTO hermes_pool_occupancy
-                (recorded_at, people_count, scrape_ok, scrape_ms, error)
-            VALUES (%s, %s, %s, %s, %s)
-            ON CONFLICT DO NOTHING
-            """,
-            (ts, people_count, scrape_ok, scrape_ms, error_text),
-        )
-        conn.close()
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                INSERT INTO hermes_pool_occupancy
+                    (recorded_at, people_count, scrape_ok, scrape_ms, error)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT DO NOTHING
+                """,
+                (ts, people_count, scrape_ok, scrape_ms, error_text),
+            )
+        finally:
+            conn.close()
     except Exception as exc:
         print(f"[pool-monitor] postgres error: {exc}", flush=True)
 
