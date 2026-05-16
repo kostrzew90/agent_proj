@@ -31,6 +31,11 @@ export const metadata: Metadata = {
   alternates: {
     canonical: site.kancelaria.url,
   },
+  twitter: {
+    card: 'summary',
+    title: site.seo.tytul,
+    description: site.seo.opis,
+  },
 }
 
 const jsonLd = {
@@ -52,7 +57,7 @@ const jsonLd = {
     latitude: site.kancelaria.lat,
     longitude: site.kancelaria.lng,
   },
-  openingHours: 'Mo-Fr 09:00-17:00',
+  openingHours: site.kancelaria.godzinySchema,
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

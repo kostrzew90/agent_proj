@@ -10,8 +10,9 @@
     "miasto": "Warszawa",
     "godziny": "Pon–Pt 9:00–17:00",
     "url": "https://borzewski-legal.pl",
-    "lat": "52.2297",
-    "lng": "21.0122"
+    "lat": 52.2297,
+    "lng": 21.0122,
+    "godzinySchema": "Mo-Fr 09:00-17:00"
   },
   "specjalizacje": [
     { "slug": "prawo-karne", "nazwa": "Prawo karne", "opis": "Obrona w postępowaniu karnym, reprezentacja pokrzywdzonych, sprawy gospodarcze z elementem karnym." },
