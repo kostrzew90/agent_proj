@@ -1,0 +1,12 @@
+{
+  "name": "Kancelaria Adwokacka Artur Borzewski",
+  "short_name": "Borzewski Legal",
+  "description": "Kancelaria adwokacka w Warszawie",
+  "start_url": "/",
+  "display": "browser",
+  "background_color": "#000000",
+  "theme_color": "#eab308",
+  "icons": [
+    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }
+  ]
+}
