@@ -1,5 +1,6 @@
 import site from '../content/site.json'
 import ContactForm from './ContactForm'
+import LogoImage from './LogoImage'
 
 export default function HomePage() {
   return (
@@ -25,12 +26,7 @@ export default function HomePage() {
       <header className="fixed top-0 left-0 w-full z-50 backdrop-blur-xl bg-black/60 border-b border-white/5">
         <div className="max-w-7xl mx-auto px-6 h-24 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <img
-              src="/images/logo.png"
-              alt={site.kancelaria.nazwa}
-              className="h-16 w-auto object-contain"
-              onError={(e) => { e.currentTarget.style.display = 'none' }}
-            />
+            <LogoImage alt={site.kancelaria.nazwa} />
             <div className="w-14 h-14 rounded-full border border-yellow-500/40 flex items-center justify-center text-yellow-400 text-2xl font-serif bg-black">
               AB
             </div>

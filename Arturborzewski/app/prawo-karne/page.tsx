@@ -1,7 +1,12 @@
 import type { Metadata } from 'next'
 import site from '../../content/site.json'
 
-const spec = site.specjalizacje.find(s => s.slug === 'prawo-karne')!
+function getSpec(slug: string) {
+  const found = site.specjalizacje.find(s => s.slug === slug)
+  if (!found) throw new Error(`Specjalizacja ${slug} nie istnieje w site.json`)
+  return found
+}
+const spec = getSpec('prawo-karne')
 
 export const metadata: Metadata = {
   title: `${spec.nazwa} | ${site.kancelaria.nazwa}`,
