@@ -303,7 +303,7 @@ Daje: rollback przez git, wersjonowanie, staging branch.
 | App Router | Tak | Spójność z istniejącym komponentem |
 | Treści | content/site.json | Artur edytuje bez dotykania JSX |
 | Analytics | Brak w v1 | Zero trackerów = zero bannera cookies |
-| Podstrony SEO | Do decyzji | Patrz sekcja poniżej |
+| Podstrony SEO | v1 — szkielety | Lepsze pozycjonowanie od razu, content rozbudowany w v2 |
 
 ---
 
@@ -314,7 +314,7 @@ Opus wskazał, że dla kancelarii lokalne SEO przez podstrony (`/prawo-karne/`, 
 **Za v1 z podstronami:** lepsze pozycjonowanie od razu, Google indeksuje specjalizacje osobno.  
 **Za v1 bez podstron:** szybszy start, treści można rozbudować w v2 gdy Artur dostarczy content.
 
-**Rekomendacja:** stworzyć szkielety podstron z minimalnym contentem w v1, rozbudować w v2.
+**Decyzja:** szkielety podstron w v1 (`/prawo-karne/`, `/prawo-gospodarcze/`, `/kontakt/`). Content rozbudowany w v2 gdy Artur dostarczy teksty.
 
 ---
 
