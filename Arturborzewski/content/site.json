@@ -1,0 +1,40 @@
+{
+  "kancelaria": {
+    "nazwa": "Kancelaria Adwokacka Artur Borzewski",
+    "email": "kontakt@borzewski-legal.pl",
+    "biuro": "biuro@borzewski-legal.pl",
+    "telefon": "+48 000 000 000",
+    "telefonRaw": "+48000000000",
+    "nip": "000-000-00-00",
+    "adres": "ul. Przykładowa 1, 00-000 Warszawa",
+    "miasto": "Warszawa",
+    "godziny": "Pon–Pt 9:00–17:00",
+    "url": "https://borzewski-legal.pl",
+    "lat": "52.2297",
+    "lng": "21.0122"
+  },
+  "specjalizacje": [
+    { "slug": "prawo-karne", "nazwa": "Prawo karne", "opis": "Obrona w postępowaniu karnym, reprezentacja pokrzywdzonych, sprawy gospodarcze z elementem karnym." },
+    { "slug": "prawo-gospodarcze", "nazwa": "Prawo gospodarcze", "opis": "Obsługa prawna przedsiębiorców, spory gospodarcze, umowy handlowe, restrukturyzacje." },
+    { "slug": "prawo-cywilne", "nazwa": "Prawo cywilne", "opis": "Sprawy majątkowe, odszkodowania, spory z zakresu prawa cywilnego." },
+    { "slug": "negocjacje-i-umowy", "nazwa": "Negocjacje i umowy", "opis": "Przygotowanie i opiniowanie umów, negocjacje kontraktów, ugody pozasądowe." },
+    { "slug": "compliance", "nazwa": "Compliance", "opis": "Wdrożenia procedur compliance, AML, RODO, audyty prawne przedsiębiorstw." },
+    { "slug": "cyberbezpieczenstwo", "nazwa": "Cyberbezpieczeństwo", "opis": "Obsługa prawna incydentów cybernetycznych, ochrona danych osobowych, regulacje IT." }
+  ],
+  "aiFeatures": [
+    "AI-assisted workflow",
+    "Bezpieczny obieg dokumentów",
+    "Konsultacje online",
+    "Szyfrowana komunikacja"
+  ],
+  "realizacje": [
+    "Reprezentacja przedsiębiorcy w sporze gospodarczym",
+    "Negocjacje zakończone ugodą",
+    "Stała obsługa prawna nowoczesnych przedsiębiorstw"
+  ],
+  "seo": {
+    "tytul": "Adwokat Artur Borzewski | Kancelaria Adwokacka Warszawa",
+    "opis": "Kancelaria adwokacka w Warszawie. Prawo karne, gospodarcze, cywilne. Profesjonalna i dyskretna obsługa prawna klientów indywidualnych i przedsiębiorców.",
+    "slowa": "adwokat Warszawa, prawo gospodarcze Warszawa, prawo karne, kancelaria adwokacka, obsługa prawna przedsiębiorców"
+  }
+}
