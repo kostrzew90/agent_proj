@@ -134,7 +134,7 @@
           "color": {"mode": "palette-classic"},
           "custom": {"lineWidth": 2, "fillOpacity": 12, "spanNulls": false},
           "min": 0,
-          "softMax": 80,
+          "max": 80,
           "unit": "short"
         },
         "overrides": [
@@ -167,17 +167,17 @@
       "type": "timeseries",
       "targets": [
         {
-          "rawSql": "SELECT recorded_at AS time, people_count AS \"Osoby\" FROM hermes_pool_occupancy WHERE scrape_ok = true ORDER BY recorded_at",
+          "rawSql": "SELECT recorded_at AS time, people_count AS \"Osoby\" FROM hermes_pool_occupancy WHERE scrape_ok = true AND $__timeFilter(recorded_at) ORDER BY recorded_at",
           "refId": "A",
           "format": "time_series"
         },
         {
-          "rawSql": "SELECT recorded_at AS time, ROUND(AVG(people_count) OVER (ORDER BY recorded_at ROWS BETWEEN 5 PRECEDING AND CURRENT ROW)) AS \"Śr kroczące (3h)\" FROM hermes_pool_occupancy WHERE scrape_ok = true ORDER BY recorded_at",
+          "rawSql": "SELECT recorded_at AS time, ROUND(AVG(people_count) OVER (ORDER BY recorded_at ROWS BETWEEN 5 PRECEDING AND CURRENT ROW)) AS \"Śr kroczące (3h)\" FROM hermes_pool_occupancy WHERE scrape_ok = true AND $__timeFilter(recorded_at) ORDER BY recorded_at",
           "refId": "B",
           "format": "time_series"
         },
         {
-          "rawSql": "SELECT recorded_at AS time, CASE WHEN scrape_ok = false THEN 2 ELSE NULL END AS \"Błąd scrape\" FROM hermes_pool_occupancy ORDER BY recorded_at",
+          "rawSql": "SELECT recorded_at AS time, CASE WHEN scrape_ok = false THEN 2 ELSE NULL END AS \"Błąd scrape\" FROM hermes_pool_occupancy WHERE $__timeFilter(recorded_at) ORDER BY recorded_at",
           "refId": "C",
           "format": "time_series"
         }
@@ -232,11 +232,13 @@
             "mode": "absolute",
             "steps": [
               {"color": "green", "value": null},
-              {"color": "yellow", "value": 20},
-              {"color": "red", "value": 32}
+              {"color": "yellow", "value": 25},
+              {"color": "red", "value": 50}
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "min": 0,
+          "max": 80
         },
         "overrides": []
       },
@@ -251,7 +253,9 @@
         "reduceOptions": {"calcs": ["mean"], "fields": "", "values": false},
         "showUnfilled": true,
         "sizing": "auto",
-        "valueMode": "color"
+        "valueMode": "color",
+        "minVizWidth": 8,
+        "maxVizWidth": 200
       },
       "title": "Śr. obłożenie wg godziny dnia",
       "type": "bargauge",
@@ -315,7 +319,7 @@
   "templating": {
     "list": [
       {
-        "current": {"text": "Neon Pool", "value": "neon-pool"},
+        "current": {"text": "Hermes Postgres", "value": "hermes-postgres"},
         "hide": 0,
         "includeAll": false,
         "label": "Źródło danych",

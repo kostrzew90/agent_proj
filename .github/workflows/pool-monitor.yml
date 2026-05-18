@@ -2,8 +2,9 @@ name: Pool Monitor — Basen Nieporęt
 
 on:
   schedule:
-    # co 30 min, 4:00–20:30 UTC = 6:00–22:30 Warsaw (CEST +2)
-    - cron: "0,30 4-20 * * *"
+    # co 15 min, 4:00–20:45 UTC = 6:00–22:45 Warsaw (CEST +2)
+    # GH throttluje scheduled workflows — 15 min daje faktyczne ~30-60 min
+    - cron: "0,15,30,45 4-20 * * *"
   workflow_dispatch: {}   # ręczne uruchomienie z UI GitHub
 
 jobs:
