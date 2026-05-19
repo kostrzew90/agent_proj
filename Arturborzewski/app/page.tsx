@@ -25,11 +25,8 @@ export default function HomePage() {
       {/* HEADER */}
       <header className="fixed top-0 left-0 w-full z-50 backdrop-blur-xl bg-black/60 border-b border-white/5">
         <div className="max-w-7xl mx-auto px-6 h-24 flex items-center justify-between">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center">
             <LogoImage alt={site.kancelaria.nazwa} />
-            <div className="w-14 h-14 rounded-full border border-yellow-500/40 flex items-center justify-center text-yellow-400 text-2xl font-serif bg-black">
-              AB
-            </div>
           </div>
           <nav className="hidden lg:flex items-center gap-10 text-sm tracking-wide">
             <a href="#about" className="hover:text-yellow-400 transition duration-300">O kancelarii</a>
@@ -102,9 +99,12 @@ export default function HomePage() {
                 className="rounded-[32px] w-full h-[700px] object-cover"
               />
               <div className="absolute inset-0 rounded-[32px] bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
-              <div className="absolute bottom-10 left-10">
-                <div className="text-yellow-400 tracking-[0.3em] uppercase text-sm mb-3">Kancelaria Adwokacka</div>
-                <div className="text-4xl font-serif">Artur Borzewski</div>
+              <div className="absolute bottom-8 left-8 right-8">
+                <LogoImage
+                  alt={site.kancelaria.nazwa}
+                  src="/images/logo-mono.png"
+                  className="w-full max-w-xs object-contain"
+                />
               </div>
             </div>
           </AnimatedSection>
@@ -293,7 +293,12 @@ export default function HomePage() {
 
       {/* FOOTER */}
       <footer className="border-t border-white/5 py-10 text-zinc-500">
-        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between gap-6 text-sm">
+        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-6 text-sm">
+          <LogoImage
+            alt={site.kancelaria.nazwa}
+            src="/images/logo-skrocone.png"
+            className="h-12 w-auto object-contain opacity-70"
+          />
           <div>© {new Date().getFullYear()} {site.kancelaria.nazwa}</div>
           <div>Nowoczesna obsługa prawna klientów indywidualnych i biznesowych.</div>
         </div>

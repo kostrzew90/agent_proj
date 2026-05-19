@@ -2,14 +2,16 @@
 
 interface Props {
   alt: string
+  src?: string
+  className?: string
 }
 
-export default function LogoImage({ alt }: Props) {
+export default function LogoImage({ alt, src = '/images/logo-pelne.png', className = 'h-14 w-auto object-contain' }: Props) {
   return (
     <img
-      src="/images/logo.png"
+      src={src}
       alt={alt}
-      className="h-16 w-auto object-contain"
+      className={className}
       onError={(e) => { e.currentTarget.style.display = 'none' }}
     />
   )
