@@ -19,14 +19,35 @@
     { "slug": "prawo-gospodarcze", "nazwa": "Prawo gospodarcze", "opis": "Obsługa prawna przedsiębiorców, spory gospodarcze, umowy handlowe, restrukturyzacje." },
     { "slug": "prawo-cywilne", "nazwa": "Prawo cywilne", "opis": "Sprawy majątkowe, odszkodowania, spory z zakresu prawa cywilnego." },
     { "slug": "negocjacje-i-umowy", "nazwa": "Negocjacje i umowy", "opis": "Przygotowanie i opiniowanie umów, negocjacje kontraktów, ugody pozasądowe." },
-    { "slug": "compliance", "nazwa": "Compliance", "opis": "Wdrożenia procedur compliance, AML, RODO, audyty prawne przedsiębiorstw." },
-    { "slug": "cyberbezpieczenstwo", "nazwa": "Cyberbezpieczeństwo", "opis": "Obsługa prawna incydentów cybernetycznych, ochrona danych osobowych, regulacje IT." }
+    { "slug": "compliance", "nazwa": "Compliance", "opis": "Wdrożenia procedur compliance, AML, RODO, audyty prawne przedsiębiorstw." }
   ],
-  "aiFeatures": [
-    "AI-assisted workflow",
-    "Bezpieczny obieg dokumentów",
-    "Konsultacje online",
-    "Szyfrowana komunikacja"
+  "oAdwokacie": {
+    "tytul": "Skuteczna obrona wymaga wiedzy i doświadczenia.",
+    "bio": [
+      "Adwokat Artur Borzewski specjalizuje się w sprawach karnych i gospodarczych, reprezentując zarówno klientów indywidualnych, jak i przedsiębiorców w postępowaniach sądowych i pozasądowych.",
+      "Wieloletnie doświadczenie w sali sądowej, połączone z analitycznym podejściem do każdej sprawy, pozwala na skuteczną obronę interesów klientów na każdym etapie postępowania.",
+      "Kancelaria stawia na bezpośredni kontakt, transparentność działań i rzetelną komunikację — klient zawsze wie, na jakim etapie jest jego sprawa."
+    ],
+    "doswiadczenie": [
+      "Obrona w sprawach karnych i karnogospodarczych",
+      "Reprezentacja przed sądami wszystkich instancji",
+      "Negocjacje i ugody pozasądowe",
+      "Stała obsługa prawna przedsiębiorstw"
+    ]
+  },
+  "klienci": [
+    { "ikona": "👤", "nazwa": "Klienci indywidualni", "opis": "Osoby fizyczne potrzebujące obrony, reprezentacji lub porady prawnej w sprawach karnych i cywilnych." },
+    { "ikona": "🏢", "nazwa": "Przedsiębiorcy", "opis": "Właściciele firm wymagający obsługi prawnej w zakresie prawa gospodarczego, umów i sporów." },
+    { "ikona": "⚖️", "nazwa": "Spółki i korporacje", "opis": "Podmioty gospodarcze potrzebujące stałej obsługi prawnej, compliance i restrukturyzacji." },
+    { "ikona": "🤝", "nazwa": "Instytucje", "opis": "Organizacje i instytucje wymagające reprezentacji lub opinii prawnych w złożonych sprawach." }
+  ],
+  "wyróznienia": [
+    { "ikona": "⚡", "tytul": "Skuteczność", "opis": "Każda sprawa traktowana indywidualnie. Strategia dostosowana do celu, nie do szablonu." },
+    { "ikona": "🔒", "tytul": "Dyskrecja", "opis": "Pełna poufność obsługi. Bezpieczna komunikacja i ochrona danych klientów na każdym etapie." },
+    { "ikona": "📞", "tytul": "Dostępność", "opis": "Bezpośredni kontakt z adwokatem. Bez sekretariatów i pośredników — klient zawsze wie, co się dzieje." },
+    { "ikona": "💡", "tytul": "Nowoczesne narzędzia", "opis": "Cyfrowy obieg dokumentów, bezpieczna komunikacja online i wsparcie technologiczne usprawniające obsługę." },
+    { "ikona": "🗺️", "tytul": "Kompleksowość", "opis": "Pełen zakres obsługi prawnej pod jednym dachem — od porady po reprezentację sądową." },
+    { "ikona": "🤝", "tytul": "Partnerskie podejście", "opis": "Długoterminowe relacje z klientami oparte na zaufaniu, przejrzystości i wzajemnym szacunku." }
   ],
   "realizacje": [
     "Reprezentacja przedsiębiorcy w sporze gospodarczym",
