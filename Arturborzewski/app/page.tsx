@@ -216,7 +216,7 @@ export default function HomePage() {
             <h2 className="text-4xl md:text-6xl font-serif">Co wyróżnia kancelarię</h2>
           </AnimatedSection>
           <AnimatedCardGrid className="grid md:grid-cols-2 xl:grid-cols-3 gap-8">
-            {site.wyróznienia.map((item) => (
+            {site.wyroznienia.map((item) => (
               <AnimatedCardItem key={item.tytul}>
                 <div className="rounded-[30px] border border-white/5 bg-white/[0.02] p-10 h-full">
                   <div className="text-2xl mb-6">{item.ikona}</div>

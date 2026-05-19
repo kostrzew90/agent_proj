@@ -41,7 +41,7 @@
     { "ikona": "⚖️", "nazwa": "Spółki i korporacje", "opis": "Podmioty gospodarcze potrzebujące stałej obsługi prawnej, compliance i restrukturyzacji." },
     { "ikona": "🤝", "nazwa": "Instytucje", "opis": "Organizacje i instytucje wymagające reprezentacji lub opinii prawnych w złożonych sprawach." }
   ],
-  "wyróznienia": [
+  "wyroznienia": [
     { "ikona": "⚡", "tytul": "Skuteczność", "opis": "Każda sprawa traktowana indywidualnie. Strategia dostosowana do celu, nie do szablonu." },
     { "ikona": "🔒", "tytul": "Dyskrecja", "opis": "Pełna poufność obsługi. Bezpieczna komunikacja i ochrona danych klientów na każdym etapie." },
     { "ikona": "📞", "tytul": "Dostępność", "opis": "Bezpośredni kontakt z adwokatem. Bez sekretariatów i pośredników — klient zawsze wie, co się dzieje." },
