@@ -34,6 +34,10 @@ CREATE INDEX IF NOT EXISTS autocentrum_reviews_embedding_idx
 CREATE INDEX IF NOT EXISTS autocentrum_models_lookup_idx
     ON autocentrum_models (LOWER(make), LOWER(model), year_from, year_to);
 
+CREATE UNIQUE INDEX IF NOT EXISTS autocentrum_reviews_url_unique_idx
+    ON autocentrum_reviews (url)
+    WHERE url IS NOT NULL;
+
 -- Grant to existing hermes_ro user (read for VINhunter plugin)
 DO $$
 BEGIN
