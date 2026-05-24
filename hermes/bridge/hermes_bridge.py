@@ -127,10 +127,33 @@ _CRON_JOBS: dict[str, dict] = {
         "description": "Basen Nieporęt — liczba osób co 30 min (wyłączony — przejęty przez GitHub Actions → Neon)",
         "notify": "silent",
     },
+    "scrape-autocentrum": {
+        "interval_s": 86400,
+        "run_at_hour": 2,
+        "enabled": True,
+        "last_run": 0.0,
+        "description": "Scrape autocentrum.pl reviews + opinions (daily 2:00)",
+        "notify": "silent",
+    },
 }
 
 _cron_lock = threading.Lock()
 _LAST_POOL_MONITOR: dict = {"ok": None, "last_run": None, "count": None}
+
+_AUTOCENTRUM_QUEUE_FILE: Path = _AUDIT_DIR / "autocentrum_queue.json"
+
+_AUTOCENTRUM_SEED: list[dict] = [
+    {"make": "BMW", "model": "Seria 3", "done": False},
+    {"make": "BMW", "model": "Seria 5", "done": False},
+    {"make": "Audi", "model": "A4", "done": False},
+    {"make": "Audi", "model": "A6", "done": False},
+    {"make": "Volkswagen", "model": "Passat", "done": False},
+    {"make": "Volkswagen", "model": "Golf", "done": False},
+    {"make": "Mercedes-Benz", "model": "Klasa C", "done": False},
+    {"make": "Toyota", "model": "Avensis", "done": False},
+    {"make": "Toyota", "model": "Corolla", "done": False},
+    {"make": "Opel", "model": "Astra", "done": False},
+]
 
 # Lazy DB connection — created on first recall, not at startup.
 _db_conn: Optional[Any] = None
@@ -1466,6 +1489,218 @@ def _handle_pool_monitor() -> str:
     return f"Basen: błąd scrape ({scrape_ms}ms) — {error_text}"
 
 
+# ---------------------------------------------------------------------------
+# Skill handler: scrape-autocentrum
+# ---------------------------------------------------------------------------
+
+def _autocentrum_load_queue() -> list[dict]:
+    """Load scrape queue from JSON file, initialize from seed if missing."""
+    if _AUTOCENTRUM_QUEUE_FILE.exists():
+        try:
+            return json.loads(_AUTOCENTRUM_QUEUE_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    queue = [dict(item) for item in _AUTOCENTRUM_SEED]
+    _AUTOCENTRUM_QUEUE_FILE.write_text(
+        json.dumps(queue, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    return queue
+
+
+def _autocentrum_save_queue(queue: list[dict]) -> None:
+    _AUTOCENTRUM_QUEUE_FILE.write_text(
+        json.dumps(queue, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+
+def _autocentrum_embed(text: str) -> list[float] | None:
+    """Embed text via Ollama qwen3-embedding:0.6b. Returns None on error."""
+    try:
+        resp = httpx.post(
+            f"{_OLLAMA_URL}/api/embed",
+            json={"model": _EMBEDDING_MODEL, "input": text},
+            timeout=30.0,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        embeddings = data.get("embeddings") or data.get("embedding")
+        if embeddings:
+            return embeddings[0] if isinstance(embeddings[0], list) else embeddings
+        return None
+    except Exception as exc:
+        print(f"[scrape-autocentrum] embed error: {exc}", flush=True)
+        return None
+
+
+def _handle_scrape_autocentrum(args: str = "") -> str:
+    """
+    Scrape autocentrum.pl for one car model.
+    args: "BMW Seria3" for manual trigger, "" for cron (picks next from queue).
+    """
+    import re as _re
+
+    # Determine which model to scrape
+    queue = _autocentrum_load_queue()
+    make: str = ""
+    model: str = ""
+
+    if args.strip():
+        parts = args.strip().split(None, 1)
+        make = parts[0] if parts else ""
+        model = parts[1] if len(parts) > 1 else ""
+    else:
+        pending = [item for item in queue if not item.get("done")]
+        if not pending:
+            for item in queue:
+                item["done"] = False
+            _autocentrum_save_queue(queue)
+            pending = queue
+        make = pending[0]["make"]
+        model = pending[0]["model"]
+
+    if not make or not model:
+        return "⚠️ autocentrum: brakuje make/model. Użyj: /skill scrape-autocentrum BMW Seria3"
+
+    # 1. Find autocentrum.pl URL via Brave Search
+    search_query = f"site:autocentrum.pl {make} {model} test opinia"
+    search_results = _brave_search(search_query, count=3)
+
+    model_url: str | None = None
+    make_slug = make.lower().replace("-", "").replace(" ", "")
+    for r in search_results:
+        url = r.get("url", "")
+        if "autocentrum.pl" in url and make_slug in url.lower().replace("-", "").replace(" ", ""):
+            model_url = url
+            break
+
+    if not model_url and search_results:
+        # Use first result with autocentrum.pl regardless
+        for r in search_results:
+            if "autocentrum.pl" in r.get("url", ""):
+                model_url = r.get("url")
+                break
+
+    if not model_url:
+        return f"⚠️ autocentrum: nie znaleziono strony dla {make} {model} (Brave Search: 0 trafień)"
+
+    # 2. Connect to DB
+    conn = None
+    try:
+        conn = psycopg2.connect(_RECALL_DSN)
+        conn.autocommit = True
+        cur = conn.cursor()
+    except Exception as exc:
+        return f"⚠️ autocentrum: błąd połączenia DB: {exc}"
+
+    try:
+        # 3. Insert model record
+        cur.execute(
+            """
+            INSERT INTO autocentrum_models (make, model, url)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (url) DO UPDATE SET scraped_at = NOW()
+            RETURNING id
+            """,
+            (make, model, model_url),
+        )
+        row = cur.fetchone()
+        if row:
+            model_id = row[0]
+        else:
+            cur.execute("SELECT id FROM autocentrum_models WHERE url = %s", (model_url,))
+            model_id = cur.fetchone()[0]
+
+        # 4. Scrape page text via browser-mcp (async, run in thread)
+        editorial_count = 0
+
+        async def _scrape_async() -> int:
+            from mcp_client import MCPClient
+            count = 0
+            try:
+                async with MCPClient("http://browser-mcp:8000/sse") as mcp:
+                    result = await mcp.call("browser_navigate", {"url": model_url})
+                    page_text = ""
+                    if isinstance(result, dict):
+                        page_text = result.get("text", result.get("content", ""))
+                    elif isinstance(result, str):
+                        page_text = result
+
+                    if not page_text or len(page_text) < 100:
+                        return count
+
+                    # Extract rating
+                    rating: float | None = None
+                    m = _re.search(r"(\d+(?:[.,]\d+)?)\s*/\s*10", page_text)
+                    if m:
+                        try:
+                            rating = float(m.group(1).replace(",", "."))
+                        except ValueError:
+                            pass
+
+                    # Chunk + embed + insert (max 4000 chars = up to 5 chunks)
+                    chunk_size = 800
+                    editorial_title = f"{make} {model} — test autocentrum.pl"
+                    for i in range(0, min(len(page_text), 4000), chunk_size):
+                        chunk = page_text[i: i + chunk_size]
+                        if len(chunk) < 50:
+                            continue
+                        embedding = _autocentrum_embed(chunk)
+                        emb_str = (
+                            f"[{','.join(str(x) for x in embedding)}]"
+                            if embedding else None
+                        )
+                        cur.execute(
+                            """
+                            INSERT INTO autocentrum_reviews
+                                (model_id, source, title, content, rating, url, embedding)
+                            VALUES (%s, 'editorial', %s, %s, %s, %s, %s)
+                            """,
+                            (
+                                model_id,
+                                editorial_title if i == 0 else None,
+                                chunk,
+                                rating,
+                                model_url,
+                                emb_str,
+                            ),
+                        )
+                        count += 1
+            except Exception as exc:
+                print(f"[scrape-autocentrum] browser-mcp error: {exc}", flush=True)
+            return count
+
+        scrape_result: dict = {}
+
+        def _run_scrape() -> None:
+            try:
+                editorial_count_inner = asyncio.run(_scrape_async())
+                scrape_result["ed"] = editorial_count_inner
+            except Exception as exc:
+                print(f"[scrape-autocentrum] thread error: {exc}", flush=True)
+                scrape_result["ed"] = 0
+
+        t = threading.Thread(target=_run_scrape)
+        t.start()
+        t.join(timeout=120)
+        editorial_count = scrape_result.get("ed", 0)
+
+    finally:
+        cur.close()
+        conn.close()
+
+    # 5. Mark done in queue
+    for item in queue:
+        if item["make"] == make and item["model"] == model:
+            item["done"] = True
+    _autocentrum_save_queue(queue)
+
+    return (
+        f"✅ autocentrum scrape: {make} {model}\n"
+        f"Fragmenty zapisane: {editorial_count}\n"
+        f"URL: {model_url}"
+    )
+
+
 def _cron_execute_skill(skill_name: str) -> str:
     """Execute a skill by name (same routing as _make_reply for SKILL: prefix)."""
     if skill_name in ("scan-rss", "scan-rss-opportunities"):
@@ -1494,6 +1729,8 @@ def _cron_execute_skill(skill_name: str) -> str:
         return _handle_service_health(skill_name)
     if skill_name == "pool-monitor":
         return _handle_pool_monitor()
+    if skill_name == "scrape-autocentrum":
+        return _handle_scrape_autocentrum()
     return f"[cron] skill '{skill_name}' not supported for cron."
 
 
@@ -2258,6 +2495,8 @@ def _make_reply(text: str) -> str:
             return _handle_recompute_importance()
         if skill_name in ("review-learn", "review-projects"):
             return _handle_review_learn()
+        if skill_name in ("scrape-autocentrum",):
+            return _handle_scrape_autocentrum(skill_args)
         return f"[stub] skill '{skill_name}' nie jest jeszcze zaimplementowany."
     # Plain message → automatic research (Google + Ollama)
     if text.strip():
