@@ -1929,6 +1929,178 @@ def _handle_vinhunter_researcher() -> str:
     )
 
 
+# ---------------------------------------------------------------------------
+# Skill handler: vinhunter-plugin-writer
+# ---------------------------------------------------------------------------
+
+def _handle_vinhunter_plugin_writer(args: str = "") -> str:
+    """
+    Write a VINhunter plugin for a named source.
+    args: source name from research report (e.g. "rdw_open_data")
+    """
+    import re as _re
+    from mcp_client import MCPClient
+
+    source_name = args.strip()
+    if not source_name:
+        return "⚠️ Podaj nazwę źródła: /skill vinhunter-write-plugin [source_name]"
+
+    safe_name = source_name.lower().replace(" ", "_").replace("-", "_")
+
+    # 1. Find latest research report
+    reports = sorted(_AUDIT_DIR.glob("vinhunter-research-*.md"), reverse=True)
+    if not reports:
+        return "⚠️ Brak raportu research. Uruchom: /skill vinhunter-research"
+    report_content = reports[0].read_text(encoding="utf-8")
+
+    # 2. Read existing plugin templates via mcp-fs-vinhunter
+    async def _read_templates() -> tuple[str, str]:
+        try:
+            async with MCPClient(_MCP_SERVERS["fs-vinhunter"]) as mcp:
+                nhtsa = await mcp.call(
+                    "fs_read_file", {"path": "backend/plugins/vin_decode/nhtsa.py"}
+                )
+                try:
+                    rdw = await mcp.call(
+                        "fs_read_file", {"path": "backend/plugins/registries/nl_rdw.py"}
+                    )
+                except Exception:
+                    rdw = ""
+                return str(nhtsa), str(rdw)
+        except Exception as exc:
+            return "", f"# template read error: {exc}"
+
+    def _run_templates() -> tuple[str, str]:
+        box: dict = {}
+        def _t():
+            box["v"] = asyncio.run(_read_templates())
+        t = threading.Thread(target=_t)
+        t.start()
+        t.join(timeout=30)
+        if t.is_alive():
+            print("[plugin-writer] template read timeout", flush=True)
+        return box.get("v", ("", ""))
+
+    nhtsa_code, rdw_code = _run_templates()
+
+    # 3. LLM generates plugin code
+    prompt = (
+        f"Jesteś ekspertem Python piszącym pluginy do projektu VINhunter — OSINT dla historii pojazdów.\n\n"
+        f"Napisz kompletny plugin Python dla źródła: **{source_name}**\n\n"
+        f"Informacje o źródle z raportu research:\n{report_content}\n\n"
+        f"=== Wzorzec 1: nhtsa.py (vin_decode) ===\n{nhtsa_code}\n\n"
+        f"=== Wzorzec 2: nl_rdw.py (registries) ===\n{rdw_code}\n\n"
+        "Wymagania:\n"
+        "- Dziedzicz po SourcePlugin z plugins.base\n"
+        "- Zaimplementuj async def search_by_vin(self, vin, **kwargs) -> PluginResult\n"
+        "- Używaj httpx.AsyncClient dla requestów HTTP\n"
+        "- Obsługuj błędy: timeout, connection error, 4xx/5xx → SourceStatus.ERROR lub NO_DATA\n"
+        "- Wybierz kategorię: SourceCategory.VIN_DECODE / REGISTRY / DAMAGE / PHOTO_OSINT / ADS_ARCHIVE\n"
+        "- Dodaj krótki docstring z URL API (jeśli znany z raportu)\n\n"
+        "Zwróć TYLKO kod Python, bez wyjaśnień i bez markdown fences."
+    )
+
+    llm_result = llm_client.call_llm(
+        prompt, tier="hard", max_tokens=2048, skill="vinhunter-plugin-writer"
+    )
+    if llm_result is None:
+        return "⚠️ vinhunter-plugin-writer: LLM returned None"
+    plugin_code = llm_result.get("text", "").strip()
+    if not plugin_code:
+        return f"⚠️ vinhunter-plugin-writer: LLM error: {llm_result.get('error')}"
+
+    # Strip markdown fences if LLM added them anyway
+    plugin_code = _re.sub(r"^```python\n?", "", plugin_code)
+    plugin_code = _re.sub(r"\n?```$", "", plugin_code).strip()
+
+    # 4. Determine category from generated code
+    category_dir = "vin_decode"
+    if "REGISTRY" in plugin_code:
+        category_dir = "registries"
+    elif "DAMAGE" in plugin_code:
+        category_dir = "damage"
+    elif "PHOTO_OSINT" in plugin_code:
+        category_dir = "osint_photo"
+    elif "ADS_ARCHIVE" in plugin_code:
+        category_dir = "ads_archive"
+
+    plugin_path = f"backend/plugins/{category_dir}/{safe_name}.py"
+    branch_name = f"hermes/plugin-{safe_name}"
+
+    # 5. Write via mcp-fs-vinhunter
+    async def _write_and_commit() -> str:
+        async with MCPClient(_MCP_SERVERS["fs-vinhunter"]) as mcp:
+            try:
+                await mcp.call("git_checkout_branch", {"branch_name": branch_name})
+            except Exception as exc:
+                print(f"[plugin-writer] git checkout warn: {exc}", flush=True)
+
+            await mcp.call("fs_write_file", {"path": plugin_path, "content": plugin_code})
+
+            try:
+                commit_out = await mcp.call(
+                    "git_commit",
+                    {"message": f"feat(plugins): add {safe_name} plugin (hermes-generated)"},
+                )
+                return str(commit_out)
+            except Exception as exc:
+                return f"(git commit warn: {exc})"
+
+    def _run_write() -> str:
+        box: dict = {}
+        def _t():
+            try:
+                box["v"] = asyncio.run(_write_and_commit())
+            except Exception as exc:
+                box["v"] = f"error: {exc}"
+        t = threading.Thread(target=_t)
+        t.start()
+        t.join(timeout=60)
+        if t.is_alive():
+            print("[plugin-writer] write_and_commit timeout", flush=True)
+        return box.get("v", "timeout")
+
+    write_result = _run_write()
+
+    # 6. Alumnium health check (optional)
+    health_note = ""
+    try:
+        async def _health() -> bool:
+            async with MCPClient(_MCP_SERVERS["alumnium"]) as mcp:
+                result = await mcp.call(
+                    "al_navigate", {"url": "http://host.docker.internal:8200/health"}
+                )
+                return "navigated" in str(result).lower()
+
+        def _run_health() -> bool:
+            box: dict = {}
+            def _t():
+                try:
+                    box["v"] = asyncio.run(_health())
+                except Exception:
+                    box["v"] = False
+            t = threading.Thread(target=_t)
+            t.start()
+            t.join(timeout=20)
+            return box.get("v", False)
+
+        if _run_health():
+            health_note = "VINhunter ✅ działa — zrestartuj backend żeby załadować plugin."
+        else:
+            health_note = "VINhunter nie odpowiada (OK jeśli nie jest uruchomiony)."
+    except Exception:
+        health_note = "Alumnium check pominięty."
+
+    return (
+        f"✅ Plugin `{safe_name}` napisany.\n"
+        f"Plik: {plugin_path}\n"
+        f"Branch: `{branch_name}` (lokalny)\n"
+        f"Git: {write_result}\n"
+        f"{health_note}\n\n"
+        f"Następny krok: zrestartuj VINhunter i zweryfikuj plugin."
+    )
+
+
 def _cron_execute_skill(skill_name: str) -> str:
     """Execute a skill by name (same routing as _make_reply for SKILL: prefix)."""
     if skill_name in ("scan-rss", "scan-rss-opportunities"):
@@ -2729,6 +2901,8 @@ def _make_reply(text: str) -> str:
             return _handle_scrape_autocentrum(skill_args)
         if skill_name in ("vinhunter-research", "vinhunter-researcher"):
             return _handle_vinhunter_researcher()
+        if skill_name in ("vinhunter-write-plugin", "vinhunter-plugin-writer"):
+            return _handle_vinhunter_plugin_writer(skill_args)
         return f"[stub] skill '{skill_name}' nie jest jeszcze zaimplementowany."
     # Plain message → automatic research (Google + Ollama)
     if text.strip():
