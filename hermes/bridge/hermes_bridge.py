@@ -1670,7 +1670,7 @@ def _handle_scrape_autocentrum(args: str = "") -> str:
                                 editorial_title if i == 0 else None,
                                 chunk,
                                 rating,
-                                model_url,
+                                model_url if i == 0 else None,
                                 emb_str,
                             ),
                         )
@@ -1680,8 +1680,7 @@ def _handle_scrape_autocentrum(args: str = "") -> str:
                     import time as _time
                     opinions_url: str | None = None
                     # Look for opinions link in page text
-                    import re as _re2
-                    op_match = _re2.search(
+                    op_match = _re.search(
                         r'(https?://[^\s"\']+autocentrum\.pl[^\s"\']*opinie[^\s"\']*)',
                         page_text,
                     )
@@ -1713,7 +1712,7 @@ def _handle_scrape_autocentrum(args: str = "") -> str:
                                 break
 
                             # Split opinions by common separators (newlines + rating patterns)
-                            opinion_blocks = _re2.split(r"\n{2,}", op_text)
+                            opinion_blocks = _re.split(r"\n{2,}", op_text)
                             found_on_page = 0
                             for block in opinion_blocks:
                                 block = block.strip()
@@ -1725,14 +1724,14 @@ def _handle_scrape_autocentrum(args: str = "") -> str:
 
                                 # Extract rating from block
                                 op_rating: float | None = None
-                                r_match = _re2.search(r"(\d+(?:[.,]\d+)?)\s*/\s*10", block)
+                                r_match = _re.search(r"(\d+(?:[.,]\d+)?)\s*/\s*10", block)
                                 if r_match:
                                     try:
                                         op_rating = float(r_match.group(1).replace(",", "."))
                                     except ValueError:
                                         pass
                                 if op_rating is None:
-                                    r_match2 = _re2.search(r"(\d)\s*/\s*5", block)
+                                    r_match2 = _re.search(r"(\d)\s*/\s*5", block)
                                     if r_match2:
                                         try:
                                             op_rating = float(r_match2.group(1)) * 2
@@ -1784,12 +1783,24 @@ def _handle_scrape_autocentrum(args: str = "") -> str:
         t = threading.Thread(target=_run_scrape)
         t.start()
         t.join(timeout=120)
-        editorial_count = scrape_result.get("ed", 0)
-        opinion_count = scrape_result.get("op", 0)
+        if t.is_alive():
+            # Thread timed out — don't mark done, report failure
+            editorial_count = 0
+            opinion_count = 0
+            _timed_out = True
+        else:
+            editorial_count = scrape_result.get("ed", 0)
+            opinion_count = scrape_result.get("op", 0)
+            _timed_out = False
 
     finally:
-        cur.close()
-        conn.close()
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
+
+    if _timed_out:
+        return f"⚠️ autocentrum: scrape {make} {model} timeout po 120s — brak danych w DB"
 
     # 5. Mark done in queue
     for item in queue:
