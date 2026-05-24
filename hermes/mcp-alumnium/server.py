@@ -38,6 +38,7 @@ _loop_thread.start()
 _browser: Browser | None = None
 _page: Page | None = None
 _al = None  # alumnium.Aluminium instance
+_pw = None  # playwright instance (kept to allow clean stop on recovery)
 
 
 def _run(coro, timeout: float = 60.0):
@@ -48,7 +49,7 @@ def _run(coro, timeout: float = 60.0):
 
 async def _ensure_session():
     """Initialize or recover Playwright + alumnium session."""
-    global _browser, _page, _al
+    global _browser, _page, _al, _pw
 
     try:
         page_closed = _page is None or _page.is_closed()
@@ -56,7 +57,15 @@ async def _ensure_session():
         page_closed = True
         _page = None
     if page_closed:
+        if _Aluminium is None:
+            raise RuntimeError("alumnium not installed — pip install alumnium")
+        if _pw is not None:
+            try:
+                await _pw.stop()
+            except Exception:
+                pass
         pw = await async_playwright().start()
+        _pw = pw
         _browser = await pw.chromium.launch(
             headless=True,
             args=["--no-sandbox", "--disable-dev-shm-usage"],
@@ -101,9 +110,7 @@ def al_check(assertion: str) -> str:
         _, al = await _ensure_session()
         loop = asyncio.get_event_loop()
         result = await loop.run_in_executor(None, al.check, assertion)
-        if result:
-            return "true"
-        return f"false: {assertion}"
+        return str(result)
 
     return _run(_do(), timeout=60.0)
 
