@@ -121,6 +121,21 @@ services:
     labels:
       hermes: "true"
 
+  mcp-fs-vinhunter:
+    build:
+      context: ./mcp-fs-vinhunter
+    container_name: mcp-fs-vinhunter
+    restart: unless-stopped
+    labels: ["hermes=true"]
+    networks: [hermes-net]
+    volumes:
+      - ../VIN OSINT/vinhunter:/vinhunter
+    expose: ["8000"]
+    environment:
+      VINHUNTER_ROOT: /vinhunter
+      MCP_TRANSPORT: sse
+      MCP_PORT: "8000"
+
   hermes-bridge:
     build:
       context: ./bridge
@@ -239,6 +254,24 @@ services:
     depends_on:
       - chrome-hermes
     command: TCP-LISTEN:9223,fork,reuseaddr TCP:127.0.0.1:9222
+
+  pool-monitor:
+    image: python:3.12-slim
+    container_name: hermes-pool-monitor
+    restart: unless-stopped
+    labels: ["hermes=true"]
+    networks: [hermes-net]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      POOL_DSN: postgresql://hermes_ingest:${HERMES_INGEST_PASSWORD}@host.docker.internal:5434/rag
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ./scripts:/scripts:ro
+      - ./config:/config:ro
+    command: >
+      bash -c "pip install --quiet --root-user-action=ignore psycopg2-binary requests beautifulsoup4 lxml &&
+      while true; do timeout 60 python /scripts/pool_monitor.py || echo 'WARN: pool_monitor timeout/error'; sleep 1800; done"
 
   grafana:
     image: grafana/grafana:10.4.13
