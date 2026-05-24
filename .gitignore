@@ -26,3 +26,6 @@ llmday/*.m4a
 
 # Docker volumes
 postgres-data/
+
+# Hermes-managed local git repo in VINhunter subdirectory
+VIN OSINT/vinhunter/.git/

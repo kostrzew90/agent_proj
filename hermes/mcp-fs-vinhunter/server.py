@@ -21,6 +21,32 @@ mcp = FastMCP("fs-vinhunter", host="0.0.0.0")
 _ROOT = Path(os.environ.get("VINHUNTER_ROOT", "/vinhunter"))
 
 
+def _ensure_git_init() -> None:
+    """Initialize a local git repo in _ROOT if not present."""
+    git_dir = _ROOT / ".git"
+    if git_dir.exists():
+        return
+    subprocess.run(["git", "init"], cwd=str(_ROOT), check=True, capture_output=True)
+    subprocess.run(
+        ["git", "config", "user.email", "hermes@local"],
+        cwd=str(_ROOT), check=True, capture_output=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Hermes"],
+        cwd=str(_ROOT), check=True, capture_output=True,
+    )
+    # Initial empty commit so branching works immediately
+    subprocess.run(["git", "add", "-A"], cwd=str(_ROOT), capture_output=True)
+    subprocess.run(
+        ["git", "commit", "--allow-empty", "-m", "chore: hermes local init"],
+        cwd=str(_ROOT), check=False, capture_output=True,
+    )
+    print(f"[mcp-fs-vinhunter] git init done in {_ROOT}", flush=True)
+
+
+_ensure_git_init()
+
+
 def _safe_path(path: str) -> Path:
     """Resolve path inside _ROOT, raise ValueError if traversal detected."""
     target = (_ROOT / path.lstrip("/")).resolve()
