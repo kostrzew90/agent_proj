@@ -1583,14 +1583,25 @@ def _handle_scrape_autocentrum(args: str = "") -> str:
     if not model_url:
         return f"⚠️ autocentrum: nie znaleziono strony dla {make} {model} (Brave Search: 0 trafień)"
 
-    # 2. Connect to DB
+    # 2. Connect to DB — try hermes_ingest first, fall back to rag user
     conn = None
+    cur = None
+    _ingest_pw = os.environ.get("HERMES_INGEST_PASSWORD", "")
+    _ingest_dsn = _RECALL_DSN.replace(
+        "rag:ragpass@", f"hermes_ingest:{_ingest_pw}@"
+    ) if _ingest_pw else None
     try:
-        conn = psycopg2.connect(_RECALL_DSN)
-        conn.autocommit = True
-        cur = conn.cursor()
-    except Exception as exc:
-        return f"⚠️ autocentrum: błąd połączenia DB: {exc}"
+        if _ingest_dsn:
+            conn = psycopg2.connect(_ingest_dsn)
+        else:
+            raise Exception("no ingest creds")
+    except Exception:
+        try:
+            conn = psycopg2.connect(_RECALL_DSN)
+        except Exception as exc2:
+            return f"⚠️ autocentrum: błąd połączenia DB: {exc2}"
+    conn.autocommit = True
+    cur = conn.cursor()
 
     try:
         # 3. Insert model record
@@ -1598,24 +1609,23 @@ def _handle_scrape_autocentrum(args: str = "") -> str:
             """
             INSERT INTO autocentrum_models (make, model, url)
             VALUES (%s, %s, %s)
-            ON CONFLICT (url) DO UPDATE SET scraped_at = NOW()
-            RETURNING id
+            ON CONFLICT (url) DO NOTHING
             """,
             (make, model, model_url),
         )
+        cur.execute("SELECT id FROM autocentrum_models WHERE url = %s", (model_url,))
         row = cur.fetchone()
-        if row:
-            model_id = row[0]
-        else:
-            cur.execute("SELECT id FROM autocentrum_models WHERE url = %s", (model_url,))
-            model_id = cur.fetchone()[0]
+        if not row:
+            return f"⚠️ autocentrum: nie można ustalić model_id dla {model_url}"
+        model_id = row[0]
 
         # 4. Scrape page text via browser-mcp (async, run in thread)
         editorial_count = 0
 
-        async def _scrape_async() -> int:
+        async def _scrape_async() -> tuple[int, int]:
             from mcp_client import MCPClient
-            count = 0
+            ed_count = 0
+            op_count = 0
             try:
                 async with MCPClient("http://browser-mcp:8000/sse") as mcp:
                     result = await mcp.call("browser_navigate", {"url": model_url})
@@ -1626,7 +1636,7 @@ def _handle_scrape_autocentrum(args: str = "") -> str:
                         page_text = result
 
                     if not page_text or len(page_text) < 100:
-                        return count
+                        return ed_count, op_count
 
                     # Extract rating
                     rating: float | None = None
@@ -1664,25 +1674,118 @@ def _handle_scrape_autocentrum(args: str = "") -> str:
                                 emb_str,
                             ),
                         )
-                        count += 1
+                        ed_count += 1
+
+                    # Owner opinions — navigate to opinions URL
+                    import time as _time
+                    opinions_url: str | None = None
+                    # Look for opinions link in page text
+                    import re as _re2
+                    op_match = _re2.search(
+                        r'(https?://[^\s"\']+autocentrum\.pl[^\s"\']*opinie[^\s"\']*)',
+                        page_text,
+                    )
+                    if op_match:
+                        opinions_url = op_match.group(1)
+                    else:
+                        # Construct typical opinions URL pattern
+                        base = model_url.rstrip("/")
+                        opinions_url = base + "/opinie/"
+
+                    # Scrape up to 50 opinions across pages
+                    opinions_scraped = 0
+                    page_num = 1
+                    while opinions_scraped < 50 and page_num <= 5:
+                        try:
+                            _time.sleep(2)
+                            if page_num == 1:
+                                op_page_url = opinions_url
+                            else:
+                                op_page_url = opinions_url.rstrip("/") + f"/{page_num}/"
+                            op_result = await mcp.call("browser_navigate", {"url": op_page_url})
+                            op_text = ""
+                            if isinstance(op_result, dict):
+                                op_text = op_result.get("text", op_result.get("content", ""))
+                            elif isinstance(op_result, str):
+                                op_text = op_result
+
+                            if not op_text or len(op_text) < 100:
+                                break
+
+                            # Split opinions by common separators (newlines + rating patterns)
+                            opinion_blocks = _re2.split(r"\n{2,}", op_text)
+                            found_on_page = 0
+                            for block in opinion_blocks:
+                                block = block.strip()
+                                if len(block) < 30:
+                                    continue
+                                # Skip blocks that look like navigation/headers
+                                if any(kw in block.lower() for kw in ["cookie", "regulamin", "newsletter", "reklam"]):
+                                    continue
+
+                                # Extract rating from block
+                                op_rating: float | None = None
+                                r_match = _re2.search(r"(\d+(?:[.,]\d+)?)\s*/\s*10", block)
+                                if r_match:
+                                    try:
+                                        op_rating = float(r_match.group(1).replace(",", "."))
+                                    except ValueError:
+                                        pass
+                                if op_rating is None:
+                                    r_match2 = _re2.search(r"(\d)\s*/\s*5", block)
+                                    if r_match2:
+                                        try:
+                                            op_rating = float(r_match2.group(1)) * 2
+                                        except ValueError:
+                                            pass
+
+                                if len(block) >= 30:
+                                    op_emb = _autocentrum_embed(block) if len(block) >= 50 else None
+                                    op_emb_str = (
+                                        f"[{','.join(str(x) for x in op_emb)}]"
+                                        if op_emb else None
+                                    )
+                                    cur.execute(
+                                        """
+                                        INSERT INTO autocentrum_reviews
+                                            (model_id, source, content, rating, url, embedding)
+                                        VALUES (%s, 'owner', %s, %s, %s, %s)
+                                        """,
+                                        (model_id, block[:2000], op_rating, op_page_url, op_emb_str),
+                                    )
+                                    op_count += 1
+                                    found_on_page += 1
+                                    opinions_scraped += 1
+                                    if opinions_scraped >= 50:
+                                        break
+
+                            if found_on_page == 0:
+                                break  # No more opinions
+                            page_num += 1
+                        except Exception as op_exc:
+                            print(f"[scrape-autocentrum] opinions page {page_num} error: {op_exc}", flush=True)
+                            break
             except Exception as exc:
                 print(f"[scrape-autocentrum] browser-mcp error: {exc}", flush=True)
-            return count
+            return ed_count, op_count
 
         scrape_result: dict = {}
 
         def _run_scrape() -> None:
             try:
-                editorial_count_inner = asyncio.run(_scrape_async())
-                scrape_result["ed"] = editorial_count_inner
+                ed, op = asyncio.run(_scrape_async())
+                scrape_result["ed"] = ed
+                scrape_result["op"] = op
             except Exception as exc:
                 print(f"[scrape-autocentrum] thread error: {exc}", flush=True)
                 scrape_result["ed"] = 0
+                scrape_result["op"] = 0
 
         t = threading.Thread(target=_run_scrape)
         t.start()
         t.join(timeout=120)
         editorial_count = scrape_result.get("ed", 0)
+        opinion_count = scrape_result.get("op", 0)
 
     finally:
         cur.close()
@@ -1695,8 +1798,8 @@ def _handle_scrape_autocentrum(args: str = "") -> str:
     _autocentrum_save_queue(queue)
 
     return (
-        f"✅ autocentrum scrape: {make} {model}\n"
-        f"Fragmenty zapisane: {editorial_count}\n"
+        f"✅ autocentrum scrape: {make} {model} — "
+        f"{editorial_count} fragm. recenzji + {opinion_count} opinii właścicieli zapisanych do bazy\n"
         f"URL: {model_url}"
     )
 
