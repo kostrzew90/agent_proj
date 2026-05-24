@@ -550,6 +550,7 @@ _MCP_SERVERS: dict[str, str] = {
     "browser-mcp": "http://browser-mcp:8000/sse",
     "chrome-readonly-mcp": "http://chrome-readonly-mcp:8000/sse",
     "fs-vinhunter": "http://mcp-fs-vinhunter:8000/sse",
+    "alumnium": "http://mcp-alumnium:8000/sse",
 }
 
 # Tools safe to call without args (or with minimal safe args)

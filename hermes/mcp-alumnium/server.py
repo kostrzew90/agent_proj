@@ -18,7 +18,7 @@ from mcp.server.fastmcp import FastMCP
 from playwright.async_api import async_playwright, Browser, Page
 
 try:
-    from alumnium import Aluminium as _Aluminium
+    from alumnium import Alumni as _Aluminium
 except ImportError:
     _Aluminium = None  # type: ignore
 
@@ -62,7 +62,7 @@ async def _ensure_session():
             args=["--no-sandbox", "--disable-dev-shm-usage"],
         )
         _page = await _browser.new_page()
-        _al = _Aluminium(_page)
+        _al = _Aluminium((_page, _loop))
 
     return _page, _al
 
