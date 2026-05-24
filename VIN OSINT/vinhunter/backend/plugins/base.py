@@ -10,6 +10,7 @@ class SourceCategory(Enum):
     DAMAGE = "damage"
     PHOTO_OSINT = "photo_osint"
     ADS_ARCHIVE = "ads_archive"
+    LOCAL_KNOWLEDGE = "local_knowledge"
 
 
 class SourceStatus(Enum):

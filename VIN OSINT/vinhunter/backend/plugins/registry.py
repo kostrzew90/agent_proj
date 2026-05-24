@@ -8,7 +8,7 @@ from plugins.base import SourcePlugin, SourceCategory
 
 logger = structlog.get_logger()
 
-PLUGIN_SUBDIRS = ["vin_decode", "registries", "damage", "osint_photo", "ads_archive"]
+PLUGIN_SUBDIRS = ["vin_decode", "registries", "damage", "osint_photo", "ads_archive", "local_knowledge"]
 
 
 class PluginRegistry:
