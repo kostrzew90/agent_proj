@@ -1,0 +1,3 @@
+mcp>=1.0.0
+playwright>=1.44.0
+alumnium>=0.1.0
