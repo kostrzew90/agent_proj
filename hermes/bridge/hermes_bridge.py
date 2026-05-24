@@ -135,6 +135,14 @@ _CRON_JOBS: dict[str, dict] = {
         "description": "Scrape autocentrum.pl reviews + opinions (daily 2:00)",
         "notify": "silent",
     },
+    "vinhunter-researcher": {
+        "interval_s": 604800,
+        "run_at_hour": 10,
+        "enabled": True,
+        "last_run": 0.0,
+        "description": "Research new VIN data sources (weekly, 10:00)",
+        "notify": "always",
+    },
 }
 
 _cron_lock = threading.Lock()
@@ -1816,6 +1824,107 @@ def _handle_scrape_autocentrum(args: str = "") -> str:
     )
 
 
+# ---------------------------------------------------------------------------
+# Skill handler: vinhunter-researcher
+# ---------------------------------------------------------------------------
+
+def _handle_vinhunter_researcher() -> str:
+    """
+    Research new VIN data sources weekly.
+    Brave Search → LLM scoring → audit report → Telegram summary.
+    """
+    from mcp_client import MCPClient
+
+    # 1. List existing plugin categories
+    async def _list_plugins() -> list[str]:
+        try:
+            async with MCPClient(_MCP_SERVERS["fs-vinhunter"]) as mcp:
+                result = await mcp.call("fs_list_dir", {"path": "backend/plugins"})
+                lines = str(result).splitlines()
+                return [line.split()[-1] for line in lines if line.strip().startswith("D")]
+        except Exception as exc:
+            print(f"[vinhunter-researcher] list_plugins error: {exc}", flush=True)
+            return []
+
+    def _run_list() -> list[str]:
+        box: dict = {}
+        def _t():
+            box["v"] = asyncio.run(_list_plugins())
+        t = threading.Thread(target=_t)
+        t.start()
+        t.join(timeout=30)
+        return box.get("v", [])
+
+    existing_plugins = _run_list()
+
+    # 2. Brave Search — deduplicate by domain
+    queries = [
+        "VIN API EU free 2026",
+        "car history database API Europe",
+        "vehicle registry open data API",
+    ]
+    raw_results: list[dict] = []
+    seen_domains: set[str] = set()
+    for q in queries:
+        for r in _brave_search(q, count=5):
+            url = r.get("url", "")
+            parts = url.split("/")
+            domain = parts[2] if len(parts) > 2 else url
+            if domain and domain not in seen_domains:
+                seen_domains.add(domain)
+                raw_results.append(r)
+
+    if not raw_results:
+        return "⚠️ vinhunter-researcher: Brave Search zwrócił 0 wyników. Sprawdź BRAVE_API_KEY."
+
+    # 3. LLM analysis
+    existing_str = ", ".join(existing_plugins) if existing_plugins else "brak danych"
+    results_str = "\n".join(
+        f"- {r.get('title', '')}: {r.get('url', '')} — {r.get('description', '')}"
+        for r in raw_results
+    )
+    prompt = (
+        "Jesteś ekspertem od OSINT dla pojazdów. Analizujesz nowe źródła danych VIN.\n\n"
+        f"Istniejące pluginy VINhunter (kategorie): {existing_str}\n\n"
+        f"Wyniki wyszukiwania:\n{results_str}\n\n"
+        "Dla każdego NOWEGO źródła oceń na 4 osiach:\n"
+        "- Typ: API REST=5, scraping=3, open data=3\n"
+        "- Pokrycie: EU=5, global=3, US=1\n"
+        "- Koszt: free=5, freemium=3, paid=1\n"
+        "- Trudność: easy=5, medium=3, hard=1\n"
+        "Score łączny: 0-20\n\n"
+        "Wyjście:\n"
+        "1. Tabela markdown: Nazwa | URL | Typ | Pokrycie | Koszt | Trudność | Score\n"
+        "2. Sekcja '## Top 3 do implementacji' z krótkim opisem każdego i dokładną nazwą "
+        "do użycia jako argument pluginu (snake_case, np. rdw_open_data)"
+    )
+
+    llm_result = llm_client.call_llm(prompt, tier="medium", skill="vinhunter-research")
+    report_text = llm_result.get("text", "")
+    if not report_text:
+        return f"⚠️ vinhunter-researcher: LLM error: {llm_result.get('error')}"
+
+    # 4. Write report
+    date_str = datetime.now().strftime("%Y-%m-%d")
+    report_path = _AUDIT_DIR / f"vinhunter-research-{date_str}.md"
+    report_path.write_text(
+        f"# VINhunter Research — {date_str}\n\n{report_text}",
+        encoding="utf-8",
+    )
+
+    # 5. Extract top source name (first snake_case name in Top 3 section)
+    import re as _re
+    top_match = _re.search(r"##\s*Top 3[^\n]*\n+.*?`?([a-z][a-z0-9_]+)`?", report_text, _re.DOTALL)
+    top_safe = top_match.group(1).strip() if top_match else "nieznane"
+
+    return (
+        f"🔍 VINhunter research — {date_str}\n"
+        f"Raport: audit/vinhunter-research-{date_str}.md\n"
+        f"Najlepsze źródło: {top_safe}\n\n"
+        f"Napisać plugin? /skill vinhunter-write-plugin {top_safe}"
+    )
+
+
 def _cron_execute_skill(skill_name: str) -> str:
     """Execute a skill by name (same routing as _make_reply for SKILL: prefix)."""
     if skill_name in ("scan-rss", "scan-rss-opportunities"):
@@ -1846,6 +1955,8 @@ def _cron_execute_skill(skill_name: str) -> str:
         return _handle_pool_monitor()
     if skill_name == "scrape-autocentrum":
         return _handle_scrape_autocentrum()
+    if skill_name == "vinhunter-researcher":
+        return _handle_vinhunter_researcher()
     return f"[cron] skill '{skill_name}' not supported for cron."
 
 
@@ -2612,6 +2723,8 @@ def _make_reply(text: str) -> str:
             return _handle_review_learn()
         if skill_name in ("scrape-autocentrum",):
             return _handle_scrape_autocentrum(skill_args)
+        if skill_name in ("vinhunter-research", "vinhunter-researcher"):
+            return _handle_vinhunter_researcher()
         return f"[stub] skill '{skill_name}' nie jest jeszcze zaimplementowany."
     # Plain message → automatic research (Google + Ollama)
     if text.strip():
