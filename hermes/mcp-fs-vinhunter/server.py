@@ -24,7 +24,8 @@ _ROOT = Path(os.environ.get("VINHUNTER_ROOT", "/vinhunter"))
 def _safe_path(path: str) -> Path:
     """Resolve path inside _ROOT, raise ValueError if traversal detected."""
     target = (_ROOT / path.lstrip("/")).resolve()
-    if not str(target).startswith(str(_ROOT.resolve())):
+    root_resolved = _ROOT.resolve()
+    if root_resolved not in target.parents and target != root_resolved:
         raise ValueError(f"Path traversal rejected: {path}")
     return target
 
@@ -37,7 +38,10 @@ def _git(args: list[str]) -> str:
         text=True,
         timeout=30,
     )
-    return (result.stdout + result.stderr).strip()
+    output = (result.stdout + result.stderr).strip()
+    if result.returncode != 0:
+        raise RuntimeError(f"git {args[0]} failed: {output}")
+    return output
 
 
 @mcp.tool()
@@ -52,13 +56,18 @@ def fs_write_file(path: str, content: str) -> str:
 @mcp.tool()
 def fs_read_file(path: str) -> str:
     """Read a file from the VINhunter directory."""
-    return _safe_path(path).read_text(encoding="utf-8")
+    target = _safe_path(path)
+    if not target.exists():
+        raise FileNotFoundError(f"File not found: {path}")
+    return target.read_text(encoding="utf-8")
 
 
 @mcp.tool()
 def fs_list_dir(path: str = "") -> str:
     """List directory contents inside VINhunter."""
     target = _safe_path(path)
+    if not target.is_dir():
+        raise NotADirectoryError(f"Not a directory: {path}")
     items = sorted(target.iterdir(), key=lambda p: (p.is_file(), p.name))
     return "\n".join(
         f"{'F' if p.is_file() else 'D'} {p.name}" for p in items
@@ -68,10 +77,10 @@ def fs_list_dir(path: str = "") -> str:
 @mcp.tool()
 def git_checkout_branch(branch_name: str) -> str:
     """Create and checkout a branch (checkout existing if already present)."""
-    out = _git(["checkout", "-b", branch_name])
-    if "already exists" in out or "fatal" in out:
-        out = _git(["checkout", branch_name])
-    return out
+    try:
+        return _git(["checkout", "-b", branch_name])
+    except RuntimeError:
+        return _git(["checkout", branch_name])
 
 
 @mcp.tool()
