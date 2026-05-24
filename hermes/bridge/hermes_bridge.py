@@ -1853,6 +1853,8 @@ def _handle_vinhunter_researcher() -> str:
         t = threading.Thread(target=_t)
         t.start()
         t.join(timeout=30)
+        if t.is_alive():
+            print("[vinhunter-researcher] MCP list_plugins timeout", flush=True)
         return box.get("v", [])
 
     existing_plugins = _run_list()
@@ -1880,7 +1882,7 @@ def _handle_vinhunter_researcher() -> str:
     # 3. LLM analysis
     existing_str = ", ".join(existing_plugins) if existing_plugins else "brak danych"
     results_str = "\n".join(
-        f"- {r.get('title', '')}: {r.get('url', '')} — {r.get('description', '')}"
+        f"- {r.get('title', '')}: {r.get('url', '')} — {r.get('snippet', '')}"
         for r in raw_results
     )
     prompt = (
@@ -1900,6 +1902,8 @@ def _handle_vinhunter_researcher() -> str:
     )
 
     llm_result = llm_client.call_llm(prompt, tier="medium", skill="vinhunter-research")
+    if llm_result is None:
+        return "⚠️ vinhunter-researcher: LLM returned None"
     report_text = llm_result.get("text", "")
     if not report_text:
         return f"⚠️ vinhunter-researcher: LLM error: {llm_result.get('error')}"
