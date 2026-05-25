@@ -74,6 +74,11 @@ class RetrievalSettings(BaseSettings):
     top_k: int = 10
     semantic_weight: float = 0.7
     bm25_weight: float = 0.3
+    reranker_enabled: bool = True
+    reranker_top_k: int = 5
+    reranker_llm_weight: float = 0.7        # hybrid merge: 0.7 LLM + 0.3 RRF
+    reranker_max_per_section: int = 2       # diversity cap
+    reranker_content_truncate: int = 600    # chars sent to LLM per chunk
 
     model_config = {"env_prefix": "RETRIEVAL_", "extra": "ignore"}
 
