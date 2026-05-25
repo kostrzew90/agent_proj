@@ -71,8 +71,8 @@ def _parse_scores(text: str) -> list[ChunkScore]:
     # Attempt 1: direct JSON parse via pydantic
     try:
         parsed = RerankerScores.model_validate_json(text)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("_parse_scores direct parse failed: %s", exc)
 
     # Attempt 2: regex extract inner JSON object, then pydantic
     if parsed is None:
@@ -80,8 +80,8 @@ def _parse_scores(text: str) -> list[ChunkScore]:
         if match:
             try:
                 parsed = RerankerScores.model_validate_json(match.group())
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("_parse_scores regex parse failed: %s", exc)
 
     if parsed is None:
         return []
@@ -230,7 +230,7 @@ class LLMReranker:
         # Fill remaining slots from original order if diversity filtered too many
         if len(reranked) < effective_top_k:
             seen_ids = {r.chunk_id for r in reranked}
-            for r in results:
+            for r, _ in merged:
                 if r.chunk_id not in seen_ids:
                     reranked.append(r)
                     seen_ids.add(r.chunk_id)

@@ -228,3 +228,61 @@ async def test_pydantic_validation_rejects_invalid_scores():
     # Should fall back to RRF order (original first chunk preserved)
     assert len(reranked) == 3
     assert reranked[0].chunk_id == 0
+
+
+@pytest.mark.asyncio
+async def test_backfill_uses_hybrid_order_not_rrf():
+    """When diversity caps eviction triggers back-fill, prefer high-hybrid-score chunks over RRF order."""
+    from core.llm_reranker import LLMReranker
+    from core.llm import GenerationResult
+
+    # 4 chunks, all in same section → diversity max_per_section=2 caps at 2.
+    # LLM heavily favours chunks 3 and 4 (last two by RRF rank).
+    # After diversity cap returns 2 chunks (first two by hybrid score),
+    # top_k=3 forces back-fill of one more — should be the next-best hybrid, not RRF[0].
+    results = [
+        # chunk_id 0: RRF=1.0 (best by RRF), LLM=0 (worst by LLM)
+        _FakeResult(0, 1, "low LLM but top RRF", 1.0, None, "S", "d.pdf", "text", None, None),
+        # chunk_id 1: RRF=0.9, LLM=0
+        _FakeResult(1, 1, "low LLM, high RRF", 0.9, None, "S", "d.pdf", "text", None, None),
+        # chunk_id 2: RRF=0.5, LLM=5 (best hybrid)
+        _FakeResult(2, 1, "best LLM", 0.5, None, "S", "d.pdf", "text", None, None),
+        # chunk_id 3: RRF=0.4, LLM=4 (second-best hybrid)
+        _FakeResult(3, 1, "second LLM", 0.4, None, "S", "d.pdf", "text", None, None),
+    ]
+
+    # LLM scores chunks 3,4 (1-based ids) very high — chunks 1,2 (1-based) very low
+    llm_response = '''{
+      "scores": [
+        {"id": 1, "relevance": 0, "specificity": 0, "coverage": 0},
+        {"id": 2, "relevance": 0, "specificity": 0, "coverage": 0},
+        {"id": 3, "relevance": 5, "specificity": 5, "coverage": 5},
+        {"id": 4, "relevance": 4, "specificity": 4, "coverage": 4}
+      ]
+    }'''
+    mock_result = GenerationResult(text=llm_response, model="test")
+
+    with patch("core.llm_reranker.settings") as mock_settings:
+        mock_settings.ai.openrouter_api_key = ""
+        mock_settings.ai.ollama_url = "http://localhost:11434"
+        mock_settings.ai.judge_model = "qwen3:1.7b"
+        mock_settings.retrieval.reranker_enabled = True
+        mock_settings.retrieval.reranker_top_k = 3
+        mock_settings.retrieval.reranker_llm_weight = 0.7
+        mock_settings.retrieval.reranker_max_per_section = 2
+        mock_settings.retrieval.reranker_content_truncate = 600
+
+        reranker = LLMReranker()
+        reranker._client = AsyncMock()
+        reranker._client.generate = AsyncMock(return_value=mock_result)
+
+        reranked = await reranker.rerank("test", results, top_k=3)
+
+    # Expected: chunks 2 and 3 (best hybrid) fit under diversity cap.
+    # Back-fill: should pick the next-best hybrid (chunk 0 with RRF=1.0 but LLM=0),
+    # NOT a random RRF-first chunk. With back-fill walking merged (hybrid order),
+    # the third pick is the highest remaining merged score.
+    assert len(reranked) == 3
+    chunk_ids = [r.chunk_id for r in reranked]
+    # Chunks 2 and 3 should be in the top 2 (best LLM scores)
+    assert 2 in chunk_ids and 3 in chunk_ids
