@@ -136,7 +136,7 @@ _CRON_JOBS: dict[str, dict] = {
         "notify": "silent",
     },
     "vinhunter-researcher": {
-        "interval_s": 604800,
+        "interval_s": 86400,
         "run_at_hour": 10,
         "enabled": True,
         "last_run": 0.0,
