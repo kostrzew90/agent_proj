@@ -12,6 +12,7 @@ import asyncio
 import csv
 import json
 import os
+import re
 import signal
 import threading
 import time
@@ -3071,3 +3072,24 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+# ---------------------------------------------------------------------------
+# Project Digest (skill) — helpers prefixed _pd_*
+# ---------------------------------------------------------------------------
+
+_PD_SECRET_PATTERNS: list[tuple] = [
+    (re.compile(r"sk-[A-Za-z0-9_-]{16,}"), "sk-***REDACTED***"),
+    (re.compile(r"Bearer\s+[A-Za-z0-9._-]{16,}", re.IGNORECASE), "Bearer ***REDACTED***"),
+    (re.compile(r"(api[_-]?key|token|secret)\s*[=:]\s*[^\s,;]+", re.IGNORECASE), r"\1=***REDACTED***"),
+    (re.compile(r"eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+"), "***JWT-REDACTED***"),
+    (re.compile(r"\b[a-f0-9]{40,}\b"), "***HEX-REDACTED***"),
+    (re.compile(r"\b(OPENAI_API_KEY|ANTHROPIC_API_KEY|GROQ_API_KEY|TELEGRAM_BOT_TOKEN)\b"), "***ENV-VAR***"),
+]
+
+
+def _pd_sanitize(text: str) -> str:
+    """Mask secrets in any string before sending to Telegram (external boundary)."""
+    for pat, repl in _PD_SECRET_PATTERNS:
+        text = pat.sub(repl, text)
+    return text
