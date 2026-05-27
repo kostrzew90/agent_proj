@@ -3202,3 +3202,49 @@ def _pd_git_log_since(hours: int) -> dict:
         except Exception as exc:
             out[name] = {"error": str(exc)[:60]}
     return out
+
+
+_PD_HTTP_ENDPOINTS: dict[str, str] = {
+    "RAG": "http://rag-backend:8000/health",
+    "Selfmadeagent": "http://selfmadeagent:8080/health",
+}
+
+
+def _pd_health_check() -> dict:
+    """Return container states (docker ps -a) + HTTP /health pings."""
+    containers: dict[str, str] = {}
+    try:
+        r = subprocess.run(
+            ["docker", "ps", "-a", "--format", "{{.Names}}\t{{.Status}}"],
+            timeout=5, capture_output=True, text=True,
+        )
+        if r.returncode == 0:
+            for line in r.stdout.splitlines():
+                name, _, status = line.partition("\t")
+                if not name:
+                    continue
+                if status.startswith("Up"):
+                    containers[name] = "up"
+                elif status.startswith("Exited"):
+                    containers[name] = "exited"
+                elif status.startswith("Restarting"):
+                    containers[name] = "restarting"
+                else:
+                    containers[name] = "unknown"
+    except Exception as exc:
+        containers["_error"] = str(exc)[:60]
+
+    http: dict[str, dict] = {}
+    for name, url in _PD_HTTP_ENDPOINTS.items():
+        t0 = time.monotonic()
+        try:
+            with httpx.Client(timeout=3.0) as client:
+                resp = client.get(url)
+            http[name] = {
+                "ok": resp.status_code == 200,
+                "latency_ms": int((time.monotonic() - t0) * 1000),
+            }
+        except Exception as exc:
+            http[name] = {"ok": False, "error": str(exc)[:40]}
+
+    return {"containers": containers, "http": http}

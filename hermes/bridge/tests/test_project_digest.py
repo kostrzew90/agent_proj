@@ -145,3 +145,41 @@ class TestGitLog:
     def test_git_log_since_rejects_non_int(self):
         with pytest.raises(AssertionError):
             hermes_bridge._pd_git_log_since(hours="12")  # type: ignore
+
+
+class TestHealthCheck:
+    def test_parses_docker_ps_states(self, monkeypatch):
+        fake_stdout = (
+            "rag-backend\tUp 2 hours\n"
+            "rag-postgres\tUp 2 hours\n"
+            "hermes-watcher\tExited (1) 30 minutes ago\n"
+            "old-container\tRestarting (3) 5 seconds ago\n"
+        )
+
+        class FakeCompleted:
+            returncode = 0
+            stdout = fake_stdout
+
+        def fake_run(*args, **kwargs):
+            return FakeCompleted()
+
+        monkeypatch.setattr(hermes_bridge.subprocess, "run", fake_run)
+        monkeypatch.setattr(hermes_bridge, "_PD_HTTP_ENDPOINTS", {})
+
+        out = hermes_bridge._pd_health_check()
+        assert out["containers"]["rag-backend"] == "up"
+        assert out["containers"]["hermes-watcher"] == "exited"
+        assert out["containers"]["old-container"] == "restarting"
+
+    def test_docker_failure_does_not_crash(self, monkeypatch):
+        import subprocess as _subprocess
+
+        def fake_run(*args, **kwargs):
+            raise _subprocess.TimeoutExpired(cmd="docker", timeout=5)
+
+        monkeypatch.setattr(hermes_bridge.subprocess, "run", fake_run)
+        monkeypatch.setattr(hermes_bridge, "_PD_HTTP_ENDPOINTS", {})
+
+        out = hermes_bridge._pd_health_check()
+        assert "containers" in out
+        assert "http" in out
