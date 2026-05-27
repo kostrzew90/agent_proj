@@ -108,3 +108,40 @@ class TestParseCosts:
         out = hermes_bridge._pd_parse_costs(since_hours=1)
         assert out["entries"] == 1
         assert out["total_usd"] == pytest.approx(0.1)
+
+
+class TestGitLog:
+    def test_parses_commits_and_shortstat(self):
+        stdout = (
+            "abc1234 feat(rag): wire reranker\n"
+            " 2 files changed, 30 insertions(+), 5 deletions(-)\n"
+            "def5678 fix(rag): close http clients\n"
+            " 1 file changed, 4 insertions(+)\n"
+        )
+        out = hermes_bridge._pd_parse_git_log(stdout)
+        assert len(out["commits"]) == 2
+        assert "feat(rag): wire reranker" in out["commits"][0]
+        assert out["files_changed"] == 3
+
+    def test_handles_empty_output(self):
+        out = hermes_bridge._pd_parse_git_log("")
+        assert out == {"commits": [], "files_changed": 0}
+
+    def test_tolerates_merge_commit_lines(self):
+        stdout = (
+            "abc1234 Merge branch 'feature'\n"
+            "Binary files differ\n"
+            " 1 file changed, 0 insertions(+), 0 deletions(-)\n"
+        )
+        out = hermes_bridge._pd_parse_git_log(stdout)
+        assert len(out["commits"]) == 1
+        assert out["files_changed"] == 1
+
+    def test_git_log_since_missing_repo(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(hermes_bridge, "_PD_PROJECTS", {"fake": str(tmp_path / "no-such-dir")})
+        out = hermes_bridge._pd_git_log_since(hours=12)
+        assert out["fake"] == {"error": "repo missing"}
+
+    def test_git_log_since_rejects_non_int(self):
+        with pytest.raises(AssertionError):
+            hermes_bridge._pd_git_log_since(hours="12")  # type: ignore

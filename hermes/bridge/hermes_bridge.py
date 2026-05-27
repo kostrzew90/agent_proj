@@ -15,6 +15,7 @@ import json
 import os
 import re
 import signal
+import subprocess
 import threading
 import time
 from datetime import datetime, timezone
@@ -3149,3 +3150,55 @@ def _pd_parse_costs(since_hours: int) -> dict:
         entries += 1
 
     return {"total_usd": total, "by_model": by_model, "entries": entries}
+
+
+_PD_PROJECTS: dict[str, str] = {
+    "RAG": "/workspace/ro/RAG",
+    "Selfmadeagent": "/workspace/ro/Selfmadeagent",
+    "VINhunter": "/workspace/ro/VIN OSINT/vinhunter",
+    "trading-app": "/workspace/ro/trading-app",
+    "hermes": "/workspace/ro/hermes",
+}
+
+
+def _pd_parse_git_log(stdout: str) -> dict:
+    """Best-effort parser for `git log --pretty=format:%h %s --shortstat`."""
+    commits: list[str] = []
+    files_changed = 0
+    for line in stdout.splitlines():
+        try:
+            if re.match(r"^[a-f0-9]{7,40}\s", line):
+                commits.append(line)
+            elif " file" in line and "changed" in line:
+                m = re.search(r"(\d+)\s+files?\s+changed", line)
+                if m:
+                    files_changed += int(m.group(1))
+        except Exception:
+            continue
+    return {"commits": commits, "files_changed": files_changed}
+
+
+def _pd_git_log_since(hours: int) -> dict:
+    """Run `git log --since=<hours> hours ago` per project. Soft-fail on missing/broken repos."""
+    assert isinstance(hours, int), "hours must be int (subprocess safety)"
+    out: dict[str, dict] = {}
+    for name, path in _PD_PROJECTS.items():
+        repo = Path(path)
+        if not repo.exists() or not (repo / ".git").exists():
+            out[name] = {"error": "repo missing"}
+            continue
+        try:
+            r = subprocess.run(
+                ["git", "log", f"--since={hours} hours ago",
+                 "--pretty=format:%h %s", "--shortstat"],
+                cwd=str(repo), timeout=10, capture_output=True, text=True,
+            )
+            if r.returncode != 0:
+                out[name] = {"error": f"git rc={r.returncode}"}
+                continue
+            out[name] = _pd_parse_git_log(r.stdout)
+        except subprocess.TimeoutExpired:
+            out[name] = {"error": "timeout"}
+        except Exception as exc:
+            out[name] = {"error": str(exc)[:60]}
+    return out
