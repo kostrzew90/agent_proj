@@ -9,6 +9,7 @@ writes replies to /audit/outbox/, moves processed files to
 from __future__ import annotations
 
 import asyncio
+import collections
 import csv
 import json
 import os
@@ -3093,3 +3094,58 @@ def _pd_sanitize(text: str) -> str:
     for pat, repl in _PD_SECRET_PATTERNS:
         text = pat.sub(repl, text)
     return text
+
+
+def _pd_to_epoch(ts) -> float:
+    """Convert ISO string or numeric timestamp to epoch seconds. 0.0 on failure."""
+    if isinstance(ts, (int, float)):
+        return float(ts)
+    if isinstance(ts, str):
+        try:
+            return datetime.fromisoformat(ts.replace("Z", "+00:00")).timestamp()
+        except (ValueError, TypeError):
+            return 0.0
+    return 0.0
+
+
+def _pd_parse_costs(since_hours: int) -> dict:
+    """Aggregate costs.jsonl entries newer than cutoff. Robust to malformed lines."""
+    assert isinstance(since_hours, int), "since_hours must be int"
+    cutoff = time.time() - since_hours * 3600
+    by_model: dict[str, float] = {}
+    total = 0.0
+    entries = 0
+
+    path = _AUDIT_DIR / "costs.jsonl"
+    if not path.exists():
+        return {"total_usd": 0.0, "by_model": {}, "entries": 0}
+
+    MAX_LINE = 16384
+    try:
+        with path.open("r", encoding="utf-8", errors="ignore") as f:
+            lines = collections.deque(f, maxlen=5000)
+    except OSError:
+        return {"total_usd": 0.0, "by_model": {}, "entries": 0}
+
+    for line in lines:
+        if len(line) > MAX_LINE:
+            continue
+        try:
+            e = json.loads(line)
+        except (json.JSONDecodeError, ValueError):
+            continue
+        if not isinstance(e, dict):
+            continue
+        ts = _pd_to_epoch(e.get("timestamp") or e.get("ts") or 0)
+        if ts < cutoff:
+            continue
+        model = str(e.get("model", "unknown"))
+        try:
+            cost = float(e.get("cost_usd", 0) or 0)
+        except (TypeError, ValueError):
+            cost = 0.0
+        by_model[model] = by_model.get(model, 0.0) + cost
+        total += cost
+        entries += 1
+
+    return {"total_usd": total, "by_model": by_model, "entries": entries}

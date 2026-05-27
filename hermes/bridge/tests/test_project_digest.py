@@ -48,3 +48,63 @@ class TestSanitizer:
         text = "Normal commit message: feat(rag): add reranker"
         out = hermes_bridge._pd_sanitize(text)
         assert out == text
+
+
+class TestParseCosts:
+    def _write_costs(self, tmp_path, entries):
+        path = tmp_path / "costs.jsonl"
+        path.write_text("\n".join(json.dumps(e) for e in entries), encoding="utf-8")
+
+    def test_aggregates_by_model(self, tmp_path):
+        now = time.time()
+        self._write_costs(tmp_path, [
+            {"timestamp": now - 1000, "model": "gpt-5", "cost_usd": 0.50},
+            {"timestamp": now - 2000, "model": "gpt-5", "cost_usd": 0.25},
+            {"timestamp": now - 500, "model": "claude-sonnet", "cost_usd": 0.10},
+        ])
+        out = hermes_bridge._pd_parse_costs(since_hours=1)
+        assert out["entries"] == 3
+        assert out["total_usd"] == pytest.approx(0.85)
+        assert out["by_model"]["gpt-5"] == pytest.approx(0.75)
+        assert out["by_model"]["claude-sonnet"] == pytest.approx(0.10)
+
+    def test_ignores_entries_outside_window(self, tmp_path):
+        now = time.time()
+        self._write_costs(tmp_path, [
+            {"timestamp": now - 100, "model": "a", "cost_usd": 1.0},
+            {"timestamp": now - 7200, "model": "b", "cost_usd": 99.0},
+        ])
+        out = hermes_bridge._pd_parse_costs(since_hours=1)
+        assert out["entries"] == 1
+        assert out["total_usd"] == pytest.approx(1.0)
+
+    def test_handles_malformed_jsonl(self, tmp_path):
+        path = tmp_path / "costs.jsonl"
+        now = time.time()
+        path.write_text(
+            f'{{"timestamp": {now - 100}, "model": "ok", "cost_usd": 0.5}}\n'
+            'NOT JSON\n'
+            '{"incomplete":\n'
+            f'{{"timestamp": {now - 50}, "model": "ok2", "cost_usd": 0.3}}\n',
+            encoding="utf-8",
+        )
+        out = hermes_bridge._pd_parse_costs(since_hours=1)
+        assert out["entries"] == 2
+        assert out["total_usd"] == pytest.approx(0.8)
+
+    def test_handles_missing_file(self, tmp_path):
+        out = hermes_bridge._pd_parse_costs(since_hours=1)
+        assert out == {"total_usd": 0.0, "by_model": {}, "entries": 0}
+
+    def test_caps_oversize_lines(self, tmp_path):
+        path = tmp_path / "costs.jsonl"
+        now = time.time()
+        oversize = '{"timestamp": ' + str(now - 50) + ', "model": "x", "padding": "' + ("z" * 20000) + '"}'
+        path.write_text(
+            oversize + "\n" +
+            f'{{"timestamp": {now - 30}, "model": "good", "cost_usd": 0.1}}\n',
+            encoding="utf-8",
+        )
+        out = hermes_bridge._pd_parse_costs(since_hours=1)
+        assert out["entries"] == 1
+        assert out["total_usd"] == pytest.approx(0.1)
