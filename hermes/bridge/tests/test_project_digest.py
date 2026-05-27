@@ -183,3 +183,67 @@ class TestHealthCheck:
         out = hermes_bridge._pd_health_check()
         assert "containers" in out
         assert "http" in out
+
+
+class TestScanExtras:
+    def test_picks_up_recent_log(self, tmp_path):
+        (tmp_path / "newthing.log").write_text("event A\nevent B\n", encoding="utf-8")
+        out = hermes_bridge._pd_scan_extras(since_hours=24)
+        names = [e["file"] for e in out]
+        assert "newthing.log" in names
+        target = next(e for e in out if e["file"] == "newthing.log")
+        assert "event B" in target["last"]
+
+    def test_skips_denylisted(self, tmp_path):
+        (tmp_path / "auth.log").write_text("password=secret123\n", encoding="utf-8")
+        (tmp_path / "secrets.json").write_text("{}\n", encoding="utf-8")
+        (tmp_path / ".env").write_text("X=1\n", encoding="utf-8")
+        (tmp_path / "cdp.log").write_text("cookie\n", encoding="utf-8")
+        (tmp_path / "llm-proxy.jsonl").write_text('{"prompt":"x"}\n', encoding="utf-8")
+        out = hermes_bridge._pd_scan_extras(since_hours=24)
+        files = {e["file"] for e in out}
+        assert "auth.log" not in files
+        assert "secrets.json" not in files
+        assert ".env" not in files
+        assert "cdp.log" not in files
+        assert "llm-proxy.jsonl" not in files
+
+    def test_only_allowlist_extensions(self, tmp_path):
+        (tmp_path / "ok.log").write_text("entry\n", encoding="utf-8")
+        (tmp_path / "binary.bin").write_text("xxx\n", encoding="utf-8")
+        (tmp_path / "image.png").write_text("yyy\n", encoding="utf-8")
+        out = hermes_bridge._pd_scan_extras(since_hours=24)
+        files = {e["file"] for e in out}
+        assert "ok.log" in files
+        assert "binary.bin" not in files
+        assert "image.png" not in files
+
+    def test_skips_old_files(self, tmp_path):
+        import os as _os
+        old = tmp_path / "old.log"
+        old.write_text("old entry\n", encoding="utf-8")
+        old_mtime = time.time() - 48 * 3600
+        _os.utime(old, (old_mtime, old_mtime))
+        out = hermes_bridge._pd_scan_extras(since_hours=24)
+        assert "old.log" not in {e["file"] for e in out}
+
+    def test_jsonl_pretty_extract(self, tmp_path):
+        (tmp_path / "thing.jsonl").write_text(
+            '{"event":"crawl_done","count":47}\n',
+            encoding="utf-8",
+        )
+        out = hermes_bridge._pd_scan_extras(since_hours=24)
+        target = next(e for e in out if e["file"] == "thing.jsonl")
+        assert "event=crawl_done" in target["last"] or "crawl_done" in target["last"]
+
+    def test_caps_at_ten_extras(self, tmp_path):
+        for i in range(15):
+            (tmp_path / f"x{i}.log").write_text(f"entry {i}\n", encoding="utf-8")
+        out = hermes_bridge._pd_scan_extras(since_hours=24)
+        assert len(out) <= 10
+
+    def test_truncates_long_line(self, tmp_path):
+        (tmp_path / "verbose.log").write_text("X" * 1000 + "\n", encoding="utf-8")
+        out = hermes_bridge._pd_scan_extras(since_hours=24)
+        target = next(e for e in out if e["file"] == "verbose.log")
+        assert len(target["last"]) <= 180

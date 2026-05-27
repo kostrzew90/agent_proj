@@ -3248,3 +3248,63 @@ def _pd_health_check() -> dict:
             http[name] = {"ok": False, "error": str(exc)[:40]}
 
     return {"containers": containers, "http": http}
+
+
+_PD_ALLOW_PATTERNS: tuple = ("*.log", "*.jsonl")
+_PD_DENY_FILES: set = {
+    "auth.log", "secrets.json", ".env",
+    "cdp.log", "cdp_readonly.log",
+    "costs.jsonl", "review-learn.log", "cron.log",
+    "research.log", "watcher-heartbeat.txt",
+    "llm-proxy.jsonl",
+    "self-learn.log",
+}
+
+
+def _pd_scan_extras(since_hours: int) -> list[dict]:
+    """Scan /audit for recent log/jsonl files not handled elsewhere."""
+    assert isinstance(since_hours, int)
+    cutoff = time.time() - since_hours * 3600
+    extras: list[dict] = []
+    MAX_LINE = 16384
+
+    candidates: set = set()
+    for pat in _PD_ALLOW_PATTERNS:
+        candidates.update(_AUDIT_DIR.glob(pat))
+
+    for path in sorted(candidates):
+        if path.name in _PD_DENY_FILES or not path.is_file():
+            continue
+        try:
+            if path.stat().st_mtime < cutoff:
+                continue
+        except OSError:
+            continue
+        try:
+            with path.open("r", encoding="utf-8", errors="ignore") as f:
+                tail = collections.deque(f, maxlen=1)
+        except OSError:
+            continue
+        if not tail:
+            continue
+        line = tail[-1].strip()
+        if len(line) > MAX_LINE:
+            continue
+
+        display = line[:180]
+        if path.suffix == ".jsonl":
+            try:
+                obj = json.loads(line)
+                if isinstance(obj, dict):
+                    for key in ("message", "event", "type", "msg", "summary"):
+                        if key in obj:
+                            display = f"{key}={obj[key]}"[:180]
+                            break
+            except (json.JSONDecodeError, ValueError):
+                pass
+
+        extras.append({"file": path.name, "last": display})
+        if len(extras) >= 10:
+            break
+
+    return extras
