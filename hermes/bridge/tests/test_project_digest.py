@@ -138,9 +138,10 @@ class TestGitLog:
         assert out["files_changed"] == 1
 
     def test_git_log_since_missing_repo(self, monkeypatch, tmp_path):
-        monkeypatch.setattr(hermes_bridge, "_PD_PROJECTS", {"fake": str(tmp_path / "no-such-dir")})
+        monkeypatch.setattr(hermes_bridge, "_PD_REPO_ROOT", str(tmp_path / "no-such-dir"))
+        monkeypatch.setattr(hermes_bridge, "_PD_PROJECTS", {"fake": "fake-subpath"})
         out = hermes_bridge._pd_git_log_since(hours=12)
-        assert out["fake"] == {"error": "repo missing"}
+        assert out["fake"]["error"] == "monorepo not found"
 
     def test_git_log_since_rejects_non_int(self):
         with pytest.raises(AssertionError):

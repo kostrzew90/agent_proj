@@ -3174,12 +3174,14 @@ def _pd_parse_costs(since_hours: int) -> dict:
     return {"total_usd": total, "by_model": by_model, "entries": entries}
 
 
+_PD_REPO_ROOT: str = "/workspace/ro"
+
 _PD_PROJECTS: dict[str, str] = {
-    "RAG": "/workspace/ro/RAG",
-    "Selfmadeagent": "/workspace/ro/Selfmadeagent",
-    "VINhunter": "/workspace/ro/VIN OSINT/vinhunter",
-    "trading-app": "/workspace/ro/trading-app",
-    "hermes": "/workspace/ro/hermes",
+    "RAG": "RAG",
+    "Selfmadeagent": "Selfmadeagent",
+    "VINhunter": "VIN OSINT/vinhunter",
+    "trading-app": "trading-app",
+    "hermes": "hermes",
 }
 
 
@@ -3201,19 +3203,24 @@ def _pd_parse_git_log(stdout: str) -> dict:
 
 
 def _pd_git_log_since(hours: int) -> dict:
-    """Run `git log --since=<hours> hours ago` per project. Soft-fail on missing/broken repos."""
+    """Run `git log --since=<hours> hours ago -- <subpath>` per project (monorepo). Soft-fail."""
     assert isinstance(hours, int), "hours must be int (subprocess safety)"
     out: dict[str, dict] = {}
-    for name, path in _PD_PROJECTS.items():
-        repo = Path(path)
-        if not repo.exists() or not (repo / ".git").exists():
-            out[name] = {"error": "repo missing"}
+    repo_root = Path(_PD_REPO_ROOT)
+    if not repo_root.exists() or not (repo_root / ".git").exists():
+        return {n: {"error": "monorepo not found"} for n in _PD_PROJECTS}
+
+    for name, subpath in _PD_PROJECTS.items():
+        full_path = repo_root / subpath
+        if not full_path.exists():
+            out[name] = {"error": "subpath missing"}
             continue
         try:
             r = subprocess.run(
                 ["git", "log", f"--since={hours} hours ago",
-                 "--pretty=format:%h %s", "--shortstat"],
-                cwd=str(repo), timeout=10, capture_output=True, text=True,
+                 "--pretty=format:%h %s", "--shortstat",
+                 "--", subpath],
+                cwd=str(repo_root), timeout=10, capture_output=True, text=True,
             )
             if r.returncode != 0:
                 out[name] = {"error": f"git rc={r.returncode}"}
@@ -3227,8 +3234,8 @@ def _pd_git_log_since(hours: int) -> dict:
 
 
 _PD_HTTP_ENDPOINTS: dict[str, str] = {
-    "RAG": "http://rag-backend:8000/health",
-    "Selfmadeagent": "http://selfmadeagent:8080/health",
+    "RAG": "http://host.docker.internal:8000/api/v1/health",
+    "Selfmadeagent": "http://host.docker.internal:8080/health",
 }
 
 
@@ -3253,6 +3260,8 @@ def _pd_health_check() -> dict:
                     containers[name] = "restarting"
                 else:
                     containers[name] = "unknown"
+    except FileNotFoundError:
+        containers["_note"] = "docker socket not mounted"
     except Exception as exc:
         containers["_error"] = str(exc)[:60]
 
@@ -3493,6 +3502,9 @@ def _pd_format_digest(mode: str, data: dict) -> str:
         health = data.get("health", {})
         h_lines = ["📊 Health", "  Containers:"]
         for name, state in sorted(health.get("containers", {}).items()):
+            if name.startswith("_"):
+                h_lines.append(f"    ℹ {name[1:]}: {state}")
+                continue
             icon = "🟢" if state == "up" else "🔴"
             h_lines.append(f"    {icon} {name} ({state})")
         h_lines.append("  HTTP:")
