@@ -322,3 +322,91 @@ class TestResearchLog:
         out = hermes_bridge._pd_research_log_since(hours=12)
         assert out["count"] == 2
         assert "hybrid RRF" in out["last_topic"] or "agentic" in out["last_topic"]
+
+
+class TestFormatDigest:
+    def test_morning_format_contains_sections(self):
+        data = {
+            "costs": {"total_usd": 2.41, "by_model": {"gpt-5": 1.22}, "entries": 14},
+            "health": {"containers": {"rag-backend": "up"}, "http": {"RAG": {"ok": True, "latency_ms": 42}}},
+            "queue": {"new_last_24h": 5},
+            "extras": [{"file": "thing.log", "last": "entry X"}],
+        }
+        out = hermes_bridge._pd_format_digest("morning", data)
+        assert "Morning" in out
+        assert "$2.41" in out
+        assert "rag-backend" in out
+        assert "RAG" in out
+        assert "5" in out
+
+    def test_evening_format_contains_git(self):
+        data = {
+            "costs": {"total_usd": 4.0, "by_model": {}, "entries": 0},
+            "git": {
+                "RAG": {"commits": ["abc1234 feat: x"], "files_changed": 3},
+                "trading-app": {"error": "repo missing"},
+            },
+            "highlights": [{"file": "x.py", "preview": "• leak"}],
+            "research": {"count": 2, "last_topic": "RRF"},
+            "extras": [],
+        }
+        out = hermes_bridge._pd_format_digest("evening", data)
+        assert "Evening" in out
+        assert "RAG" in out
+        assert "feat: x" in out
+        assert "trading-app" in out
+        assert "leak" in out
+        assert "RRF" in out
+
+    def test_sanitizes_output(self):
+        data = {
+            "costs": {"total_usd": 0.0, "by_model": {}, "entries": 0},
+            "health": {"containers": {}, "http": {}},
+            "queue": {"new_last_24h": 0},
+            "extras": [{"file": "leak.log", "last": "Bearer abcdefghijklmnop12345"}],
+        }
+        out = hermes_bridge._pd_format_digest("morning", data)
+        assert "abcdefghijklmnop12345" not in out
+        assert "REDACTED" in out
+
+    def test_output_within_telegram_budget(self):
+        data = {
+            "costs": {"total_usd": 100.0, "by_model": {f"m{i}": 1.0 for i in range(50)}, "entries": 100},
+            "git": {p: {"commits": [f"abc{i} commit {i}" for i in range(20)], "files_changed": 50}
+                    for p in hermes_bridge._PD_PROJECTS},
+            "highlights": [{"file": f"f{i}.py", "preview": "x" * 80} for i in range(10)],
+            "research": {"count": 100, "last_topic": "y" * 100},
+            "extras": [{"file": f"e{i}.log", "last": "z" * 180} for i in range(10)],
+        }
+        out = hermes_bridge._pd_format_digest("evening", data)
+        assert len(out) <= 3800
+
+
+class TestHandleProjectDigest:
+    def test_dispatches_morning_mode(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(hermes_bridge, "_pd_parse_costs", lambda since_hours: {"total_usd": 0.0, "by_model": {}, "entries": 0})
+        monkeypatch.setattr(hermes_bridge, "_pd_health_check", lambda: {"containers": {}, "http": {}})
+        monkeypatch.setattr(hermes_bridge, "_pd_review_learn_queue", lambda: {"new_last_24h": 7})
+        monkeypatch.setattr(hermes_bridge, "_pd_scan_extras", lambda since_hours: [])
+
+        out = hermes_bridge._handle_project_digest("project-digest-morning")
+        assert "Morning" in out
+        assert "7" in out
+
+    def test_dispatches_evening_mode(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(hermes_bridge, "_pd_parse_costs", lambda since_hours: {"total_usd": 0.0, "by_model": {}, "entries": 0})
+        monkeypatch.setattr(hermes_bridge, "_pd_git_log_since", lambda hours: {})
+        monkeypatch.setattr(hermes_bridge, "_pd_review_learn_highlights", lambda last_n: [])
+        monkeypatch.setattr(hermes_bridge, "_pd_research_log_since", lambda hours: {"count": 0, "last_topic": ""})
+        monkeypatch.setattr(hermes_bridge, "_pd_scan_extras", lambda since_hours: [])
+
+        out = hermes_bridge._handle_project_digest("project-digest-evening")
+        assert "Evening" in out
+
+    def test_lock_blocks_second_run(self, tmp_path):
+        import os
+        lock_path = tmp_path / ".digest-project-digest-morning.lock"
+        lock_path.write_text(str(os.getpid()))
+
+        out = hermes_bridge._handle_project_digest("project-digest-morning")
+        assert "already running" in out.lower() or "skip" in out.lower()

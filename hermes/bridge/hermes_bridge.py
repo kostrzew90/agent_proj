@@ -3426,3 +3426,137 @@ def _pd_research_log_since(hours: int) -> dict:
     )
     last = entries[0].get("topic") or entries[0].get("query") or entries[0].get("question") or ""
     return {"count": len(entries), "last_topic": str(last)[:100]}
+
+
+def _pd_append_section(lines: list[str], section: list[str], budget_remaining: int) -> int:
+    """Append section if it fits; truncate with marker if not. Returns new budget."""
+    section_size = sum(len(s) + 1 for s in section)
+    if section_size <= budget_remaining:
+        lines.extend(section)
+        return budget_remaining - section_size
+    used = 0
+    for i, s in enumerate(section):
+        if used + len(s) + 1 > budget_remaining - 30:
+            lines.append(f"… (+{len(section) - i} more)")
+            return 0
+        lines.append(s)
+        used += len(s) + 1
+    return budget_remaining - used
+
+
+def _pd_format_digest(mode: str, data: dict) -> str:
+    """Build digest string ≤3800 chars, sanitized."""
+    BUDGET = 3800
+    header_icon = "🌅" if mode == "morning" else "🌙"
+    title = "Morning" if mode == "morning" else "Evening"
+    date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    lines: list[str] = [
+        f"{header_icon} Project Digest — {title} ({date_str})",
+        "",
+    ]
+    budget = BUDGET - sum(len(s) + 1 for s in lines)
+
+    costs = data.get("costs", {})
+    window_label = "last 24h" if mode == "morning" else "today"
+    cost_lines = [
+        f"💰 Costs ({window_label})",
+        f"  Total: ${costs.get('total_usd', 0.0):.2f}  (entries: {costs.get('entries', 0)})",
+    ]
+    for model, v in sorted(costs.get("by_model", {}).items(), key=lambda x: -x[1])[:5]:
+        cost_lines.append(f"  {model}: ${v:.2f}")
+    cost_lines.append("")
+    budget = _pd_append_section(lines, cost_lines, budget)
+
+    if mode == "morning":
+        health = data.get("health", {})
+        h_lines = ["📊 Health", "  Containers:"]
+        for name, state in sorted(health.get("containers", {}).items()):
+            icon = "🟢" if state == "up" else "🔴"
+            h_lines.append(f"    {icon} {name} ({state})")
+        h_lines.append("  HTTP:")
+        for name, info in sorted(health.get("http", {}).items()):
+            if info.get("ok"):
+                h_lines.append(f"    🟢 {name} ({info.get('latency_ms', 0)}ms)")
+            else:
+                h_lines.append(f"    🔴 {name} ({info.get('error', 'down')})")
+        h_lines.append("")
+        budget = _pd_append_section(lines, h_lines, budget)
+
+        queue = data.get("queue", {})
+        q_lines = [
+            "🔍 Review-learn queue",
+            f"  new last 24h: {queue.get('new_last_24h', 0)}",
+            "",
+        ]
+        budget = _pd_append_section(lines, q_lines, budget)
+    else:
+        git = data.get("git", {})
+        g_lines = ["📦 Git activity (last 12h)"]
+        for proj, info in sorted(git.items()):
+            if "error" in info:
+                g_lines.append(f"  ⚠️ {proj}: {info['error']}")
+                continue
+            commits = info.get("commits", [])
+            files = info.get("files_changed", 0)
+            g_lines.append(f"  {proj}: {len(commits)} commits, {files} files")
+            for c in commits[:2]:
+                g_lines.append(f"    🔝 {c[:80]}")
+        g_lines.append("")
+        budget = _pd_append_section(lines, g_lines, budget)
+
+        highlights = data.get("highlights", [])
+        if highlights:
+            h_lines = ["🎯 Review-learn highlights"]
+            for h in highlights:
+                h_lines.append(f"  • {h.get('file', '?')} — {h.get('preview', '')}")
+            h_lines.append("")
+            budget = _pd_append_section(lines, h_lines, budget)
+
+        research = data.get("research", {})
+        if research.get("count", 0) > 0:
+            r_lines = [
+                "🔬 Research (last 12h)",
+                f"  {research['count']} entries, last: {research.get('last_topic', '')[:80]}",
+                "",
+            ]
+            budget = _pd_append_section(lines, r_lines, budget)
+
+    extras = data.get("extras", [])
+    if extras:
+        e_lines = ["📋 Extras"]
+        for e in extras:
+            e_lines.append(f"  [{e['file']}] {e['last']}")
+        e_lines.append("")
+        budget = _pd_append_section(lines, e_lines, budget)
+
+    lines.append("🚨 Signals: (none)")
+
+    result = "\n".join(lines)
+    if len(result) > BUDGET:
+        result = result[:BUDGET - 20] + "\n… (truncated)"
+    return _pd_sanitize(result)
+
+
+def _handle_project_digest(skill_name: str) -> str:
+    """Main entry point. skill_name = project-digest-morning | project-digest-evening."""
+    mode = "morning" if "morning" in skill_name else "evening"
+    cutoff_h = 24 if mode == "morning" else 12
+
+    with _pd_digest_lock(skill_name) as acquired:
+        if not acquired:
+            return f"⏭️ digest {skill_name} already running, skipping"
+
+        data: dict = {
+            "costs": _pd_parse_costs(since_hours=cutoff_h),
+        }
+        if mode == "morning":
+            data["health"] = _pd_health_check()
+            data["queue"] = _pd_review_learn_queue()
+        else:
+            data["git"] = _pd_git_log_since(hours=12)
+            data["highlights"] = _pd_review_learn_highlights(last_n=2)
+            data["research"] = _pd_research_log_since(hours=12)
+        data["extras"] = _pd_scan_extras(since_hours=cutoff_h)
+
+        return _pd_format_digest(mode, data)
