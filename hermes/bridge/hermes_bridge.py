@@ -3355,3 +3355,74 @@ def _pd_digest_lock(name: str):
             lock_path.unlink(missing_ok=True)
         except OSError:
             pass
+
+
+# ---------------------------------------------------------------------------
+# Task 7: review-learn queue / highlights + research log helpers
+# ---------------------------------------------------------------------------
+
+
+def _pd_iter_jsonl_recent(path: Path, since_hours: int) -> list[dict]:
+    """Read JSONL, return parsed dicts within window. Robust to malformed lines."""
+    if not path.exists():
+        return []
+    cutoff = time.time() - since_hours * 3600
+    entries: list[dict] = []
+    MAX_LINE = 16384
+    try:
+        with path.open("r", encoding="utf-8", errors="ignore") as f:
+            lines = collections.deque(f, maxlen=5000)
+    except OSError:
+        return []
+    for line in lines:
+        if len(line) > MAX_LINE:
+            continue
+        try:
+            e = json.loads(line)
+        except (json.JSONDecodeError, ValueError):
+            continue
+        if not isinstance(e, dict):
+            continue
+        ts = _pd_to_epoch(e.get("timestamp") or e.get("ts") or 0)
+        if ts < cutoff:
+            continue
+        entries.append(e)
+    return entries
+
+
+def _pd_review_learn_queue() -> dict:
+    """Stats: how many reviews in last 24h."""
+    log_path = _AUDIT_DIR / "review-learn.log"
+    entries = _pd_iter_jsonl_recent(log_path, since_hours=24)
+    return {"new_last_24h": len(entries)}
+
+
+def _pd_review_learn_highlights(last_n: int = 2) -> list[dict]:
+    """Return last N entries with file + preview."""
+    log_path = _AUDIT_DIR / "review-learn.log"
+    entries = _pd_iter_jsonl_recent(log_path, since_hours=24)
+    entries.sort(
+        key=lambda e: _pd_to_epoch(e.get("timestamp") or e.get("ts") or 0),
+        reverse=True,
+    )
+    out: list[dict] = []
+    for e in entries[:last_n]:
+        out.append({
+            "file": str(e.get("file", "?"))[:60],
+            "preview": str(e.get("preview", ""))[:80],
+        })
+    return out
+
+
+def _pd_research_log_since(hours: int) -> dict:
+    """Count research.log entries in window + last topic."""
+    log_path = _AUDIT_DIR / "research.log"
+    entries = _pd_iter_jsonl_recent(log_path, since_hours=hours)
+    if not entries:
+        return {"count": 0, "last_topic": ""}
+    entries.sort(
+        key=lambda e: _pd_to_epoch(e.get("timestamp") or e.get("ts") or 0),
+        reverse=True,
+    )
+    last = entries[0].get("topic") or entries[0].get("query") or entries[0].get("question") or ""
+    return {"count": len(entries), "last_topic": str(last)[:100]}

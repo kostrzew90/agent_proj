@@ -272,3 +272,53 @@ class TestDigestLock:
             with hermes_bridge._pd_digest_lock("evening") as b:
                 assert a is True
                 assert b is True
+
+
+class TestReviewLearnQueue:
+    def test_counts_new_last_24h(self, tmp_path):
+        log = tmp_path / "review-learn.log"
+        now = time.time()
+        log.write_text(
+            json.dumps({"timestamp": now - 1000, "file": "a.py"}) + "\n" +
+            json.dumps({"timestamp": now - 100, "file": "b.py"}) + "\n" +
+            json.dumps({"timestamp": now - 200000, "file": "c.py"}) + "\n",
+            encoding="utf-8",
+        )
+        out = hermes_bridge._pd_review_learn_queue()
+        assert out["new_last_24h"] == 2
+
+    def test_missing_log_returns_zero(self, tmp_path):
+        out = hermes_bridge._pd_review_learn_queue()
+        assert out["new_last_24h"] == 0
+
+
+class TestReviewLearnHighlights:
+    def test_extracts_recent_previews(self, tmp_path):
+        log = tmp_path / "review-learn.log"
+        now = time.time()
+        log.write_text(
+            json.dumps({"timestamp": now - 3000, "file": "old.py", "preview": "old finding"}) + "\n" +
+            json.dumps({"timestamp": now - 1000, "file": "x.py", "preview": "• resource leak"}) + "\n" +
+            json.dumps({"timestamp": now - 500, "file": "y.py", "preview": "• hidden invariant"}) + "\n",
+            encoding="utf-8",
+        )
+        out = hermes_bridge._pd_review_learn_highlights(last_n=2)
+        assert len(out) == 2
+        files = [h["file"] for h in out]
+        assert "y.py" in files
+        assert "x.py" in files
+
+
+class TestResearchLog:
+    def test_counts_entries_in_window(self, tmp_path):
+        log = tmp_path / "research.log"
+        now = time.time()
+        log.write_text(
+            json.dumps({"timestamp": now - 1000, "topic": "agentic patterns"}) + "\n" +
+            json.dumps({"timestamp": now - 500, "topic": "hybrid RRF"}) + "\n" +
+            json.dumps({"timestamp": now - 50000, "topic": "old"}) + "\n",
+            encoding="utf-8",
+        )
+        out = hermes_bridge._pd_research_log_since(hours=12)
+        assert out["count"] == 2
+        assert "hybrid RRF" in out["last_topic"] or "agentic" in out["last_topic"]
