@@ -147,6 +147,22 @@ _CRON_JOBS: dict[str, dict] = {
         "description": "Research new VIN data sources (weekly, 10:00)",
         "notify": "always",
     },
+    "project-digest-morning": {
+        "interval_s": 86400,
+        "run_at_hour": 8,
+        "enabled": True,
+        "last_run": 0.0,
+        "description": "Project digest (morning, 8:00 UTC)",
+        "notify": "always",
+    },
+    "project-digest-evening": {
+        "interval_s": 86400,
+        "run_at_hour": 20,
+        "enabled": True,
+        "last_run": 0.0,
+        "description": "Project digest (evening, 20:00 UTC)",
+        "notify": "always",
+    },
 }
 
 _cron_lock = threading.Lock()
@@ -2135,6 +2151,8 @@ def _cron_execute_skill(skill_name: str) -> str:
         return _handle_pool_monitor()
     if skill_name == "scrape-autocentrum":
         return _handle_scrape_autocentrum()
+    if skill_name in ("project-digest-morning", "project-digest-evening"):
+        return _handle_project_digest(skill_name)
     if skill_name == "vinhunter-researcher":
         return _handle_vinhunter_researcher()
     return f"[cron] skill '{skill_name}' not supported for cron."
@@ -2903,6 +2921,9 @@ def _make_reply(text: str) -> str:
             return _handle_review_learn()
         if skill_name in ("scrape-autocentrum",):
             return _handle_scrape_autocentrum(skill_args)
+        if skill_name in ("project-digest-morning", "project-digest-evening", "project-digest"):
+            target = skill_name if skill_name != "project-digest" else "project-digest-morning"
+            return _handle_project_digest(target)
         if skill_name in ("vinhunter-research", "vinhunter-researcher"):
             return _handle_vinhunter_researcher()
         if skill_name in ("vinhunter-write-plugin", "vinhunter-plugin-writer"):

@@ -410,3 +410,20 @@ class TestHandleProjectDigest:
 
         out = hermes_bridge._handle_project_digest("project-digest-morning")
         assert "already running" in out.lower() or "skip" in out.lower()
+
+
+class TestRouting:
+    def test_cron_dispatch(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(hermes_bridge, "_pd_parse_costs", lambda since_hours: {"total_usd": 0.0, "by_model": {}, "entries": 0})
+        monkeypatch.setattr(hermes_bridge, "_pd_health_check", lambda: {"containers": {}, "http": {}})
+        monkeypatch.setattr(hermes_bridge, "_pd_review_learn_queue", lambda: {"new_last_24h": 0})
+        monkeypatch.setattr(hermes_bridge, "_pd_scan_extras", lambda since_hours: [])
+
+        result = hermes_bridge._cron_execute_skill("project-digest-morning")
+        assert "Morning" in result
+
+    def test_crons_registered(self):
+        assert "project-digest-morning" in hermes_bridge._CRON_JOBS
+        assert "project-digest-evening" in hermes_bridge._CRON_JOBS
+        assert hermes_bridge._CRON_JOBS["project-digest-morning"]["run_at_hour"] == 8
+        assert hermes_bridge._CRON_JOBS["project-digest-evening"]["run_at_hour"] == 20
