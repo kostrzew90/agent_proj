@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import collections
+import contextlib
 import csv
 import json
 import os
@@ -3308,3 +3309,49 @@ def _pd_scan_extras(since_hours: int) -> list[dict]:
             break
 
     return extras
+
+
+@contextlib.contextmanager
+def _pd_digest_lock(name: str):
+    """Singleton execution lock with atomic stale-reclaim. Yields bool (acquired)."""
+    lock_path = _AUDIT_DIR / f".digest-{name}.lock"
+    flags = os.O_CREAT | os.O_EXCL | os.O_RDWR
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+
+    def _acquire() -> int | None:
+        try:
+            fd = os.open(str(lock_path), flags, 0o600)
+            os.write(fd, str(os.getpid()).encode())
+            return fd
+        except FileExistsError:
+            return None
+
+    fd = _acquire()
+    if fd is None:
+        try:
+            stale_pid = int(lock_path.read_text().strip())
+            os.kill(stale_pid, 0)
+            yield False
+            return
+        except (ProcessLookupError, ValueError, PermissionError, FileNotFoundError, OSError):
+            try:
+                lock_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+            fd = _acquire()
+            if fd is None:
+                yield False
+                return
+
+    try:
+        yield True
+    finally:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+        try:
+            lock_path.unlink(missing_ok=True)
+        except OSError:
+            pass

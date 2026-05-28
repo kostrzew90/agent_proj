@@ -247,3 +247,28 @@ class TestScanExtras:
         out = hermes_bridge._pd_scan_extras(since_hours=24)
         target = next(e for e in out if e["file"] == "verbose.log")
         assert len(target["last"]) <= 180
+
+
+class TestDigestLock:
+    def test_first_acquire_succeeds(self, tmp_path):
+        with hermes_bridge._pd_digest_lock("morning") as acquired:
+            assert acquired is True
+        assert not (tmp_path / ".digest-morning.lock").exists()
+
+    def test_double_acquire_blocked(self, tmp_path):
+        with hermes_bridge._pd_digest_lock("evening") as first:
+            assert first is True
+            with hermes_bridge._pd_digest_lock("evening") as second:
+                assert second is False
+
+    def test_stale_lock_reclaimed(self, tmp_path):
+        lock_path = tmp_path / ".digest-morning.lock"
+        lock_path.write_text("999999")
+        with hermes_bridge._pd_digest_lock("morning") as acquired:
+            assert acquired is True
+
+    def test_concurrent_keys_independent(self, tmp_path):
+        with hermes_bridge._pd_digest_lock("morning") as a:
+            with hermes_bridge._pd_digest_lock("evening") as b:
+                assert a is True
+                assert b is True
