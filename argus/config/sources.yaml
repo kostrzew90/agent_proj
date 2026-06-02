@@ -1,0 +1,5 @@
+sources:
+  - {kind: rss, handle: "https://www.coindesk.com/arc/outboundfeeds/rss/", display_name: CoinDesk}
+  - {kind: rss, handle: "https://cointelegraph.com/rss",                   display_name: CoinTelegraph}
+  - {kind: rss, handle: "https://decrypt.co/feed",                         display_name: Decrypt}
+  - {kind: rss, handle: "https://www.theblock.co/rss.xml",                 display_name: TheBlock}

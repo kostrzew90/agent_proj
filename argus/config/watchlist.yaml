@@ -1,0 +1,28 @@
+assets:
+  - {symbol: BTC,    kind: crypto, coingecko_id: bitcoin,                 binance_symbol: BTCUSDT,    scorable: true}
+  - {symbol: ETH,    kind: crypto, coingecko_id: ethereum,                binance_symbol: ETHUSDT,    scorable: true}
+  - {symbol: XRP,    kind: crypto, coingecko_id: ripple,                  binance_symbol: XRPUSDT,    scorable: true}
+  - {symbol: DOT,    kind: crypto, coingecko_id: polkadot,                binance_symbol: DOTUSDT,    scorable: true}
+  - {symbol: JUP,    kind: crypto, coingecko_id: jupiter-exchange-solana, binance_symbol: JUPUSDT,    scorable: true}
+  - {symbol: HBAR,   kind: crypto, coingecko_id: hedera-hashgraph,        binance_symbol: HBARUSDT,   scorable: true}
+  - {symbol: RENDER, kind: crypto, coingecko_id: render-token,            binance_symbol: RENDERUSDT, scorable: true}
+  - {symbol: AERO,   kind: crypto, coingecko_id: aerodrome-finance,       binance_symbol: AEROUSDT,   scorable: true}
+  - {symbol: XAI,    kind: crypto, coingecko_id: xai-blockchain,          binance_symbol: XAIUSDT,    scorable: true}
+  - {symbol: ONDO,   kind: crypto, coingecko_id: ondo-finance,            binance_symbol: ONDOUSDT,   scorable: true}
+  - {symbol: AEVO,   kind: crypto, coingecko_id: aevo-exchange,           binance_symbol: AEVOUSDT,   scorable: true}
+  - {symbol: GROK,   kind: crypto, coingecko_id: grok-2,                  binance_symbol: GROKUSDT,   scorable: true}
+  - {symbol: ALU,    kind: crypto, coingecko_id: altura,                  binance_symbol: ALUUSDT,    scorable: true}
+  - {symbol: RUNE,   kind: crypto, coingecko_id: thorchain,               binance_symbol: RUNEUSDT,   scorable: true}
+  - {symbol: XOMA, kind: stock, yf_symbol: XOMA, scorable: true}
+  - {symbol: BYND, kind: stock, yf_symbol: BYND, scorable: true}
+  - {symbol: DLNG, kind: stock, yf_symbol: DLNG, scorable: true}
+  - {symbol: LCID, kind: stock, yf_symbol: LCID, scorable: true}
+  - {symbol: NFE,  kind: stock, yf_symbol: NFE,  scorable: true}
+  - {symbol: NTR,  kind: stock, yf_symbol: NTR,  scorable: true}
+  - {symbol: PLG,  kind: stock, yf_symbol: PLG,  scorable: true}
+  - {symbol: TOTAL,  kind: index, scorable: false}
+  - {symbol: BTC.D,  kind: index, scorable: false}
+  - {symbol: ETHBTC, kind: index, scorable: false}
+  - {symbol: USDT,   kind: macro, scorable: false}
+  - {symbol: SILVER, kind: macro, scorable: false}
+  - {symbol: CNY,    kind: macro, scorable: false}
