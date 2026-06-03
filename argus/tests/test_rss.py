@@ -32,3 +32,15 @@ def test_collect_dedup(session):
         collect_rss(session, src)
         collect_rss(session, src)  # ten sam external_id
     assert session.query(Item).count() == 1
+
+def test_price_failure_skips_claim_keeps_item(session):
+    from argus.models import Asset, Source, Item, Claim
+    session.add(Asset(symbol="BTC", kind="crypto", binance_symbol="BADSYM", scorable=True))
+    src = Source(kind="rss", handle="http://feed2", display_name="F2")
+    session.add(src); session.commit()
+    with patch("argus.collectors.rss.feedparser.parse", return_value=_fake_feed()), \
+         patch("argus.collectors.rss.get_spot_price", side_effect=RuntimeError("Invalid symbol")):
+        n = collect_rss(session, src)   # must NOT raise
+    assert n == 1
+    assert session.query(Item).count() == 1   # item kept
+    assert session.query(Claim).count() == 0   # claim skipped

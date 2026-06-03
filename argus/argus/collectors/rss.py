@@ -1,11 +1,14 @@
 from datetime import datetime, timezone
 import calendar
+import logging
 import feedparser
 from sqlalchemy import select
 from argus.models import Asset, Item, Claim, ClaimAudit
 from argus.extract import extract_claims, PARSER_VERSION
 from argus.prices import get_spot_price
 from dataclasses import asdict
+
+logger = logging.getLogger(__name__)
 
 
 def _published(entry) -> datetime | None:
@@ -38,7 +41,11 @@ def collect_rss(session, source) -> int:
         created += 1
         for pc in extract_claims(text, assets):
             asset = by_symbol[pc.asset_symbol]
-            entry_price = get_spot_price(asset)
+            try:
+                entry_price = get_spot_price(asset)
+            except Exception as e:
+                logger.warning("skip claim for %s: price fetch failed: %s", asset.symbol, e)
+                continue
             claim = Claim(source_id=source.id, item_id=item.id, asset=asset.symbol,
                           direction=pc.direction, target_price=pc.target_price,
                           confidence=pc.confidence, method="rule",
