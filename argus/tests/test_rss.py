@@ -44,3 +44,21 @@ def test_price_failure_skips_claim_keeps_item(session):
     assert n == 1
     assert session.query(Item).count() == 1   # item kept
     assert session.query(Claim).count() == 0   # claim skipped
+
+def test_collect_emits_sector_claim(session):
+    from types import SimpleNamespace
+    from unittest.mock import patch
+    from argus.models import Asset, Source, Claim
+    session.add(Asset(symbol="NFE", kind="stock", yf_symbol="NFE", scorable=True))
+    src = Source(kind="news", handle="http://feed-news", display_name="WSJ Markets")
+    session.add(src); session.commit()
+    entry = SimpleNamespace(id="n1", title="Natural gas prices look bullish", summary="",
+                            link="http://x/n1", published_parsed=(2026, 6, 4, 0, 0, 0, 0, 0, 0))
+    feed = SimpleNamespace(entries=[entry])
+    smap = {"natural_gas": {"aliases": ["natural gas"], "tickers": ["NFE"], "confidence": 0.3}}
+    with patch("argus.collectors.rss.feedparser.parse", return_value=feed), \
+         patch("argus.collectors.rss.load_sector_map", return_value=smap), \
+         patch("argus.collectors.rss.get_spot_price", return_value=25.0):
+        collect_rss(session, src)
+    c = session.query(Claim).filter_by(asset="NFE").one()
+    assert c.direction == "bull" and c.confidence == 0.3

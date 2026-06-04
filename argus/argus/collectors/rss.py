@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 import calendar
 import logging
+import os
+import yaml
 import feedparser
 from sqlalchemy import select
 from argus.models import Asset, Item, Claim, ClaimAudit
@@ -9,6 +11,12 @@ from argus.prices import get_spot_price
 from dataclasses import asdict
 
 logger = logging.getLogger(__name__)
+
+
+def load_sector_map(path: str = "config/sectors.yaml") -> dict:
+    if os.path.exists(path):
+        return yaml.safe_load(open(path, encoding="utf-8")) or {}
+    return {}
 
 
 def _published(entry) -> datetime | None:
@@ -24,6 +32,7 @@ def collect_rss(session, source) -> int:
     by_symbol = {a.symbol: a for a in assets}
     created = 0
     now = datetime.now(timezone.utc)
+    sector_map = load_sector_map()
     for entry in feed.entries:
         ext = getattr(entry, "id", None) or getattr(entry, "link", None)
         if ext is None:
@@ -39,7 +48,7 @@ def collect_rss(session, source) -> int:
                     published_at=_published(entry), fetched_at=now)
         session.add(item); session.flush()
         created += 1
-        for pc in extract_claims(text, assets):
+        for pc in extract_claims(text, assets, sector_map=sector_map):
             asset = by_symbol[pc.asset_symbol]
             try:
                 entry_price = get_spot_price(asset)
