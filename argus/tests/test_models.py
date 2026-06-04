@@ -34,3 +34,15 @@ def test_wallet_position_roundtrip(session):
     session.commit()
     wp = session.query(WalletPosition).one()
     assert wp.coin == "BTC" and wp.side == "long" and wp.open is True
+
+def test_liquidation_roundtrip(session):
+    from datetime import datetime, timezone
+    from argus.models import Asset, Liquidation
+    session.add(Asset(symbol="BTC", kind="crypto", binance_symbol="BTCUSDT", scorable=True))
+    now = datetime.now(timezone.utc)
+    session.add(Liquidation(asset="BTC", exchange="binance", side="long_liq", price=67000.0,
+                            qty=1.5, notional_usd=100500.0, ts=now, raw_symbol="BTCUSDT",
+                            created_at=now))
+    session.commit()
+    l = session.query(Liquidation).one()
+    assert l.asset == "BTC" and l.side == "long_liq" and l.notional_usd == 100500.0

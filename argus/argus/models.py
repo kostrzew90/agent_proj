@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import (String, Float, Boolean, Integer, DateTime, ForeignKey, JSON, UniqueConstraint)
+from sqlalchemy import (String, Float, Boolean, Integer, DateTime, ForeignKey, JSON, UniqueConstraint, Index)
 from sqlalchemy.orm import Mapped, mapped_column
 from argus.db import Base
 
@@ -113,3 +113,20 @@ class WalletPosition(Base):
     opened_ts: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     last_seen_ts: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     open: Mapped[bool] = mapped_column(Boolean)
+
+class Liquidation(Base):
+    __tablename__ = "liquidations"
+    __table_args__ = (
+        Index("idx_liquidations_asset_ts", "asset", "ts"),
+        Index("idx_liquidations_ts", "ts"),
+    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    asset: Mapped[str] = mapped_column(ForeignKey("assets.symbol"))
+    exchange: Mapped[str] = mapped_column(String, default="binance")
+    side: Mapped[str] = mapped_column(String)              # long_liq|short_liq
+    price: Mapped[float] = mapped_column(Float)
+    qty: Mapped[float] = mapped_column(Float)
+    notional_usd: Mapped[float] = mapped_column(Float)
+    ts: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    raw_symbol: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
