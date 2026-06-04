@@ -65,3 +65,18 @@ def test_candles_provider_failure_502():
     with patch("argus.api.get_candles", side_effect=RuntimeError("binance down")):
         r = client.get("/api/candles?asset=BTC")
     assert r.status_code == 502
+
+def test_assets_includes_scorable_without_claims():
+    from argus.models import Asset
+    client, Sess = _client()
+    s = Sess()
+    s.add(Asset(symbol="LCID", kind="stock", yf_symbol="LCID", scorable=True))   # no claims
+    s.add(Asset(symbol="TOTAL", kind="index", scorable=False))                   # excluded
+    s.commit()
+    rows = client.get("/api/assets?horizon=1h").json()
+    symbols = {r["asset"] for r in rows}
+    assert "LCID" in symbols
+    assert "TOTAL" not in symbols
+    lcid = next(r for r in rows if r["asset"] == "LCID")
+    assert lcid["lean"] == 0.0
+    assert lcid["kind"] == "stock"

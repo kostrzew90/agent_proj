@@ -22,7 +22,10 @@ async def health():
 
 @app.get("/api/assets")
 async def assets(horizon: str = "24h", session=Depends(get_session)):
-    return trend_lean(session, horizon)
+    leans = {r["asset"]: r["lean"] for r in trend_lean(session, horizon)}
+    rows = [{"asset": a.symbol, "kind": a.kind, "lean": leans.get(a.symbol, 0.0)}
+            for a in session.scalars(select(Asset).where(Asset.scorable == True))]  # noqa: E712
+    return sorted(rows, key=lambda r: -r["lean"])
 
 @app.get("/api/sources")
 async def sources(horizon: str = "24h", session=Depends(get_session)):
