@@ -1,10 +1,11 @@
 from pathlib import Path
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, HTTPException
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select
 from argus.db import SessionLocal
-from argus.models import Source, SourceScore, Claim, Outcome
+from argus.models import Source, SourceScore, SourceAssetScore, Claim, Outcome, Asset
 from argus.analytics import trend_lean
+from argus.charts import get_candles
 
 app = FastAPI(title="Argus")
 
@@ -42,6 +43,18 @@ async def claims(limit: int = 50, session=Depends(get_session)):
     return [{"id": c.id, "asset": c.asset, "direction": c.direction,
              "confidence": c.confidence, "method": c.method,
              "entry_ts": c.entry_ts.isoformat(), "status": c.status} for c in rows]
+
+@app.get("/api/candles")
+def candles(asset: str, session=Depends(get_session)):
+    a = session.get(Asset, asset)
+    if a is None:
+        raise HTTPException(status_code=404, detail="unknown asset")
+    try:
+        return get_candles(a)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"candle fetch failed: {e}")
 
 # static dashboard (created later in Task 12)
 _web = Path(__file__).parent / "web"

@@ -41,3 +41,27 @@ def test_assets_and_sources_endpoints():
     leaders = client.get("/api/sources?horizon=24h").json()
     assert leaders[0]["display_name"] == "CoinDesk"
     assert leaders[0]["decayed_score"] == 0.58
+
+def test_candles_ok():
+    from unittest.mock import patch
+    from argus.models import Asset
+    client, Sess = _client()
+    s = Sess(); s.add(Asset(symbol="BTC", kind="crypto", binance_symbol="BTCUSDT", scorable=True)); s.commit()
+    fake = [{"time": 1717200000, "open": 67000.0, "high": 67500.0, "low": 66800.0, "close": 67200.0}]
+    with patch("argus.api.get_candles", return_value=fake):
+        r = client.get("/api/candles?asset=BTC")
+    assert r.status_code == 200
+    assert r.json() == fake
+
+def test_candles_unknown_asset_404():
+    client, _ = _client()
+    assert client.get("/api/candles?asset=NOPE").status_code == 404
+
+def test_candles_provider_failure_502():
+    from unittest.mock import patch
+    from argus.models import Asset
+    client, Sess = _client()
+    s = Sess(); s.add(Asset(symbol="BTC", kind="crypto", binance_symbol="BTCUSDT", scorable=True)); s.commit()
+    with patch("argus.api.get_candles", side_effect=RuntimeError("binance down")):
+        r = client.get("/api/candles?asset=BTC")
+    assert r.status_code == 502
