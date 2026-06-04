@@ -102,3 +102,34 @@ def test_asset_detail_claims_and_sources():
     assert d["claims"][0]["hit"] is True
     assert d["sources"][0]["display_name"] == "CoinDesk"
     assert d["sources"][0]["decayed_score"] == 0.7
+
+def test_wallet_preview_validates_and_lists():
+    from unittest.mock import patch
+    client, _ = _client()
+    assert client.get("/api/wallets/preview?address=bad").status_code == 422
+    fake = {"equity": 10000.0, "positions": [{"coin": "BTC", "side": "long", "position_value": 8000.0}]}
+    with patch("argus.api.fetch_positions", return_value=fake):
+        r = client.get("/api/wallets/preview?address=0x" + "a"*40)
+    assert r.status_code == 200
+    assert r.json()["positions"][0]["coin"] == "BTC"
+
+def test_wallet_add_and_list_and_deactivate():
+    from datetime import datetime, timezone
+    from argus.models import Source, SourceScore
+    client, Sess = _client()
+    addr = "0x" + "b"*40
+    assert client.post("/api/wallets", json={"address": "nope"}).status_code == 422
+    r = client.post("/api/wallets", json={"address": addr, "label": "whale-x"})
+    assert r.status_code == 200
+    client.post("/api/wallets", json={"address": addr, "label": "whale-x"})  # idempotent
+    s = Sess()
+    src = s.query(Source).filter_by(handle=addr).one()
+    s.add(SourceScore(source_id=src.id, horizon="24h", n_claims=3, hit_rate=0.66,
+                      avg_return=0.01, decayed_score=0.6, updated_at=datetime.now(timezone.utc)))
+    s.commit()
+    rows = client.get("/api/wallets").json()
+    row = next(r for r in rows if r["handle"] == addr)
+    assert row["acc_24h"] == 0.66 and row["display_name"] == "whale-x"
+    assert client.post(f"/api/wallets/{src.id}/deactivate").status_code == 200
+    s.expire_all()
+    assert s.get(Source, src.id).active is False

@@ -1,11 +1,13 @@
+import re
 from pathlib import Path
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import select
+from sqlalchemy import select, func
 from argus.db import SessionLocal
-from argus.models import Source, SourceScore, SourceAssetScore, Claim, Outcome, Asset
+from argus.models import Source, SourceScore, SourceAssetScore, Claim, Outcome, Asset, WalletPosition
 from argus.analytics import trend_lean
 from argus.charts import get_candles
+from argus.hyperliquid import fetch_positions
 
 app = FastAPI(title="Argus")
 
@@ -86,6 +88,54 @@ async def asset_detail(symbol: str, horizon: str = "1h", session=Depends(get_ses
     sources = [{"display_name": n, "n_claims": s.n_claims, "hit_rate": s.hit_rate,
                 "decayed_score": s.decayed_score} for n, s in src_rows]
     return {"claims": claims, "sources": sources}
+
+_ADDR = re.compile(r"^0x[0-9a-fA-F]{40}$")
+
+@app.get("/api/wallets")
+async def wallets(session=Depends(get_session)):
+    out = []
+    for src in session.scalars(select(Source).where(Source.kind == "hyperliquid")):
+        scores = {sc.horizon: sc.hit_rate for sc in session.scalars(
+            select(SourceScore).where(SourceScore.source_id == src.id))}
+        active = session.scalar(select(func.count()).select_from(WalletPosition).where(
+            WalletPosition.source_id == src.id, WalletPosition.open == True)) or 0  # noqa: E712
+        out.append({"id": src.id, "display_name": src.display_name, "handle": src.handle,
+                    "active": src.active, "acc_24h": scores.get("24h"),
+                    "acc_7d": scores.get("7d"), "acc_30d": scores.get("30d"),
+                    "active_positions": active})
+    return out
+
+@app.get("/api/wallets/preview")
+def wallet_preview(address: str):
+    if not _ADDR.match(address):
+        raise HTTPException(status_code=422, detail="invalid address format")
+    try:
+        data = fetch_positions(address)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"cannot fetch positions: {e}")
+    return {"address": address, "equity": data["equity"],
+            "positions": [{"coin": p["coin"], "side": p["side"], "position_value": p["position_value"]}
+                          for p in data["positions"]]}
+
+@app.post("/api/wallets")
+async def add_wallet(payload: dict, session=Depends(get_session)):
+    address = (payload.get("address") or "").strip()
+    if not _ADDR.match(address):
+        raise HTTPException(status_code=422, detail="invalid address format")
+    label = (payload.get("label") or address[:10]).strip()
+    if session.scalar(select(Source).where(Source.handle == address)) is None:
+        session.add(Source(kind="hyperliquid", handle=address, display_name=label, active=True))
+        session.commit()
+    return {"status": "ok", "address": address}
+
+@app.post("/api/wallets/{wallet_id}/deactivate")
+async def deactivate_wallet(wallet_id: int, session=Depends(get_session)):
+    src = session.get(Source, wallet_id)
+    if src is None:
+        raise HTTPException(status_code=404, detail="unknown wallet")
+    src.active = False
+    session.commit()
+    return {"status": "ok"}
 
 # static dashboard (created later in Task 12)
 _web = Path(__file__).parent / "web"
