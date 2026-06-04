@@ -1,16 +1,32 @@
 <!doctype html>
 <html lang="pl"><head><meta charset="utf-8"><title>Argus</title>
-<style>body{font-family:system-ui;margin:2rem;background:#0f1115;color:#e6e6e6}
-table{border-collapse:collapse;margin-bottom:2rem;width:100%}
+<script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+body{font-family:system-ui;margin:1.5rem;background:#0f1115;color:#e6e6e6}
+table{border-collapse:collapse;margin-bottom:1.5rem;width:100%}
 th,td{border:1px solid #2a2e37;padding:.4rem .6rem;text-align:left}
-.bull{color:#3fb950}.bear{color:#f85149}</style></head>
+.bull{color:#3fb950}.bear{color:#f85149}
+tr.asset{cursor:pointer}tr.asset:hover{background:#1c2128}
+#detail{margin-top:1rem;border-top:1px solid #2a2e37;padding-top:1rem}
+#chart{height:360px}
+.muted{color:#8b949e}
+button{background:#21262d;color:#e6e6e6;border:1px solid #2a2e37;padding:.3rem .6rem;cursor:pointer}
+</style></head>
 <body>
 <h1>Argus — trend credibility</h1>
 <label>Horyzont:
-  <select id="h"><option>1h</option><option selected>24h</option><option>7d</option></select>
+  <select id="h"><option>1h</option><option>24h</option><option>7d</option></select>
 </label>
+<div id="empty" class="muted"></div>
 <h2>Trend-lean (aktywa)</h2><table id="assets"></table>
 <h2>Ranking źródeł</h2><table id="sources"></table>
-<h2>Ostatnie twierdzenia</h2><table id="claims"></table>
+<div id="detail" style="display:none">
+  <button id="closeDetail">× zamknij</button>
+  <h2 id="detailTitle"></h2>
+  <div id="chartErr" class="muted"></div>
+  <div id="chart"></div>
+  <h3>Źródła dla aktywa</h3><table id="detailSources"></table>
+  <h3>Claimy</h3><table id="detailClaims"></table>
+</div>
 <script src="app.js"></script>
 </body></html>
