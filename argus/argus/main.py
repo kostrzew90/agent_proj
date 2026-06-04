@@ -15,7 +15,8 @@ from datetime import datetime, timezone
 
 def _rss_job():
     with SessionLocal() as s:
-        for src in s.scalars(select(Source).where(Source.kind == "rss", Source.active == True)):  # noqa: E712
+        for src in s.scalars(select(Source).where(
+                Source.kind.in_(["rss", "reddit", "news"]), Source.active == True)):  # noqa: E712
             collect_rss(s, src)
 
 def _eval_job():
