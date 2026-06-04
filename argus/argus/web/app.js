@@ -22,6 +22,7 @@ async function loadOverview(){
 
   document.querySelectorAll('tr.asset').forEach(tr =>
     tr.addEventListener('click', () => openDetail(tr.dataset.sym, tr.dataset.kind)));
+  loadWallets();
 }
 
 async function openDetail(sym, kind){
@@ -62,6 +63,42 @@ async function openDetail(sym, kind){
     detail.claims.map(c => `<tr><td>${c.source}</td><td class="${c.direction==='bull'?'bull':'bear'}">${c.direction}</td><td>${c.confidence}</td><td>${c.entry_ts.slice(0,16)}</td><td>${c.hit===true?'✓':(c.hit===false?'✗':'—')}</td></tr>`).join('');
 }
 
+async function loadWallets(){
+  let rows = [];
+  try { rows = await getJSON('/api/wallets'); } catch(e){}
+  const pct = v => v==null ? '—' : (v*100).toFixed(0)+'%';
+  $('wallets').innerHTML = '<tr><th>Portfel</th><th>Acc 24h</th><th>Acc 7d</th><th>Acc 30d</th><th>Pozycje</th><th></th></tr>' +
+    rows.map(w => `<tr><td title="${w.handle}">${w.display_name}${w.active?'':' (off)'}</td>`+
+      `<td>${pct(w.acc_24h)}</td><td>${pct(w.acc_7d)}</td><td>${pct(w.acc_30d)}</td>`+
+      `<td>${w.active_positions}</td>`+
+      `<td><button data-wid="${w.id}" class="deact">deactivate</button></td></tr>`).join('');
+  document.querySelectorAll('button.deact').forEach(b => b.addEventListener('click', async () => {
+    await fetch(`/api/wallets/${b.dataset.wid}/deactivate`, {method:'POST'}); loadWallets();
+  }));
+}
+
+async function previewWallet(){
+  const addr = $('wAddr').value.trim();
+  $('wPreviewOut').textContent = 'Ładowanie...';
+  try {
+    const d = await getJSON(`/api/wallets/preview?address=${addr}`);
+    $('wPreviewOut').innerHTML = (`equity $${d.equity.toFixed(0)} — ` +
+      d.positions.map(p => `${p.side==='long'?'LONG':'SHORT'} ${p.coin}`).join(', ')) || 'brak pozycji';
+    $('wSave').style.display = 'inline';
+  } catch(e){ $('wPreviewOut').textContent = 'Błędny adres lub brak danych.'; $('wSave').style.display='none'; }
+}
+
+async function saveWallet(){
+  const addr = $('wAddr').value.trim(), label = $('wLabel').value.trim();
+  const r = await fetch('/api/wallets', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({address:addr, label})});
+  if(r.ok){ $('wAddr').value=''; $('wLabel').value=''; $('wPreviewOut').textContent='Dodano.';
+    $('wSave').style.display='none'; loadWallets(); }
+  else { $('wPreviewOut').textContent = 'Nie zapisano (zły adres?).'; }
+}
+
 $('h').addEventListener('change', loadOverview);
 $('closeDetail').addEventListener('click', ()=>{ $('detail').style.display='none'; });
+$('wPreview').addEventListener('click', previewWallet);
+$('wSave').addEventListener('click', saveWallet);
 loadOverview();
