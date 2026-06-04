@@ -21,7 +21,7 @@ def test_collect_creates_item_claim_audit(session):
     assert session.query(Item).count() == 1
     c = session.query(Claim).one()
     assert c.asset == "BTC" and c.direction == "bull" and c.entry_price == 67000.0
-    assert session.query(ClaimAudit).one().parser_version == "rule-v1"
+    assert session.query(ClaimAudit).one().parser_version == "rule-v2"
 
 def test_collect_dedup(session):
     session.add(Asset(symbol="BTC", kind="crypto", binance_symbol="BTCUSDT", scorable=True))
