@@ -133,3 +133,37 @@ def test_wallet_add_and_list_and_deactivate():
     assert client.post(f"/api/wallets/{src.id}/deactivate").status_code == 200
     s.expire_all()
     assert s.get(Source, src.id).active is False
+
+def test_liquidations_aggregate_by_window():
+    from datetime import datetime, timezone, timedelta
+    from argus.models import Asset, Liquidation
+    client, Sess = _client()
+    s = Sess()
+    s.add(Asset(symbol="BTC", kind="crypto", binance_symbol="BTCUSDT", scorable=True))
+    now = datetime.now(timezone.utc)
+    s.add(Liquidation(asset="BTC", exchange="binance", side="long_liq", price=1, qty=1,
+                      notional_usd=50000.0, ts=now - timedelta(minutes=30), raw_symbol="BTCUSDT", created_at=now))
+    s.add(Liquidation(asset="BTC", exchange="binance", side="short_liq", price=1, qty=1,
+                      notional_usd=20000.0, ts=now - timedelta(hours=3), raw_symbol="BTCUSDT", created_at=now))
+    s.commit()
+    one_h = client.get("/api/liquidations?window=1h").json()
+    btc_1h = next(r for r in one_h if r["asset"] == "BTC")
+    assert btc_1h["long_liq_usd"] == 50000.0 and btc_1h["short_liq_usd"] == 0.0
+    day = client.get("/api/liquidations?window=24h").json()
+    btc_24h = next(r for r in day if r["asset"] == "BTC")
+    assert btc_24h["short_liq_usd"] == 20000.0
+
+def test_liquidations_largest_min_notional():
+    from datetime import datetime, timezone
+    from argus.models import Asset, Liquidation
+    client, Sess = _client()
+    s = Sess()
+    s.add(Asset(symbol="BTC", kind="crypto", binance_symbol="BTCUSDT", scorable=True))
+    now = datetime.now(timezone.utc)
+    s.add(Liquidation(asset="BTC", exchange="binance", side="long_liq", price=1, qty=1,
+                      notional_usd=500000.0, ts=now, raw_symbol="BTCUSDT", created_at=now))
+    s.add(Liquidation(asset="BTC", exchange="binance", side="long_liq", price=1, qty=1,
+                      notional_usd=5000.0, ts=now, raw_symbol="BTCUSDT", created_at=now))
+    s.commit()
+    rows = client.get("/api/liquidations/largest?window=24h&min_notional=100000").json()
+    assert len(rows) == 1 and rows[0]["notional_usd"] == 500000.0

@@ -1,10 +1,11 @@
 import re
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select, func
 from argus.db import SessionLocal
-from argus.models import Source, SourceScore, SourceAssetScore, Claim, Outcome, Asset, WalletPosition
+from argus.models import Source, SourceScore, SourceAssetScore, Claim, Outcome, Asset, WalletPosition, Liquidation
 from argus.analytics import trend_lean
 from argus.charts import get_candles
 from argus.hyperliquid import fetch_positions
@@ -136,6 +137,35 @@ async def deactivate_wallet(wallet_id: int, session=Depends(get_session)):
     src.active = False
     session.commit()
     return {"status": "ok"}
+
+_LIQ_WINDOWS = {"1h": timedelta(hours=1), "4h": timedelta(hours=4),
+                "24h": timedelta(hours=24), "7d": timedelta(days=7)}
+
+@app.get("/api/liquidations")
+async def liquidations(window: str = "24h", session=Depends(get_session)):
+    since = datetime.now(timezone.utc) - _LIQ_WINDOWS.get(window, _LIQ_WINDOWS["24h"])
+    rows = session.execute(
+        select(Liquidation.asset, Liquidation.side,
+               func.sum(Liquidation.notional_usd), func.count())
+        .where(Liquidation.ts >= since)
+        .group_by(Liquidation.asset, Liquidation.side)).all()
+    agg: dict = {}
+    for asset, side, usd, n in rows:
+        a = agg.setdefault(asset, {"asset": asset, "long_liq_usd": 0.0, "short_liq_usd": 0.0, "count": 0})
+        a["long_liq_usd" if side == "long_liq" else "short_liq_usd"] = float(usd or 0)
+        a["count"] += int(n)
+    return sorted(agg.values(), key=lambda r: -(r["long_liq_usd"] + r["short_liq_usd"]))
+
+@app.get("/api/liquidations/largest")
+async def liquidations_largest(window: str = "24h", min_notional: float = 100000.0,
+                               session=Depends(get_session)):
+    since = datetime.now(timezone.utc) - _LIQ_WINDOWS.get(window, _LIQ_WINDOWS["24h"])
+    rows = session.scalars(
+        select(Liquidation).where(Liquidation.ts >= since,
+                                  Liquidation.notional_usd >= min_notional)
+        .order_by(Liquidation.notional_usd.desc()).limit(50))
+    return [{"asset": l.asset, "side": l.side, "notional_usd": l.notional_usd,
+             "price": l.price, "ts": l.ts.isoformat()} for l in rows]
 
 # static dashboard (created later in Task 12)
 _web = Path(__file__).parent / "web"
