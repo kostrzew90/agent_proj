@@ -22,3 +22,15 @@ def test_full_chain_roundtrip(session):
     session.commit()
     assert session.query(Claim).one().direction == "bull"
     assert session.query(Outcome).one().hit is True
+
+def test_wallet_position_roundtrip(session):
+    from datetime import datetime, timezone
+    from argus.models import Source, WalletPosition
+    s = Source(kind="hyperliquid", handle="0xabc", display_name="w1"); session.add(s); session.flush()
+    now = datetime.now(timezone.utc)
+    session.add(WalletPosition(source_id=s.id, coin="BTC", side="long", szi=0.5,
+                               entry_px=67000.0, position_value=33500.0,
+                               opened_ts=now, last_seen_ts=now, open=True))
+    session.commit()
+    wp = session.query(WalletPosition).one()
+    assert wp.coin == "BTC" and wp.side == "long" and wp.open is True

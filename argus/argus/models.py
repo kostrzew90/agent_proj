@@ -99,3 +99,17 @@ class SourceScore(Base):
     avg_return: Mapped[float] = mapped_column(Float)
     decayed_score: Mapped[float] = mapped_column(Float)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+class WalletPosition(Base):
+    __tablename__ = "wallet_positions"
+    __table_args__ = (UniqueConstraint("source_id", "coin"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source_id: Mapped[int] = mapped_column(ForeignKey("sources.id"))
+    coin: Mapped[str] = mapped_column(String)
+    side: Mapped[str] = mapped_column(String)              # long|short
+    szi: Mapped[float] = mapped_column(Float)
+    entry_px: Mapped[float] = mapped_column(Float)
+    position_value: Mapped[float] = mapped_column(Float)
+    opened_ts: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    last_seen_ts: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    open: Mapped[bool] = mapped_column(Boolean)
