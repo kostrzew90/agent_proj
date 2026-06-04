@@ -6,7 +6,7 @@ from argus.evaluator import evaluate_due_claims, HORIZONS, THRESHOLDS
 def _setup(session, direction, entry=100.0):
     session.add(Asset(symbol="BTC", kind="crypto", binance_symbol="BTCUSDT", scorable=True))
     s = Source(kind="rss", handle="h", display_name="D"); session.add(s); session.flush()
-    old = datetime.now(timezone.utc) - timedelta(days=8)  # po wszystkich horyzontach
+    old = datetime.now(timezone.utc) - timedelta(days=31)  # po wszystkich horyzontach (w tym 30d)
     c = Claim(source_id=s.id, asset="BTC", direction=direction, confidence=0.8,
               method="rule", entry_price=entry, entry_ts=old, status="open")
     session.add(c); session.commit()

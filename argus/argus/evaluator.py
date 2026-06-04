@@ -3,8 +3,8 @@ from sqlalchemy import select
 from argus.models import Asset, Claim, Outcome
 from argus.prices import get_historical_price
 
-HORIZONS = {"1h": timedelta(hours=1), "24h": timedelta(hours=24), "7d": timedelta(days=7)}
-THRESHOLDS = {"1h": 0.005, "24h": 0.015, "7d": 0.04}
+HORIZONS = {"1h": timedelta(hours=1), "24h": timedelta(hours=24), "7d": timedelta(days=7), "30d": timedelta(days=30)}
+THRESHOLDS = {"1h": 0.005, "24h": 0.015, "7d": 0.04, "30d": 0.08}
 
 def _hit(direction: str, ret: float, thr: float) -> bool:
     if direction == "bull":
@@ -35,7 +35,7 @@ def evaluate_due_claims(session, now: datetime) -> int:
                                 hit=_hit(c.direction, ret, THRESHOLDS[h]),
                                 resolved_at=now))
             created += 1
-        if now >= entry_ts + HORIZONS["7d"]:
+        if now >= entry_ts + HORIZONS["30d"]:
             c.status = "closed"
     session.commit()
     return created
