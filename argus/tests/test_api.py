@@ -80,3 +80,25 @@ def test_assets_includes_scorable_without_claims():
     lcid = next(r for r in rows if r["asset"] == "LCID")
     assert lcid["lean"] == 0.0
     assert lcid["kind"] == "stock"
+
+def test_asset_detail_claims_and_sources():
+    from datetime import datetime, timezone
+    from argus.models import Asset, Source, Claim, Outcome, SourceAssetScore
+    client, Sess = _client()
+    s = Sess()
+    s.add(Asset(symbol="BTC", kind="crypto", binance_symbol="BTCUSDT", scorable=True))
+    src = Source(kind="rss", handle="h", display_name="CoinDesk"); s.add(src); s.flush()
+    now = datetime.now(timezone.utc)
+    c = Claim(source_id=src.id, asset="BTC", direction="bull", confidence=0.8, method="rule",
+              entry_price=100.0, entry_ts=now, status="open"); s.add(c); s.flush()
+    s.add(Outcome(claim_id=c.id, horizon="1h", eval_ts=now, price_at_horizon=102.0,
+                  return_pct=0.02, hit=True))
+    s.add(SourceAssetScore(source_id=src.id, asset="BTC", horizon="1h", n_claims=1, n_hits=1,
+                           hit_rate=1.0, avg_return=0.02, decayed_score=0.7, updated_at=now))
+    s.commit()
+    d = client.get("/api/asset/BTC?horizon=1h").json()
+    assert d["claims"][0]["source"] == "CoinDesk"
+    assert d["claims"][0]["direction"] == "bull"
+    assert d["claims"][0]["hit"] is True
+    assert d["sources"][0]["display_name"] == "CoinDesk"
+    assert d["sources"][0]["decayed_score"] == 0.7

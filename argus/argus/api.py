@@ -59,6 +59,34 @@ def candles(asset: str, session=Depends(get_session)):
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"candle fetch failed: {e}")
 
+@app.get("/api/asset/{symbol}")
+async def asset_detail(symbol: str, horizon: str = "1h", session=Depends(get_session)):
+    claim_rows = session.execute(
+        select(Claim, Source.display_name)
+        .join(Source, Source.id == Claim.source_id)
+        .where(Claim.asset == symbol)
+        .order_by(Claim.entry_ts.desc()).limit(200)
+    ).all()
+    outcomes = {o.claim_id: o for o in session.scalars(
+        select(Outcome).where(Outcome.horizon == horizon))}
+    claims = []
+    for c, sname in claim_rows:
+        o = outcomes.get(c.id)
+        claims.append({"id": c.id, "source": sname, "direction": c.direction,
+                       "confidence": c.confidence, "entry_ts": c.entry_ts.isoformat(),
+                       "entry_price": c.entry_price,
+                       "hit": (o.hit if o else None),
+                       "return_pct": (o.return_pct if o else None)})
+    src_rows = session.execute(
+        select(Source.display_name, SourceAssetScore)
+        .join(SourceAssetScore, SourceAssetScore.source_id == Source.id)
+        .where(SourceAssetScore.asset == symbol, SourceAssetScore.horizon == horizon)
+        .order_by(SourceAssetScore.decayed_score.desc())
+    ).all()
+    sources = [{"display_name": n, "n_claims": s.n_claims, "hit_rate": s.hit_rate,
+                "decayed_score": s.decayed_score} for n, s in src_rows]
+    return {"claims": claims, "sources": sources}
+
 # static dashboard (created later in Task 12)
 _web = Path(__file__).parent / "web"
 if _web.exists():
