@@ -62,3 +62,41 @@ def test_confidence_fallback_when_no_equity(session):
          patch("argus.collectors.hyperliquid.get_spot_price", return_value=67000.0):
         collect_wallet(session, s)
     assert abs(session.query(Claim).one().confidence - 0.7) < 1e-9
+
+def test_consensus_emits_claim_when_supermajority(session):
+    from datetime import datetime, timezone
+    from argus.models import Asset, Source, Claim, WalletPosition
+    from argus.collectors.hyperliquid import compute_consensus
+    session.add(Asset(symbol="SOL", kind="crypto", binance_symbol="SOLUSDT", scorable=True))
+    cons = Source(kind="derived", handle="whale-consensus", display_name="Whale Consensus")
+    session.add(cons)
+    now = datetime.now(timezone.utc)
+    for i in range(6):
+        w = Source(kind="hyperliquid", handle=f"0x{i:040x}", display_name=f"w{i}")
+        session.add(w); session.flush()
+        side = "long" if i < 5 else "short"          # 5/6 long
+        session.add(WalletPosition(source_id=w.id, coin="SOL", side=side, szi=1.0, entry_px=150.0,
+                                   position_value=1000.0, opened_ts=now, last_seen_ts=now, open=True))
+    session.commit()
+    with patch("argus.collectors.hyperliquid.get_spot_price", return_value=150.0):
+        n = compute_consensus(session, min_wallets=4, ratio=0.66)
+    assert n == 1
+    c = session.query(Claim).filter_by(source_id=cons.id).one()
+    assert c.asset == "SOL" and c.direction == "bull"
+    with patch("argus.collectors.hyperliquid.get_spot_price", return_value=150.0):
+        assert compute_consensus(session, min_wallets=4, ratio=0.66) == 0   # no change
+
+def test_consensus_below_threshold_no_claim(session):
+    from datetime import datetime, timezone
+    from argus.models import Asset, Source, WalletPosition
+    from argus.collectors.hyperliquid import compute_consensus
+    session.add(Asset(symbol="SOL", kind="crypto", binance_symbol="SOLUSDT", scorable=True))
+    session.add(Source(kind="derived", handle="whale-consensus", display_name="Whale Consensus"))
+    now = datetime.now(timezone.utc)
+    for i in range(2):
+        w = Source(kind="hyperliquid", handle=f"0x{i:040x}", display_name=f"w{i}"); session.add(w); session.flush()
+        session.add(WalletPosition(source_id=w.id, coin="SOL", side="long", szi=1.0, entry_px=150.0,
+                                   position_value=1000.0, opened_ts=now, last_seen_ts=now, open=True))
+    session.commit()
+    with patch("argus.collectors.hyperliquid.get_spot_price", return_value=150.0):
+        assert compute_consensus(session, min_wallets=4, ratio=0.66) == 0

@@ -62,3 +62,58 @@ def collect_wallet(session, source) -> int:
             wp.open = False; wp.last_seen_ts = now
     session.commit()
     return created
+
+
+def compute_consensus(session, min_wallets: int = 4, ratio: float = 0.66) -> int:
+    from argus.models import Source
+    cons = session.scalar(select(Source).where(Source.kind == "derived",
+                                               Source.handle == "whale-consensus"))
+    if cons is None:
+        return 0
+    scorable = {a.symbol: a for a in session.scalars(select(Asset).where(Asset.scorable == True))}  # noqa: E712
+    hl_ids = [s.id for s in session.scalars(select(Source).where(
+        Source.kind == "hyperliquid", Source.active == True))]  # noqa: E712
+    now = datetime.now(timezone.utc)
+    tally = {}  # coin -> [longs, shorts]
+    for wp in session.scalars(select(WalletPosition).where(
+            WalletPosition.open == True, WalletPosition.source_id.in_(hl_ids or [-1]))):  # noqa: E712
+        if wp.coin not in scorable:
+            continue
+        t = tally.setdefault(wp.coin, [0, 0])
+        t[0 if wp.side == "long" else 1] += 1
+    created = 0
+    for coin, (longs, shorts) in tally.items():
+        total = longs + shorts
+        if total < min_wallets:
+            continue
+        if longs / total >= ratio:
+            side = "long"
+        elif shorts / total >= ratio:
+            side = "short"
+        else:
+            continue
+        state = session.scalar(select(WalletPosition).where(
+            WalletPosition.source_id == cons.id, WalletPosition.coin == coin))
+        if state is not None and state.open and state.side == side:
+            continue  # unchanged consensus
+        try:
+            spot = get_spot_price(scorable[coin])
+        except Exception as e:
+            logger.warning("consensus skip %s: price failed: %s", coin, e)
+            continue
+        direction = "bull" if side == "long" else "bear"
+        claim = Claim(source_id=cons.id, asset=coin, direction=direction,
+                      confidence=round(max(longs, shorts) / total, 2), method="position",
+                      entry_price=spot, entry_ts=now, status="open")
+        session.add(claim); session.flush()
+        session.add(ClaimAudit(claim_id=claim.id, raw_text=f"consensus {side} {coin} {longs}L/{shorts}S",
+                    parsed_claim={"direction": direction, "coin": coin, "longs": longs, "shorts": shorts},
+                    parser_version="consensus-v1"))
+        if state is None:
+            session.add(WalletPosition(source_id=cons.id, coin=coin, side=side, szi=0.0, entry_px=spot,
+                                       position_value=0.0, opened_ts=now, last_seen_ts=now, open=True))
+        else:
+            state.side = side; state.open = True; state.last_seen_ts = now; state.opened_ts = now
+        created += 1
+    session.commit()
+    return created
