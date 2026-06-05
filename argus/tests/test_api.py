@@ -167,3 +167,22 @@ def test_liquidations_largest_min_notional():
     s.commit()
     rows = client.get("/api/liquidations/largest?window=24h&min_notional=100000").json()
     assert len(rows) == 1 and rows[0]["notional_usd"] == 500000.0
+
+def test_llm_usage_aggregates():
+    from datetime import datetime, timezone, timedelta
+    from argus.models import LlmCall
+    client, Sess = _client()
+    s = Sess()
+    now = datetime.now(timezone.utc)
+    s.add(LlmCall(ts=now, provider="gemini", model="gemini-2.0-flash", tokens_in=100, tokens_out=50,
+                  cost_usd=0.0, latency_ms=800, ok=True, error=None))
+    s.add(LlmCall(ts=now, provider="gemini", model="gemini-2.0-flash", tokens_in=0, tokens_out=0,
+                  cost_usd=0.0, latency_ms=500, ok=False, error="boom"))
+    s.add(LlmCall(ts=now - timedelta(days=3), provider="openrouter", model="x:free", tokens_in=1, tokens_out=1,
+                  cost_usd=0.0, latency_ms=100, ok=True, error=None))
+    s.commit()
+    rows = client.get("/api/llm/usage?window=24h").json()
+    gem = next(r for r in rows if r["model"] == "gemini-2.0-flash")
+    assert gem["calls"] == 2 and gem["ok"] == 1
+    assert gem["tokens_in"] == 100 and gem["tokens_out"] == 50
+    assert all(r["model"] != "x:free" for r in rows)

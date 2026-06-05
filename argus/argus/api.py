@@ -3,9 +3,9 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import select, func
+from sqlalchemy import select, func, case
 from argus.db import SessionLocal
-from argus.models import Source, SourceScore, SourceAssetScore, Claim, Outcome, Asset, WalletPosition, Liquidation
+from argus.models import Source, SourceScore, SourceAssetScore, Claim, Outcome, Asset, WalletPosition, Liquidation, LlmCall
 from argus.analytics import trend_lean
 from argus.charts import get_candles
 from argus.hyperliquid import fetch_positions
@@ -166,6 +166,23 @@ async def liquidations_largest(window: str = "24h", min_notional: float = 100000
         .order_by(Liquidation.notional_usd.desc()).limit(50))
     return [{"asset": l.asset, "side": l.side, "notional_usd": l.notional_usd,
              "price": l.price, "ts": l.ts.isoformat()} for l in rows]
+
+@app.get("/api/llm/usage")
+async def llm_usage(window: str = "24h", session=Depends(get_session)):
+    since = datetime.now(timezone.utc) - _LIQ_WINDOWS.get(window, _LIQ_WINDOWS["24h"])
+    ok_sum = func.sum(case((LlmCall.ok == True, 1), else_=0))  # noqa: E712
+    rows = session.execute(
+        select(LlmCall.provider, LlmCall.model, func.count(), ok_sum,
+               func.sum(LlmCall.tokens_in), func.sum(LlmCall.tokens_out),
+               func.sum(LlmCall.cost_usd), func.avg(LlmCall.latency_ms))
+        .where(LlmCall.ts >= since)
+        .group_by(LlmCall.provider, LlmCall.model)).all()
+    return sorted(
+        [{"provider": p, "model": m, "calls": int(c), "ok": int(ok or 0),
+          "tokens_in": int(ti or 0), "tokens_out": int(to or 0),
+          "cost_usd": round(float(cost or 0), 6), "avg_latency_ms": int(lat or 0)}
+         for p, m, c, ok, ti, to, cost, lat in rows],
+        key=lambda r: -r["calls"])
 
 # static dashboard (created later in Task 12)
 _web = Path(__file__).parent / "web"
