@@ -35,7 +35,7 @@ Ceny: krypto Binance, akcje yfinance. DB: local Postgres (Neon = jednolinijkowy 
 ## Stan na żywo (2026-06-05, po przebiegach)
 - Sources: 4 rss + 6 reddit + 5 news + 2 hyperliquid + 1 derived = 18. Kontenery: db + app + **liq-listener** (WS Binance, 14 symboli).
 - Likwidacje: tabela `liquidations` + endpointy live; rośnie podczas zmienności rynku.
-- **LLM:** gap-fill + monitoring live i DZIAŁA. Fix: domyślny model `gemini-flash-latest` (bo `gemini-2.0-flash` ma free quota=0); modele env-configurable (`ARGUS_GEMINI_MODEL`/`ARGUS_OR_FREE_MODEL`). `/api/llm/usage` pokazał gemini-flash-latest 9 ok / 4690 tok / $0. Claimy method=llm tylko dla itemów z jasnym powiązaniem (grounding gate zwraca [] dla słabych = poprawne). ⚠️ `ARGUS_LLM_MAX_PER_RUN=30` jest PER-FEED → 429-storm; rozważ obniżenie do ~5 lub global per-job cap.
+- **LLM:** gap-fill + monitoring live i DZIAŁA. Fix: domyślny model `gemini-flash-latest` (bo `gemini-2.0-flash` ma free quota=0); modele env-configurable (`ARGUS_GEMINI_MODEL`/`ARGUS_OR_FREE_MODEL`). `/api/llm/usage` pokazał gemini-flash-latest 9 ok / 4690 tok / $0. Claimy method=llm tylko dla itemów z jasnym powiązaniem (grounding gate zwraca [] dla słabych = poprawne). ✅ Global per-job cap wdrożony (`LlmBudget`, `ARGUS_LLM_MAX_PER_RUN=20` na cały przebieg) — ~11 wywołań/job vs ~450 wcześniej, 429-storm zniknął.
 - Items ~545 (rss 261, reddit 150, news 134), claims ~45+ (rule + position).
 - Outcomes: 1h rozliczone; 24h/7d/30d dojrzewają.
 - Watchlista: 14 krypto (BTC,ETH,XRP,DOT,JUP,HBAR,RENDER,AERO,XAI,ONDO,AEVO,GROK,ALU,RUNE) + 7 akcji (XOMA,BYND,DLNG,LCID,NFE,NTR,PLG) + indeksy/makro (scorable=false).
