@@ -10,9 +10,9 @@
 
 **Spec:** `docs/superpowers/specs/2026-06-05-argus-llm-topic-ticker-design.md`
 
-**⚠️ Prerequisite (Task 7):** `GEMINI_API_KEY` + `OPENROUTER_API_KEY` muszą być w `argus/.env` na VPS (sekrety — user wstawia; .env gitignored). Bez nich LLM = no-op (gap zostaje pusty, system działa dalej).
+**⚠️ Prerequisite (Task 9):** `GEMINI_API_KEY` + `OPENROUTER_API_KEY` muszą być w `~/argus/.env` na VPS (sekrety — user wstawia; .env gitignored). Bez nich LLM = no-op (gap zostaje pusty, system działa dalej).
 
-**Uproszczenie vs spec:** bez tabeli `llm_spend` / metering USD (przedwczesne). Kontrola kosztów = cache + `ARGUS_LLM_ALLOW_PAID` (default off) + `ARGUS_LLM_MAX_PER_RUN` cap.
+**Monitoring (wymóg usera):** każde wywołanie LLM (Gemini/OpenRouter, też darmowe) rejestrowane w tabeli `llm_calls` (provider, model, tokeny, koszt USD wg cennika [free=0], latencja, ok/fail) → endpoint `/api/llm/usage` + panel (Tasks 7-8). Kontrola kosztów = cache + `ARGUS_LLM_ALLOW_PAID` (default off) + `ARGUS_LLM_MAX_PER_RUN` cap (bez osobnego metering USD poza `llm_calls`).
 
 ---
 
@@ -26,23 +26,26 @@
 
 ## Struktura plików
 ```
-argus/argus/models.py            # MOD — Task 1 (LlmCache)
+argus/argus/models.py            # MOD — Task 1 (LlmCache + LlmCall)
 argus/argus/llm/__init__.py      # NOWY — Task 2 (pusty)
-argus/argus/llm/router.py        # NOWY — Task 2
+argus/argus/llm/router.py        # NOWY — Task 2 (router + recording + pricing)
 argus/argus/llm/extractor.py     # NOWY — Task 3
 argus/argus/llm/cache.py         # NOWY — Task 4
 argus/argus/collectors/rss.py    # MOD — Task 5 (gap-fill inline)
 argus/.env.example               # MOD — Task 6
+argus/argus/api.py               # MOD — Task 7 (/api/llm/usage)
+argus/argus/web/index.html,app.js# MOD — Task 8 (panel LLM usage)
 argus/tests/test_models.py       # MOD — Task 1
 argus/tests/test_llm_router.py   # NOWY — Task 2
 argus/tests/test_llm_extractor.py# NOWY — Task 3
 argus/tests/test_llm_cache.py    # NOWY — Task 4
 argus/tests/test_rss.py          # MOD — Task 5
+argus/tests/test_api.py          # MOD — Task 7
 ```
 
 ---
 
-### Task 1: `LlmCache` model
+### Task 1: `LlmCache` + `LlmCall` models
 
 **Files:** Modify `argus/argus/models.py`; Modify `argus/tests/test_models.py`
 
@@ -60,9 +63,18 @@ def test_llm_cache_roundtrip(session):
     session.add(LlmCache(text_hash="empty1", result_json=[], created_at=datetime.now(timezone.utc)))
     session.commit()
     assert session.get(LlmCache, "empty1").result_json == []
+
+def test_llm_call_roundtrip(session):
+    from datetime import datetime, timezone
+    from argus.models import LlmCall
+    session.add(LlmCall(ts=datetime.now(timezone.utc), provider="gemini", model="gemini-2.0-flash",
+                        tokens_in=120, tokens_out=40, cost_usd=0.0, latency_ms=850, ok=True, error=None))
+    session.commit()
+    row = session.query(LlmCall).one()
+    assert row.provider == "gemini" and row.ok is True and row.cost_usd == 0.0
 ```
 
-- [ ] **Step 2: Run, verify FAIL** — `... pytest -q tests/test_models.py -k llm_cache` → ImportError.
+- [ ] **Step 2: Run, verify FAIL** — `... pytest -q tests/test_models.py -k "llm_cache or llm_call"` → ImportError.
 
 - [ ] **Step 3: Append to `argus/argus/models.py`** (`JSON` already imported):
 ```python
@@ -71,6 +83,19 @@ class LlmCache(Base):
     text_hash: Mapped[str] = mapped_column(String, primary_key=True)
     result_json: Mapped[list] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+class LlmCall(Base):
+    __tablename__ = "llm_calls"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ts: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    provider: Mapped[str] = mapped_column(String)            # gemini|openrouter
+    model: Mapped[str] = mapped_column(String)
+    tokens_in: Mapped[int] = mapped_column(Integer, default=0)
+    tokens_out: Mapped[int] = mapped_column(Integer, default=0)
+    cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    latency_ms: Mapped[int] = mapped_column(Integer, default=0)
+    ok: Mapped[bool] = mapped_column(Boolean)
+    error: Mapped[str | None] = mapped_column(String, nullable=True)
 ```
 
 - [ ] **Step 4: Run, verify PASS** — `... pytest -q tests/test_models.py` → all green.
@@ -78,30 +103,38 @@ class LlmCache(Base):
 - [ ] **Step 5: Commit**
 ```
 git add argus/argus/models.py argus/tests/test_models.py
-git commit -m "feat(argus): LlmCache model (text_hash -> extraction result)"
+git commit -m "feat(argus): LlmCache + LlmCall models (extraction cache + call monitoring)"
 ```
 
 ---
 
-### Task 2: `llm/router.py` (free→paid gated)
+### Task 2: `llm/router.py` (free→paid gated + per-call recording)
 
 **Files:** Create `argus/argus/llm/__init__.py` (empty), `argus/argus/llm/router.py`; Test `argus/tests/test_llm_router.py`
+
+Providers return `(text, usage)` where `usage={"tokens_in":int,"tokens_out":int}`. Every attempt (incl. free + failures) is recorded via `_record(...)` → `llm_calls` (best-effort, own SessionLocal). `_record` is module-level so tests can monkeypatch it.
 
 - [ ] **Step 1: Write failing test `argus/tests/test_llm_router.py`**
 ```python
 from unittest.mock import patch
 import argus.llm.router as router
 
+def test_cost_free_zero_paid_nonzero():
+    assert router._cost("meta-llama/llama-3.3-70b-instruct:free", {"tokens_in": 1000, "tokens_out": 1000}) == 0.0
+    assert router._cost("openai/gpt-4o-mini", {"tokens_in": 1_000_000, "tokens_out": 0}) > 0
+
 def test_falls_back_to_openrouter_when_gemini_fails(monkeypatch):
     monkeypatch.setattr(router, "GEMINI_KEY", "k"); monkeypatch.setattr(router, "OPENROUTER_KEY", "k")
+    monkeypatch.setattr(router, "_record", lambda *a, **k: None)
     with patch.object(router, "_gemini", side_effect=RuntimeError("down")), \
-         patch.object(router, "_openrouter", return_value="OK-OR") as orm:
+         patch.object(router, "_openrouter", return_value=("OK-OR", {"tokens_in": 5, "tokens_out": 7})) as orm:
         assert router.call_llm("p") == "OK-OR"
         assert orm.called
 
 def test_paid_skipped_when_disabled(monkeypatch):
     monkeypatch.setattr(router, "GEMINI_KEY", "k"); monkeypatch.setattr(router, "OPENROUTER_KEY", "k")
     monkeypatch.setattr(router, "ALLOW_PAID", False)
+    monkeypatch.setattr(router, "_record", lambda *a, **k: None)
     with patch.object(router, "_gemini", side_effect=RuntimeError("x")), \
          patch.object(router, "_openrouter", side_effect=RuntimeError("y")):
         try:
@@ -112,15 +145,23 @@ def test_paid_skipped_when_disabled(monkeypatch):
 def test_paid_used_when_enabled(monkeypatch):
     monkeypatch.setattr(router, "GEMINI_KEY", "k"); monkeypatch.setattr(router, "OPENROUTER_KEY", "k")
     monkeypatch.setattr(router, "ALLOW_PAID", True)
-    calls = []
+    monkeypatch.setattr(router, "_record", lambda *a, **k: None)
     def fake_or(model, *a, **k):
-        calls.append(model)
-        if ":free" in model: raise RuntimeError("free down")
-        return "PAID-OK"
+        if ":free" in model:
+            raise RuntimeError("free down")
+        return ("PAID-OK", {"tokens_in": 1, "tokens_out": 1})
     with patch.object(router, "_gemini", side_effect=RuntimeError("g")), \
          patch.object(router, "_openrouter", side_effect=fake_or):
         assert router.call_llm("p") == "PAID-OK"
-        assert any(":free" not in m for m in calls)
+
+def test_records_each_attempt(monkeypatch):
+    monkeypatch.setattr(router, "GEMINI_KEY", "k"); monkeypatch.setattr(router, "OPENROUTER_KEY", "k")
+    rec = []
+    monkeypatch.setattr(router, "_record", lambda provider, model, usage, latency_ms, ok, error: rec.append((provider, ok)))
+    with patch.object(router, "_gemini", side_effect=RuntimeError("g")), \
+         patch.object(router, "_openrouter", return_value=("hi", {"tokens_in": 2, "tokens_out": 2})):
+        router.call_llm("p")
+    assert ("gemini", False) in rec and ("openrouter", True) in rec   # failed + success both recorded
 ```
 
 - [ ] **Step 2: Run, verify FAIL** — ImportError.
@@ -128,7 +169,10 @@ def test_paid_used_when_enabled(monkeypatch):
 - [ ] **Step 3: Create `argus/argus/llm/__init__.py`** (empty) and `argus/argus/llm/router.py`:
 ```python
 import os
+import time
 import logging
+from datetime import datetime, timezone
+
 import httpx
 
 logger = logging.getLogger(__name__)
@@ -140,7 +184,28 @@ PAID_MODEL = os.getenv("ARGUS_LLM_PAID_MODEL", "openai/gpt-4o-mini")
 GEMINI_MODEL = "gemini-2.0-flash"
 OR_FREE_MODEL = "meta-llama/llama-3.3-70b-instruct:free"
 
-def _gemini(prompt: str, system: str, max_tokens: int) -> str:
+# USD per 1M tokens (in, out); free / unknown -> 0
+_PRICING = {"openai/gpt-4o-mini": (0.15, 0.60)}
+
+def _cost(model: str, usage: dict) -> float:
+    pin, pout = _PRICING.get(model, (0.0, 0.0))
+    return round(usage.get("tokens_in", 0) / 1e6 * pin + usage.get("tokens_out", 0) / 1e6 * pout, 6)
+
+def _record(provider: str, model: str, usage: dict, latency_ms: int, ok: bool, error):
+    """Best-effort write to llm_calls (own session; never raises into caller)."""
+    try:
+        from argus.db import SessionLocal
+        from argus.models import LlmCall
+        with SessionLocal() as s:
+            s.add(LlmCall(ts=datetime.now(timezone.utc), provider=provider, model=model,
+                          tokens_in=usage.get("tokens_in", 0), tokens_out=usage.get("tokens_out", 0),
+                          cost_usd=_cost(model, usage), latency_ms=latency_ms, ok=ok,
+                          error=(error[:300] if error else None)))
+            s.commit()
+    except Exception as e:
+        logger.warning("llm_call record failed: %s", e)
+
+def _gemini(prompt: str, system: str, max_tokens: int):
     if not GEMINI_KEY:
         raise RuntimeError("no gemini key")
     url = (f"https://generativelanguage.googleapis.com/v1beta/models/"
@@ -150,9 +215,13 @@ def _gemini(prompt: str, system: str, max_tokens: int) -> str:
             "generationConfig": {"maxOutputTokens": max_tokens, "temperature": 0}}
     r = httpx.post(url, json=body, timeout=60)
     r.raise_for_status()
-    return r.json()["candidates"][0]["content"]["parts"][0]["text"]
+    j = r.json()
+    out = j["candidates"][0]["content"]["parts"][0]["text"]
+    um = j.get("usageMetadata", {})
+    usage = {"tokens_in": um.get("promptTokenCount", 0), "tokens_out": um.get("candidatesTokenCount", 0)}
+    return out, usage
 
-def _openrouter(model: str, prompt: str, system: str, max_tokens: int) -> str:
+def _openrouter(model: str, prompt: str, system: str, max_tokens: int):
     if not OPENROUTER_KEY:
         raise RuntimeError("no openrouter key")
     r = httpx.post("https://openrouter.ai/api/v1/chat/completions",
@@ -163,32 +232,39 @@ def _openrouter(model: str, prompt: str, system: str, max_tokens: int) -> str:
                          "max_tokens": max_tokens, "temperature": 0},
                    timeout=60)
     r.raise_for_status()
-    return r.json()["choices"][0]["message"]["content"]
+    j = r.json()
+    out = j["choices"][0]["message"]["content"]
+    u = j.get("usage", {})
+    usage = {"tokens_in": u.get("prompt_tokens", 0), "tokens_out": u.get("completion_tokens", 0)}
+    return out, usage
 
 def call_llm(prompt: str, system: str = "", max_tokens: int = 512) -> str:
     attempts = [
-        ("gemini-free", lambda: _gemini(prompt, system, max_tokens)),
-        ("openrouter-free", lambda: _openrouter(OR_FREE_MODEL, prompt, system, max_tokens)),
+        ("gemini", GEMINI_MODEL, lambda: _gemini(prompt, system, max_tokens)),
+        ("openrouter", OR_FREE_MODEL, lambda: _openrouter(OR_FREE_MODEL, prompt, system, max_tokens)),
     ]
-    for name, fn in attempts:
-        try:
-            return fn()
-        except Exception as e:
-            logger.warning("llm %s failed: %s", name, e)
     if ALLOW_PAID:
+        attempts.append(("openrouter", PAID_MODEL, lambda: _openrouter(PAID_MODEL, prompt, system, max_tokens)))
+    last_err = None
+    for provider, model, fn in attempts:
+        t0 = time.time()
         try:
-            return _openrouter(PAID_MODEL, prompt, system, max_tokens)
+            text, usage = fn()
+            _record(provider, model, usage, int((time.time() - t0) * 1000), True, None)
+            return text
         except Exception as e:
-            logger.warning("llm paid failed: %s", e)
-    raise RuntimeError("all llm providers failed")
+            _record(provider, model, {}, int((time.time() - t0) * 1000), False, str(e))
+            last_err = e
+            logger.warning("llm %s/%s failed: %s", provider, model, e)
+    raise RuntimeError(f"all llm providers failed: {last_err}")
 ```
 
-- [ ] **Step 4: Run, verify PASS** — `... pytest -q tests/test_llm_router.py` → `3 passed`.
+- [ ] **Step 4: Run, verify PASS** — `... pytest -q tests/test_llm_router.py` → `5 passed`.
 
 - [ ] **Step 5: Commit**
 ```
 git add argus/argus/llm/__init__.py argus/argus/llm/router.py argus/tests/test_llm_router.py
-git commit -m "feat(argus): llm router (gemini/openrouter free -> gated paid)"
+git commit -m "feat(argus): llm router (free->paid) + per-call recording to llm_calls"
 ```
 
 ---
@@ -575,7 +651,104 @@ git commit -m "chore(argus): .env.example LLM keys + flags"
 
 ---
 
-### Task 7: Spike LLM z VPS (prerequisite: klucze w .env)
+### Task 7: `/api/llm/usage` endpoint (monitoring kosztów/użycia)
+
+**Files:** Modify `argus/argus/api.py`; Test `argus/tests/test_api.py` (append)
+
+- [ ] **Step 1: Append failing test to `argus/tests/test_api.py`**
+```python
+def test_llm_usage_aggregates():
+    from datetime import datetime, timezone, timedelta
+    from argus.models import LlmCall
+    client, Sess = _client()
+    s = Sess()
+    now = datetime.now(timezone.utc)
+    s.add(LlmCall(ts=now, provider="gemini", model="gemini-2.0-flash", tokens_in=100, tokens_out=50,
+                  cost_usd=0.0, latency_ms=800, ok=True, error=None))
+    s.add(LlmCall(ts=now, provider="gemini", model="gemini-2.0-flash", tokens_in=0, tokens_out=0,
+                  cost_usd=0.0, latency_ms=500, ok=False, error="boom"))
+    s.add(LlmCall(ts=now - timedelta(days=3), provider="openrouter", model="x:free", tokens_in=1, tokens_out=1,
+                  cost_usd=0.0, latency_ms=100, ok=True, error=None))  # outside 24h
+    s.commit()
+    rows = client.get("/api/llm/usage?window=24h").json()
+    gem = next(r for r in rows if r["model"] == "gemini-2.0-flash")
+    assert gem["calls"] == 2 and gem["ok"] == 1
+    assert gem["tokens_in"] == 100 and gem["tokens_out"] == 50
+    assert all(r["model"] != "x:free" for r in rows)   # 3-day-old excluded
+```
+
+- [ ] **Step 2: Run, verify FAIL** — `... pytest -q tests/test_api.py -k llm_usage` → route missing.
+
+- [ ] **Step 3: Edit `argus/argus/api.py`**
+Add `case` to the sqlalchemy import (`from sqlalchemy import select, func, case`); add `LlmCall` to the models import line. Add this route after the liquidations routes, before the static mount (reuses `_LIQ_WINDOWS` for the window map):
+```python
+@app.get("/api/llm/usage")
+async def llm_usage(window: str = "24h", session=Depends(get_session)):
+    since = datetime.now(timezone.utc) - _LIQ_WINDOWS.get(window, _LIQ_WINDOWS["24h"])
+    ok_sum = func.sum(case((LlmCall.ok == True, 1), else_=0))  # noqa: E712
+    rows = session.execute(
+        select(LlmCall.provider, LlmCall.model, func.count(), ok_sum,
+               func.sum(LlmCall.tokens_in), func.sum(LlmCall.tokens_out),
+               func.sum(LlmCall.cost_usd), func.avg(LlmCall.latency_ms))
+        .where(LlmCall.ts >= since)
+        .group_by(LlmCall.provider, LlmCall.model)).all()
+    return sorted(
+        [{"provider": p, "model": m, "calls": int(c), "ok": int(ok or 0),
+          "tokens_in": int(ti or 0), "tokens_out": int(to or 0),
+          "cost_usd": round(float(cost or 0), 6), "avg_latency_ms": int(lat or 0)}
+         for p, m, c, ok, ti, to, cost, lat in rows],
+        key=lambda r: -r["calls"])
+```
+
+- [ ] **Step 4: Run, verify PASS** — `... pytest -q tests/test_api.py -k llm_usage` (1 passed), then WHOLE file `... pytest -q tests/test_api.py` (no regressions).
+
+- [ ] **Step 5: Commit**
+```
+git add argus/argus/api.py argus/tests/test_api.py
+git commit -m "feat(argus): /api/llm/usage (cost+usage per provider/model)"
+```
+
+---
+
+### Task 8: Dashboard panel „LLM usage"
+
+**Files:** Modify `argus/argus/web/index.html`; Modify `argus/argus/web/app.js` (manual verification)
+
+- [ ] **Step 1: Read both web files** to append without breaking existing sections (overview, wallets, liquidations, detail).
+
+- [ ] **Step 2: Add to `index.html`** before `<div id="detail" ...>`:
+```html
+<h2>LLM usage
+  <select id="llmWin"><option>1h</option><option>4h</option><option selected>24h</option><option>7d</option></select>
+</h2>
+<table id="llmusage"></table>
+```
+
+- [ ] **Step 3: Append to `app.js`** (and call `loadLlmUsage()` at end of `loadOverview()`, + listener):
+```javascript
+async function loadLlmUsage(){
+  const w = document.getElementById('llmWin').value;
+  let rows = [];
+  try { rows = await getJSON(`/api/llm/usage?window=${w}`); } catch(e){}
+  document.getElementById('llmusage').innerHTML =
+    '<tr><th>Provider</th><th>Model</th><th>Calls</th><th>OK%</th><th>Tok in</th><th>Tok out</th><th>Cost $</th><th>ms</th></tr>' +
+    rows.map(r => `<tr><td>${r.provider}</td><td>${r.model}</td><td>${r.calls}</td>`+
+      `<td>${r.calls?Math.round(100*r.ok/r.calls):0}</td><td>${r.tokens_in}</td><td>${r.tokens_out}</td>`+
+      `<td>${r.cost_usd.toFixed(4)}</td><td>${r.avg_latency_ms}</td></tr>`).join('');
+}
+document.getElementById('llmWin').addEventListener('change', loadLlmUsage);
+```
+Add `loadLlmUsage();` at the end of `loadOverview()`.
+
+- [ ] **Step 4: Commit**
+```
+git add argus/argus/web/index.html argus/argus/web/app.js
+git commit -m "feat(argus): dashboard LLM usage panel"
+```
+
+---
+
+### Task 9: Spike LLM z VPS (prerequisite: klucze w .env)
 
 **Files:** Create `argus/docs/llm-spike-findings.md`
 
@@ -605,7 +778,7 @@ git commit -m "chore(argus): LLM spike findings (free model JSON from VPS)"
 
 ---
 
-### Task 8: Redeploy + smoke
+### Task 10: Redeploy + smoke
 
 **Files:** (deployment)
 
@@ -628,9 +801,9 @@ from sqlalchemy import select, func
 _rss_job()
 s = SessionLocal()
 print('claims by method:', dict(s.execute(select(Claim.method, func.count()).group_by(Claim.method)).all()))
-\"; echo '--- collect_rss metric logs ---'; docker compose logs --since 3m app | grep -i 'collect_rss' | tail -10"
+\"; echo '--- collect_rss metric logs ---'; docker compose logs --since 3m app | grep -i 'collect_rss' | tail -10; echo '--- llm usage ---'; curl -sS 'http://localhost:8080/api/llm/usage?window=24h'"
 ```
-Expected: health ok; `claims by method` zawiera `llm` > 0 (jeśli były luki + LLM zwrócił coś); logi `collect_rss ...: {'items':..,'gap':..,'cache_hit':..,'llm_called':..}`. Jeśli `llm`=0 — sprawdź logi pod kątem błędów klucza/JSON (acceptable jeśli akurat brak luk z powiązaniem; re-check).
+Expected: health ok; `claims by method` zawiera `llm` > 0 (jeśli były luki + LLM zwrócił coś); logi `collect_rss ...: {'items':..,'gap':..,'cache_hit':..,'llm_called':..}`; `/api/llm/usage` pokazuje wiersze per provider/model z tokenami/kosztem (też darmowe = cost 0). Jeśli `llm`=0 / usage puste — sprawdź logi pod kątem błędów klucza/JSON (acceptable jeśli akurat brak luk z powiązaniem; re-check).
 
 - [ ] **Step 3: Note for user** — weryfikacja przez tunel; claimy `method=llm` w drill-downie aktywa (reasoning w claim_audit).
 
@@ -640,6 +813,7 @@ Expected: health ok; `claims by method` zawiera `llm` > 0 (jeśli były luki + L
 
 **Spec coverage:**
 - Router free→paid gated (Gemini/OpenRouter), klucze env → Task 2 ✅
+- **Monitoring: każde wywołanie (też free/fail) → `llm_calls`; `/api/llm/usage` + panel** → Task 1 (LlmCall) + Task 2 (_record/_cost) + Task 7 (endpoint) + Task 8 (panel) ✅
 - Ekstraktor: wąski prompt + grounding gate, walidacja watchlisty, stałe confidence 0.35, reasoning → Task 3 ✅
 - LLM NIE zwraca confidence (kod nadaje 0.35) → Task 3 ✅
 - Gap-fill INLINE w collect_rss (bez joba/tabeli processed) → Task 5 ✅
@@ -647,13 +821,12 @@ Expected: health ok; `claims by method` zawiera `llm` > 0 (jeśli były luki + L
 - method="llm", parser_version="llm-v1", reasoning w ClaimAudit → Task 5 ✅
 - Per-run cap (ARGUS_LLM_MAX_PER_RUN) + ALLOW_PAID gate → Task 2+5+6 ✅
 - Metryki log (gap/cache_hit/llm_called/...) → Task 5 ✅
-- Klucze prerequisite + spike z VPS → Task 6+7 ✅
+- Klucze prerequisite + spike z VPS → Task 6+9 ✅
 - Judge — odłożony (brak zadania, świadomie) ✅
-- Redeploy + smoke → Task 8 ✅
+- Redeploy + smoke (z /api/llm/usage) → Task 10 ✅
 
-**Uproszczenie vs spec:** tabela `llm_spend`/metering USD pominięta (przedwczesne) — kontrola kosztów = cache + ALLOW_PAID(off) + per-run cap. Zaznaczone w nagłówku.
+**Uproszczenie vs spec:** brak osobnego metering USD poza `llm_calls` — koszt liczony per-call z cennika (`_cost`, free=0), agregowany w `/api/llm/usage`. Kontrola kosztów = cache + ALLOW_PAID(off) + per-run cap.
 
-**Placeholder scan:** brak — pełny kod w każdym kroku (wcześniejsza linia-placeholder w collect_rss usunięta).
+**Placeholder scan:** brak — pełny kod w każdym kroku.
 
-**Type consistency:** `call_llm(prompt, system, max_tokens)` (Task 2) ↔ użycie w extractor (Task 3). `extract_claims_llm(text, assets, sector_map)->list[LlmClaim]` (Task 3) ↔ import+użycie w collect_rss (Task 5). `LlmClaim(asset_symbol,direction,confidence,reasoning)` spójny. `cache_get->list|None`, `cache_put(session,h,list)`, `text_hash` (Task 4) ↔ collect_rss `_gap_fill` (Task 5). `LlmCache(text_hash,result_json,created_at)` (Task 1) ↔ cache.py (Task 4). method/parser_version stringi spójne.
-```
+**Type consistency:** `call_llm(prompt, system, max_tokens)` (Task 2) ↔ extractor (Task 3); `_gemini`/`_openrouter` zwracają `(text, usage)`, `_record(provider,model,usage,latency_ms,ok,error)`, `_cost(model,usage)` (Task 2) ↔ testy. `extract_claims_llm(text, assets, sector_map)->list[LlmClaim]` (Task 3) ↔ collect_rss (Task 5). `LlmClaim(asset_symbol,direction,confidence,reasoning)` spójny. `cache_get->list|None`, `cache_put`, `text_hash` (Task 4) ↔ `_gap_fill` (Task 5). `LlmCache`/`LlmCall` (Task 1) ↔ cache.py (Task 4) + router `_record` (Task 2) + `/api/llm/usage` (Task 7). `_LIQ_WINDOWS` reużyte w `/api/llm/usage` (Task 7).
