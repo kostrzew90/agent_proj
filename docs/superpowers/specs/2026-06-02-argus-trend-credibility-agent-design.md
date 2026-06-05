@@ -102,7 +102,7 @@ Dashboard pokazuje **kierunek** (znak) i **intensywność** (moduł).
 - Klucze LLM i DB w `.env`. Watchlist + sources seedowane SQL/configiem.
 
 ### Decyzja storage (zatwierdzona)
-- **VPS: Oracle Ampere A1 (24GB RAM).**
+- **VPS: Oracle x86_64 VM (4 vCPU / 15GB RAM, Ubuntu 22.04). Zweryfikowane 2026-06-02 — NIE ARM/Ampere; Docker 29 + Compose v5 + Python 3.10 zainstalowane.**
 - **DB: local Postgres w Dockerze na A1** (co-located z app). $0, zero latencji, brak limitów free-tier ani cold-startów — wygrywa dla 24/7 pollera.
 - Backup: docker volume + cron `pg_dump`.
 - Warstwa SQLAlchemy izoluje wybór — przejście na **Neon** (serverless) to jednolinijkowy switch connection-stringa w `.env`, bez zmian w kodzie. Opcja na later, jeśli zechcesz managed backups/branching/dostęp z wielu miejsc.
