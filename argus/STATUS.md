@@ -10,7 +10,7 @@
   `ssh -i "C:\ai\ssh-key-2026-05-19.key" -L 8090:localhost:8080 ubuntu@84.235.174.129` → http://localhost:8090 (horyzont na **1h**, bo 24h/7d/30d dojrzewają wolniej).
 - **Deploy:** `scp -r argus ubuntu@VPS:~/ && ssh ... "cd ~/argus && docker compose up -d --build"`.
 - **Testy (brak python na hoście Windows):** w Dockerze —
-  `docker run --rm -v "<repo>/argus:/app" -w /app -v argus-pipcache:/root/.cache/pip -e PYTHONPATH=/app python:3.12-slim sh -c "pip install -q --trusted-host pypi.org --trusted-host files.pythonhosted.org -r requirements.txt && python -m pytest -q"` (58 testów).
+  `docker run --rm -v "<repo>/argus:/app" -w /app -v argus-pipcache:/root/.cache/pip -e PYTHONPATH=/app python:3.12-slim sh -c "pip install -q --trusted-host pypi.org --trusted-host files.pythonhosted.org -r requirements.txt && python -m pytest -q"` (69 testów).
 
 ## Architektura (pipeline)
 ```
@@ -29,15 +29,16 @@ Ceny: krypto Binance, akcje yfinance. DB: local Postgres (Neon = jednolinijkowy 
 - **Increment 2 — Dashboard v2** — overview (wszystkie scorable aktywa, klikalne) + drill-down ze świecami i markerami claimów; fix horyzontu + empty-state; akcje widoczne.
 - **Increment 3 — Portfele Hyperliquid** — `Source(kind=hyperliquid)`, collector diffuje pozycje→position-claimy (open/flip), wszystkie pozycje w `wallet_positions` (off-watchlist widoczne, nie scorowane). confidence=position_value/equity. Whale Consensus (`kind=derived`). 30d horizon. Endpointy `/api/wallets*` + sekcja portfeli z preview. Frontend: dodawanie adresów.
 - **Increment 4 — Reddit + stock-news + asocjacja sektorowa** — ekstraktor `rule-v2` (slang WSB, cashtagi). 6 subredditów (`kind=reddit`) + 5 portali (`kind=news`). `sectors.yaml` (alias→ticker, conf 0.3) → sygnał sektorowy trafia na akcje (NTR/NFE/DLNG z newsów). source_type=Source.kind.
+- **Increment 5 — Likwidacje (market-context)** — osobny kontener `liq-listener` (reuse obrazu app) → Binance `!forceOrder@arr` WS (reconnect+circuit breaker) → tabela `liquidations` (tylko watchlist). `parse_force_order` (SELL=long_liq, BUY=short_liq). Endpointy `/api/liquidations?window=` + `/largest`. Panel (czerwony long-liq / zielony short-liq). Prune >30d. **NIE wpływa na scoring** (kontekst).
 
 ## Stan na żywo (2026-06-04, po przebiegach)
-- Sources: 4 rss + 6 reddit + 5 news + 2 hyperliquid + 1 derived = 18.
+- Sources: 4 rss + 6 reddit + 5 news + 2 hyperliquid + 1 derived = 18. Kontenery: db + app + **liq-listener** (WS Binance, 14 symboli).
+- Likwidacje: tabela `liquidations` + endpointy live; rośnie podczas zmienności rynku.
 - Items ~545 (rss 261, reddit 150, news 134), claims ~45+ (rule + position).
 - Outcomes: 1h rozliczone; 24h/7d/30d dojrzewają.
 - Watchlista: 14 krypto (BTC,ETH,XRP,DOT,JUP,HBAR,RENDER,AERO,XAI,ONDO,AEVO,GROK,ALU,RUNE) + 7 akcji (XOMA,BYND,DLNG,LCID,NFE,NTR,PLG) + indeksy/makro (scorable=false).
 
 ## Roadmapa
-- ⏳ **Increment 5 — likwidacje** (w toku): darmowy feed (Binance forceOrder / HL) jako **market-context** (NIE scored source). UWAGA: free = *zrealizowane* likwidacje, nie predykcyjny heatmap Coinglass (ten jest płatny).
 - ⏭️ **Increment X — konta KOL na X/Twitter:** realnie **płatne** (~$0.40/1k tweetów lub $10-500/mc, nieoficjalne, ryzyko ToS). Pierwszy płatny komponent — decyzja budżetowa otwarta. User zainteresowany (najwięcej sygnału).
 - ⏭️ **Increment 6 — LLM topic→ticker:** dokładniejsza asocjacja niż rule-v2 (Faza 2 LLM). Router OpenRouter/Gemini free → paid.
 
