@@ -119,3 +119,43 @@ def test_gap_fill_uses_cache_on_second_run(session):
         collect_rss(session, s1)
         collect_rss(session, s2)
     assert mllm.call_count == 1
+
+def test_global_budget_shared_across_feeds(session):
+    from types import SimpleNamespace
+    from unittest.mock import patch
+    from argus.models import Asset, Source
+    from argus.llm.extractor import LlmClaim
+    from argus.collectors.rss import collect_rss, LlmBudget
+    session.add(Asset(symbol="BTC", kind="crypto", binance_symbol="BTCUSDT", scorable=True))
+    s1 = Source(kind="news", handle="http://fa", display_name="A"); session.add(s1)
+    s2 = Source(kind="news", handle="http://fb", display_name="B"); session.add(s2); session.commit()
+    def feed_for(h):
+        tag = h.rsplit("/", 1)[-1]
+        e = SimpleNamespace(id=None, title=f"Fed dovish pivot {tag}", summary="",
+                            link=f"http://x/{tag}", published_parsed=(2026,6,5,0,0,0,0,0,0))
+        return SimpleNamespace(entries=[e])
+    budget = LlmBudget(1)
+    with patch("argus.collectors.rss.feedparser.parse", side_effect=lambda h: feed_for(h)), \
+         patch("argus.collectors.rss.load_sector_map", return_value={}), \
+         patch("argus.collectors.rss.get_spot_price", return_value=67000.0), \
+         patch("argus.collectors.rss.extract_claims_llm", return_value=[LlmClaim("BTC","bull",0.35,"r")]) as mllm:
+        collect_rss(session, s1, budget)
+        collect_rss(session, s2, budget)
+    assert mllm.call_count == 1   # shared budget allowed only ONE real LLM call across both feeds
+
+def test_budget_exhausted_skips_llm(session):
+    from types import SimpleNamespace
+    from unittest.mock import patch
+    from argus.models import Asset, Source, Claim
+    from argus.collectors.rss import collect_rss, LlmBudget
+    session.add(Asset(symbol="BTC", kind="crypto", binance_symbol="BTCUSDT", scorable=True))
+    src = Source(kind="news", handle="http://fz", display_name="Z"); session.add(src); session.commit()
+    entry = SimpleNamespace(id="z1", title="Fed dovish pivot soon", summary="", link="http://x/z1",
+                            published_parsed=(2026,6,5,0,0,0,0,0,0))
+    with patch("argus.collectors.rss.feedparser.parse", return_value=SimpleNamespace(entries=[entry])), \
+         patch("argus.collectors.rss.load_sector_map", return_value={}), \
+         patch("argus.collectors.rss.get_spot_price", return_value=67000.0), \
+         patch("argus.collectors.rss.extract_claims_llm") as mllm:
+        collect_rss(session, src, LlmBudget(0))
+    assert not mllm.called
+    assert session.query(Claim).count() == 0

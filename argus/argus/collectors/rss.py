@@ -13,7 +13,17 @@ from argus.llm.extractor import extract_claims_llm, LLM_DEFAULT_CONFIDENCE
 from argus.llm.cache import text_hash, cache_get, cache_put
 
 logger = logging.getLogger(__name__)
-_LLM_MAX_PER_RUN = int(os.getenv("ARGUS_LLM_MAX_PER_RUN", "30"))
+
+
+class LlmBudget:
+    def __init__(self, n: int):
+        self.remaining = n
+
+    def allow(self) -> bool:
+        if self.remaining > 0:
+            self.remaining -= 1
+            return True
+        return False
 
 
 def load_sector_map(path: str = "config/sectors.yaml") -> dict:
@@ -39,26 +49,15 @@ def _add_claim(session, source, item, asset_symbol, direction, confidence, metho
                            parsed_claim=parsed_claim, parser_version=parser_version))
 
 
-def _gap_fill(session, text, assets, sector_map):
-    """Return (triples, called): triples=[(asset,direction,reasoning)], called=True only on real LLM call."""
-    h = text_hash(text)
-    cached = cache_get(session, h)
-    if cached is not None:
-        return [(c["asset"], c["direction"], c.get("reasoning", "")) for c in cached], False
-    llm_claims = extract_claims_llm(text, assets, sector_map)
-    cache_put(session, h, [{"asset": c.asset_symbol, "direction": c.direction,
-                            "reasoning": c.reasoning} for c in llm_claims])
-    return [(c.asset_symbol, c.direction, c.reasoning) for c in llm_claims], True
-
-
-def collect_rss(session, source) -> int:
+def collect_rss(session, source, llm_budget=None) -> int:
+    if llm_budget is None:
+        llm_budget = LlmBudget(int(os.getenv("ARGUS_LLM_MAX_PER_RUN", "20")))
     feed = feedparser.parse(source.handle)
     assets = list(session.scalars(select(Asset).where(Asset.scorable == True)))  # noqa: E712
     by_symbol = {a.symbol: a for a in assets}
     sector_map = load_sector_map()
     now = datetime.now(timezone.utc)
     created = 0
-    llm_calls = 0
     stats = {"items": 0, "gap": 0, "cache_hit": 0, "llm_called": 0, "rule_claims": 0, "llm_claims": 0}
     for entry in feed.entries:
         ext = getattr(entry, "id", None) or getattr(entry, "link", None)
@@ -86,13 +85,19 @@ def collect_rss(session, source) -> int:
                 stats["rule_claims"] += 1
         else:
             stats["gap"] += 1
-            if llm_calls >= _LLM_MAX_PER_RUN:
-                continue
-            triples, called = _gap_fill(session, text, assets, sector_map)
-            if called:
-                llm_calls += 1; stats["llm_called"] += 1
-            else:
+            h = text_hash(text)
+            cached = cache_get(session, h)
+            if cached is not None:
+                triples = [(c["asset"], c["direction"], c.get("reasoning", "")) for c in cached]
                 stats["cache_hit"] += 1
+            elif llm_budget.allow():
+                llm_claims = extract_claims_llm(text, assets, sector_map)
+                cache_put(session, h, [{"asset": c.asset_symbol, "direction": c.direction,
+                                        "reasoning": c.reasoning} for c in llm_claims])
+                triples = [(c.asset_symbol, c.direction, c.reasoning) for c in llm_claims]
+                stats["llm_called"] += 1
+            else:
+                triples = []   # global budget exhausted this run; retry next run (not cached)
             for sym, direction, reasoning in triples:
                 asset = by_symbol.get(sym)
                 if asset is None:

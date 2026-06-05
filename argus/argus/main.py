@@ -15,10 +15,13 @@ from sqlalchemy import select
 from datetime import datetime, timezone
 
 def _rss_job():
+    import os
+    from argus.collectors.rss import LlmBudget
+    budget = LlmBudget(int(os.getenv("ARGUS_LLM_MAX_PER_RUN", "20")))
     with SessionLocal() as s:
         for src in s.scalars(select(Source).where(
                 Source.kind.in_(["rss", "reddit", "news"]), Source.active == True)):  # noqa: E712
-            collect_rss(s, src)
+            collect_rss(s, src, budget)
 
 def _eval_job():
     with SessionLocal() as s:
