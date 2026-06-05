@@ -16,5 +16,12 @@ services:
     depends_on:
       db: {condition: service_healthy}
     ports: ["8080:8080"]
+  liq-listener:
+    build: .
+    env_file: .env
+    depends_on:
+      db: {condition: service_healthy}
+    command: ["python", "-m", "argus.liquidations.listener"]
+    restart: unless-stopped
 volumes:
   argus-pg:
