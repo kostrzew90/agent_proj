@@ -8,6 +8,7 @@ from argus.collectors.rss import collect_rss
 from argus.collectors.hyperliquid import collect_wallet, compute_consensus
 from argus.evaluator import evaluate_due_claims
 from argus.scorer import recompute_scores
+from argus.liquidations.cleanup import prune_liquidations
 from argus.scheduler.apscheduler_impl import APScheduler
 from argus.models import Source
 from sqlalchemy import select
@@ -26,6 +27,7 @@ def _eval_job():
 def _score_job():
     with SessionLocal() as s:
         recompute_scores(s)
+        prune_liquidations(s)
 
 def _hyperliquid_job():
     from argus.models import Source
