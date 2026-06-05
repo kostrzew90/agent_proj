@@ -46,3 +46,24 @@ def test_liquidation_roundtrip(session):
     session.commit()
     l = session.query(Liquidation).one()
     assert l.asset == "BTC" and l.side == "long_liq" and l.notional_usd == 100500.0
+
+def test_llm_cache_roundtrip(session):
+    from datetime import datetime, timezone
+    from argus.models import LlmCache
+    session.add(LlmCache(text_hash="abc123", result_json=[{"asset": "BTC", "direction": "bull", "reasoning": "x"}],
+                         created_at=datetime.now(timezone.utc)))
+    session.commit()
+    row = session.get(LlmCache, "abc123")
+    assert row.result_json[0]["asset"] == "BTC"
+    session.add(LlmCache(text_hash="empty1", result_json=[], created_at=datetime.now(timezone.utc)))
+    session.commit()
+    assert session.get(LlmCache, "empty1").result_json == []
+
+def test_llm_call_roundtrip(session):
+    from datetime import datetime, timezone
+    from argus.models import LlmCall
+    session.add(LlmCall(ts=datetime.now(timezone.utc), provider="gemini", model="gemini-2.0-flash",
+                        tokens_in=120, tokens_out=40, cost_usd=0.0, latency_ms=850, ok=True, error=None))
+    session.commit()
+    row = session.query(LlmCall).one()
+    assert row.provider == "gemini" and row.ok is True and row.cost_usd == 0.0

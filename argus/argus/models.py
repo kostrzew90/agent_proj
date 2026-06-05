@@ -130,3 +130,22 @@ class Liquidation(Base):
     ts: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     raw_symbol: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+class LlmCache(Base):
+    __tablename__ = "llm_cache"
+    text_hash: Mapped[str] = mapped_column(String, primary_key=True)
+    result_json: Mapped[list] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+class LlmCall(Base):
+    __tablename__ = "llm_calls"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ts: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    provider: Mapped[str] = mapped_column(String)            # gemini|openrouter
+    model: Mapped[str] = mapped_column(String)
+    tokens_in: Mapped[int] = mapped_column(Integer, default=0)
+    tokens_out: Mapped[int] = mapped_column(Integer, default=0)
+    cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    latency_ms: Mapped[int] = mapped_column(Integer, default=0)
+    ok: Mapped[bool] = mapped_column(Boolean)
+    error: Mapped[str | None] = mapped_column(String, nullable=True)
