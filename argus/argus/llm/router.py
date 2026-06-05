@@ -11,8 +11,8 @@ GEMINI_KEY = os.getenv("GEMINI_API_KEY", "")
 OPENROUTER_KEY = os.getenv("OPENROUTER_API_KEY", "")
 ALLOW_PAID = os.getenv("ARGUS_LLM_ALLOW_PAID", "false").lower() == "true"
 PAID_MODEL = os.getenv("ARGUS_LLM_PAID_MODEL", "openai/gpt-4o-mini")
-GEMINI_MODEL = "gemini-2.0-flash"
-OR_FREE_MODEL = "meta-llama/llama-3.3-70b-instruct:free"
+GEMINI_MODEL = os.getenv("ARGUS_GEMINI_MODEL", "gemini-flash-latest")
+OR_FREE_MODEL = os.getenv("ARGUS_OR_FREE_MODEL", "meta-llama/llama-3.3-70b-instruct:free")
 
 # USD per 1M tokens (in, out); free / unknown -> 0
 _PRICING = {"openai/gpt-4o-mini": (0.15, 0.60)}
