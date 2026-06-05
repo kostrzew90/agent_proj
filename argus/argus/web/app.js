@@ -24,6 +24,7 @@ async function loadOverview(){
     tr.addEventListener('click', () => openDetail(tr.dataset.sym, tr.dataset.kind)));
   loadWallets();
   loadLiquidations();
+  loadLlmUsage();
 }
 
 async function openDetail(sym, kind){
@@ -111,9 +112,21 @@ async function loadLiquidations(){
       `<td>${r.count}</td></tr>`).join('');
 }
 
+async function loadLlmUsage(){
+  const w = document.getElementById('llmWin').value;
+  let rows = [];
+  try { rows = await getJSON(`/api/llm/usage?window=${w}`); } catch(e){}
+  document.getElementById('llmusage').innerHTML =
+    '<tr><th>Provider</th><th>Model</th><th>Calls</th><th>OK%</th><th>Tok in</th><th>Tok out</th><th>Cost $</th><th>ms</th></tr>' +
+    rows.map(r => `<tr><td>${r.provider}</td><td>${r.model}</td><td>${r.calls}</td>`+
+      `<td>${r.calls?Math.round(100*r.ok/r.calls):0}</td><td>${r.tokens_in}</td><td>${r.tokens_out}</td>`+
+      `<td>${r.cost_usd.toFixed(4)}</td><td>${r.avg_latency_ms}</td></tr>`).join('');
+}
+
 $('h').addEventListener('change', loadOverview);
 $('closeDetail').addEventListener('click', ()=>{ $('detail').style.display='none'; });
 $('wPreview').addEventListener('click', previewWallet);
 $('wSave').addEventListener('click', saveWallet);
 document.getElementById('liqWin').addEventListener('change', loadLiquidations);
+document.getElementById('llmWin').addEventListener('change', loadLlmUsage);
 loadOverview();
