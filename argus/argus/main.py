@@ -11,6 +11,7 @@ from argus.scorer import recompute_scores
 from argus.liquidations.cleanup import prune_liquidations
 from argus.scheduler.apscheduler_impl import APScheduler
 from argus.models import Source
+from argus.collectors.hyperstats import sync_top_traders
 from sqlalchemy import select
 from datetime import datetime, timezone
 
@@ -43,6 +44,20 @@ def _hyperliquid_job():
                 logging.getLogger(__name__).warning("HL collect failed %s: %s", src.handle, e)
         compute_consensus(s)
 
+def _hyperstats_job():
+    import os
+    with SessionLocal() as s:
+        try:
+            sync_top_traders(
+                s,
+                top_n=int(os.getenv("ARGUS_HYPERSTATS_TOP_N", "20")),
+                min_win_rate=float(os.getenv("ARGUS_HYPERSTATS_MIN_WINRATE", "0.5")),
+                min_trades=int(os.getenv("ARGUS_HYPERSTATS_MIN_TRADES", "50")),
+            )
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning("hyperstats job failed: %s", e)
+
 def bootstrap():
     Base.metadata.create_all(engine)
     with SessionLocal() as s:
@@ -55,6 +70,7 @@ def bootstrap():
     sched.add_interval("evaluate", _eval_job, minutes=60)
     sched.add_interval("score", _score_job, minutes=360)
     sched.add_interval("hyperliquid", _hyperliquid_job, minutes=15)
+    sched.add_interval("hyperstats", _hyperstats_job, minutes=1440)
     sched.start()
 
 if __name__ == "__main__":
