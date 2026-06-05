@@ -23,6 +23,7 @@ async function loadOverview(){
   document.querySelectorAll('tr.asset').forEach(tr =>
     tr.addEventListener('click', () => openDetail(tr.dataset.sym, tr.dataset.kind)));
   loadWallets();
+  loadLiquidations();
 }
 
 async function openDetail(sym, kind){
@@ -97,8 +98,22 @@ async function saveWallet(){
   else { $('wPreviewOut').textContent = 'Nie zapisano (zły adres?).'; }
 }
 
+async function loadLiquidations(){
+  const w = document.getElementById('liqWin').value;
+  let rows = [];
+  try { rows = await getJSON(`/api/liquidations?window=${w}`); } catch(e){}
+  const usd = v => '$' + Math.round(v).toLocaleString();
+  document.getElementById('liquidations').innerHTML =
+    '<tr><th>Asset</th><th>Long liq</th><th>Short liq</th><th>#</th></tr>' + rows.map(r =>
+      `<tr><td>${r.asset}</td>`+
+      `<td class="bear" title="${usd(r.long_liq_usd)}">${usd(r.long_liq_usd)}</td>`+
+      `<td class="bull" title="${usd(r.short_liq_usd)}">${usd(r.short_liq_usd)}</td>`+
+      `<td>${r.count}</td></tr>`).join('');
+}
+
 $('h').addEventListener('change', loadOverview);
 $('closeDetail').addEventListener('click', ()=>{ $('detail').style.display='none'; });
 $('wPreview').addEventListener('click', previewWallet);
 $('wSave').addEventListener('click', saveWallet);
+document.getElementById('liqWin').addEventListener('change', loadLiquidations);
 loadOverview();
