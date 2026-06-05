@@ -62,3 +62,60 @@ def test_collect_emits_sector_claim(session):
         collect_rss(session, src)
     c = session.query(Claim).filter_by(asset="NFE").one()
     assert c.direction == "bull" and c.confidence == 0.3
+
+def test_gap_fill_calls_llm_when_rule_empty(session):
+    from types import SimpleNamespace
+    from unittest.mock import patch
+    from argus.models import Asset, Source, Claim
+    from argus.llm.extractor import LlmClaim
+    session.add(Asset(symbol="BTC", kind="crypto", binance_symbol="BTCUSDT", scorable=True))
+    src = Source(kind="news", handle="http://f", display_name="WSJ Markets"); session.add(src); session.commit()
+    entry = SimpleNamespace(id="g1", title="Fed signals dovish pivot", summary="",
+                            link="http://x/g1", published_parsed=(2026, 6, 5, 0, 0, 0, 0, 0, 0))
+    feed = SimpleNamespace(entries=[entry])
+    with patch("argus.collectors.rss.feedparser.parse", return_value=feed), \
+         patch("argus.collectors.rss.load_sector_map", return_value={}), \
+         patch("argus.collectors.rss.get_spot_price", return_value=67000.0), \
+         patch("argus.collectors.rss.extract_claims_llm",
+               return_value=[LlmClaim("BTC", "bull", 0.35, "dovish -> risk on")]) as mllm:
+        collect_rss(session, src)
+    assert mllm.called
+    c = session.query(Claim).filter_by(asset="BTC").one()
+    assert c.method == "llm" and c.confidence == 0.35
+
+def test_no_gap_fill_when_rule_found_claim(session):
+    from types import SimpleNamespace
+    from unittest.mock import patch
+    from argus.models import Asset, Source
+    session.add(Asset(symbol="BTC", kind="crypto", binance_symbol="BTCUSDT", scorable=True))
+    src = Source(kind="reddit", handle="http://f2", display_name="r/x"); session.add(src); session.commit()
+    entry = SimpleNamespace(id="g2", title="long BTC", summary="", link="http://x/g2",
+                            published_parsed=(2026, 6, 5, 0, 0, 0, 0, 0, 0))
+    feed = SimpleNamespace(entries=[entry])
+    with patch("argus.collectors.rss.feedparser.parse", return_value=feed), \
+         patch("argus.collectors.rss.load_sector_map", return_value={}), \
+         patch("argus.collectors.rss.get_spot_price", return_value=67000.0), \
+         patch("argus.collectors.rss.extract_claims_llm") as mllm:
+        collect_rss(session, src)
+    assert not mllm.called
+
+def test_gap_fill_uses_cache_on_second_run(session):
+    from types import SimpleNamespace
+    from unittest.mock import patch
+    from argus.models import Asset, Source
+    from argus.llm.extractor import LlmClaim
+    session.add(Asset(symbol="BTC", kind="crypto", binance_symbol="BTCUSDT", scorable=True))
+    s1 = Source(kind="news", handle="http://fa", display_name="WSJ"); session.add(s1)
+    s2 = Source(kind="news", handle="http://fb", display_name="MW"); session.add(s2); session.commit()
+    def feed_for(_handle):
+        e = SimpleNamespace(id=None, title="Fed dovish pivot ahead", summary="",
+                            link="http://x/same", published_parsed=(2026,6,5,0,0,0,0,0,0))
+        return SimpleNamespace(entries=[e])
+    with patch("argus.collectors.rss.feedparser.parse", side_effect=lambda h: feed_for(h)), \
+         patch("argus.collectors.rss.load_sector_map", return_value={}), \
+         patch("argus.collectors.rss.get_spot_price", return_value=67000.0), \
+         patch("argus.collectors.rss.extract_claims_llm",
+               return_value=[LlmClaim("BTC","bull",0.35,"r")]) as mllm:
+        collect_rss(session, s1)
+        collect_rss(session, s2)
+    assert mllm.call_count == 1
