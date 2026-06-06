@@ -10,7 +10,7 @@
   `ssh -i "C:\ai\ssh-key-2026-05-19.key" -L 8090:localhost:8080 ubuntu@84.235.174.129` → http://localhost:8090 (horyzont na **1h**, bo 24h/7d/30d dojrzewają wolniej).
 - **Deploy:** `scp -r argus ubuntu@VPS:~/ && ssh ... "cd ~/argus && docker compose up -d --build"`.
 - **Testy (brak python na hoście Windows):** w Dockerze —
-  `docker run --rm -v "<repo>/argus:/app" -w /app -v argus-pipcache:/root/.cache/pip -e PYTHONPATH=/app python:3.12-slim sh -c "pip install -q --trusted-host pypi.org --trusted-host files.pythonhosted.org -r requirements.txt && python -m pytest -q"` (88 testów).
+  `docker run --rm -v "<repo>/argus:/app" -w /app -v argus-pipcache:/root/.cache/pip -e PYTHONPATH=/app python:3.12-slim sh -c "pip install -q --trusted-host pypi.org --trusted-host files.pythonhosted.org -r requirements.txt && python -m pytest -q"` (98 testów).
 
 ## Architektura (pipeline)
 ```
@@ -30,10 +30,11 @@ Ceny: krypto Binance, akcje yfinance. DB: local Postgres (Neon = jednolinijkowy 
 - **Increment 3 — Portfele Hyperliquid** — `Source(kind=hyperliquid)`, collector diffuje pozycje→position-claimy (open/flip), wszystkie pozycje w `wallet_positions` (off-watchlist widoczne, nie scorowane). confidence=position_value/equity. Whale Consensus (`kind=derived`). 30d horizon. Endpointy `/api/wallets*` + sekcja portfeli z preview. Frontend: dodawanie adresów.
 - **Increment 4 — Reddit + stock-news + asocjacja sektorowa** — ekstraktor `rule-v2` (slang WSB, cashtagi). 6 subredditów (`kind=reddit`) + 5 portali (`kind=news`). `sectors.yaml` (alias→ticker, conf 0.3) → sygnał sektorowy trafia na akcje (NTR/NFE/DLNG z newsów). source_type=Source.kind.
 - **Increment 5 — Likwidacje (market-context)** — osobny kontener `liq-listener` (reuse obrazu app) → Binance `!forceOrder@arr` WS (reconnect+circuit breaker) → tabela `liquidations` (tylko watchlist). `parse_force_order` (SELL=long_liq, BUY=short_liq). Endpointy `/api/liquidations?window=` + `/largest`. Panel (czerwony long-liq / zielony short-liq). Prune >30d. **NIE wpływa na scoring** (kontekst).
-- **Increment 6 — LLM topic→ticker (gap-fill) + monitoring** — `llm/` router (Gemini free→OpenRouter free→paid gated) + extractor (wąski prompt+grounding gate, stałe conf 0.35) + cache (text_hash). Gap-fill inline w collect_rss (gdy rule-v2=0). **Monitoring:** `llm_calls` + `/api/llm/usage` + panel (koszt/użycie per provider/model, też free). Judge ODŁOŻONY (Inc 7/8). Klucze w `~/argus/.env` na VPS.
+- **Increment 6 — LLM topic→ticker (gap-fill) + monitoring** — `llm/` router (Gemini free→OpenRouter free→paid gated) + extractor (wąski prompt+grounding gate, stałe conf 0.35) + cache (text_hash). Gap-fill inline w collect_rss (gdy rule-v2=0). **Monitoring:** `llm_calls` + `/api/llm/usage` + panel (koszt/użycie per provider/model, też free). Judge ODŁOŻONY. Klucze w `~/argus/.env` na VPS. Global per-job LLM cap (`LlmBudget`).
+- **Increment 7 — HyperStats leaderboard auto-discovery** — kolektor `collectors/hyperstats.py`: darmowe backdoor JSON `v2-api.hyperstats.org/api/traders` → filtr jakości → insert-only top-N top-traderów HL jako śledzone portfele (`HL <grade> <addr8>`). Dzienny job; reużywa Inc-3 (pozycje→claimy) + `/api/wallets`. Wypełnia lukę „brak leaderboard API" z Inc 3. Bez przeglądarki.
 
 ## Stan na żywo (2026-06-05, po przebiegach)
-- Sources: 4 rss + 6 reddit + 5 news + 2 hyperliquid + 1 derived = 18. Kontenery: db + app + **liq-listener** (WS Binance, 14 symboli).
+- Sources: 4 rss + 6 reddit + 5 news + **~22 hyperliquid (2 ręczne + 20 auto z HyperStats S+)** + 1 derived. Kontenery: db + app + **liq-listener** (WS Binance, 14 symboli).
 - Likwidacje: tabela `liquidations` + endpointy live; rośnie podczas zmienności rynku.
 - **LLM:** gap-fill + monitoring live i DZIAŁA. Fix: domyślny model `gemini-flash-latest` (bo `gemini-2.0-flash` ma free quota=0); modele env-configurable (`ARGUS_GEMINI_MODEL`/`ARGUS_OR_FREE_MODEL`). `/api/llm/usage` pokazał gemini-flash-latest 9 ok / 4690 tok / $0. Claimy method=llm tylko dla itemów z jasnym powiązaniem (grounding gate zwraca [] dla słabych = poprawne). ✅ Global per-job cap wdrożony (`LlmBudget`, `ARGUS_LLM_MAX_PER_RUN=20` na cały przebieg) — ~11 wywołań/job vs ~450 wcześniej, 429-storm zniknął.
 - Items ~545 (rss 261, reddit 150, news 134), claims ~45+ (rule + position).
@@ -41,9 +42,9 @@ Ceny: krypto Binance, akcje yfinance. DB: local Postgres (Neon = jednolinijkowy 
 - Watchlista: 14 krypto (BTC,ETH,XRP,DOT,JUP,HBAR,RENDER,AERO,XAI,ONDO,AEVO,GROK,ALU,RUNE) + 7 akcji (XOMA,BYND,DLNG,LCID,NFE,NTR,PLG) + indeksy/makro (scorable=false).
 
 ## Roadmapa
-- ⏭️ **Increment 7/8 — LLM judge:** ocena claimów LLM przed zapisem; dodać gdy metryki `method=llm` (po reset kwot) pokażą, czy potrzebny. Realny sędzia = outcome-scoring.
-- ⏭️ **Increment X — konta KOL na X/Twitter:** realnie **płatne** (~$0.40/1k tweetów lub $10-500/mc, nieoficjalne, ryzyko ToS). Pierwszy płatny komponent — decyzja budżetowa otwarta. User zainteresowany (najwięcej sygnału).
-- 🔧 **LLM operacyjnie:** odblokować darmowe kwoty (Gemini free / OpenRouter free) lub `ARGUS_LLM_ALLOW_PAID=true` + kredyt — wtedy gap-fill zacznie tworzyć claimy `method=llm`.
+- ⏭️ **Browser-human dla X/Twitter KOL:** Hermes MA już realny Chrome przez CDP (`browser-mcp` steruje chrome-hermes, `chrome-readonly-mcp` czyta żywe karty) — to darmowa ścieżka do X (brak API, login+CF). Hermes(laptop) wyciąga → POST do nowego endpointu ingest Argusa (VPS). Wymaga laptopa+sesji X. Osobny increment.
+- ⏭️ **LLM judge** — gdy `method=llm` uzbiera realne metryki (teraz mało przez grounding gate + throttling). Realny sędzia = outcome-scoring.
+- 🔧 **LLM operacyjnie:** gemini-flash-latest działa; ew. odblokować więcej darmowych kwot lub `ARGUS_LLM_ALLOW_PAID=true` + kredyt.
 
 ## Znane fakty / pułapki
 - Sieć laptopa ma korporacyjny MITM proxy → pip/feedy w kontenerze wymagają `--trusted-host pypi.org --trusted-host files.pythonhosted.org`; feedy SSL-fail lokalnie. VPS czysty. Testy zawsze w Dockerze.
