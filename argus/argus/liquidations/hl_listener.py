@@ -21,12 +21,6 @@ _CIRCUIT_BREAKER_SLEEP = 60
 
 
 def parse_hl_liquidation(event: dict, known_assets: set[str]) -> list[dict]:
-    """Pure: extract liquidation records from a userEvents fill message.
-
-    Liquidation fills have liquidationId != None.
-    Side is inferred from dir field: contains 'Long' -> long_liq, else short_liq.
-    Returns list of dicts ready for insert_hl_liquidations().
-    """
     fills = (event.get("data") or {}).get("fills") or []
     records = []
     for fill in fills:

@@ -98,7 +98,6 @@ def test_parse_no_fills_key():
 
 
 def test_parse_mixed_fills():
-    """One liq fill + one normal fill in same event -> only liq returned."""
     event = {
         "channel": "userEvents",
         "data": {
@@ -111,3 +110,8 @@ def test_parse_mixed_fills():
     recs = parse_hl_liquidation(event, {"BTC"})
     assert len(recs) == 1
     assert recs[0]["raw_symbol"] == "HL_LIQ:1"
+
+def test_parse_zero_liquidation_id_is_valid():
+    recs = parse_hl_liquidation(_event(lid=0), {"BTC"})
+    assert len(recs) == 1
+    assert recs[0]["raw_symbol"] == "HL_LIQ:0"
