@@ -190,3 +190,65 @@ def test_wallet_positions_not_modified(session):
     insert_hl_liquidations(session, [_rec(lid=99)])
     session.refresh(wp)
     assert wp.open is True
+
+
+import asyncio
+from unittest.mock import AsyncMock, MagicMock, patch
+from argus.liquidations.hl_listener import _load_wallets, _load_known_assets
+
+
+def test_load_wallets(session):
+    session.add(Source(handle="0xaaa", kind="hyperliquid", active=True, display_name="a"))
+    session.add(Source(handle="0xbbb", kind="hyperliquid", active=True, display_name="b"))
+    session.add(Source(handle="0xccc", kind="rss", active=True, display_name="c"))
+    session.add(Source(handle="0xddd", kind="hyperliquid", active=False, display_name="d"))
+    session.commit()
+    addrs = _load_wallets(session)
+    assert addrs == {"0xaaa", "0xbbb"}
+
+
+def test_load_known_assets(session):
+    session.add(Asset(symbol="BTC", kind="crypto", scorable=True))
+    session.add(Asset(symbol="TOTAL", kind="index", scorable=False))
+    session.commit()
+    assets = _load_known_assets(session)
+    assert "BTC" in assets
+    assert "TOTAL" in assets
+
+
+def test_wallet_task_reconnects():
+    connect_count = 0
+
+    async def fake_connect(*args, **kwargs):
+        nonlocal connect_count
+        connect_count += 1
+        if connect_count == 1:
+            raise ConnectionError("forced")
+        ws = AsyncMock()
+        ws.__aenter__ = AsyncMock(return_value=ws)
+        ws.__aexit__ = AsyncMock(return_value=False)
+        ws.send = AsyncMock()
+        ws.recv = AsyncMock(side_effect=asyncio.CancelledError())
+        return ws
+
+    async def run_task():
+        from argus.liquidations.hl_listener import _wallet_task
+        try:
+            await asyncio.wait_for(
+                _wallet_task("0xabc", frozenset({"BTC"})),
+                timeout=0.3,
+            )
+        except (asyncio.TimeoutError, asyncio.CancelledError):
+            pass
+
+    with patch("argus.liquidations.hl_listener.websockets.connect", side_effect=fake_connect), \
+         patch("argus.liquidations.hl_listener.SessionLocal") as mock_sl, \
+         patch("argus.liquidations.hl_listener.asyncio.sleep", new_callable=AsyncMock):
+        mock_s = MagicMock()
+        mock_s.__enter__ = MagicMock(return_value=mock_s)
+        mock_s.__exit__ = MagicMock(return_value=False)
+        mock_s.scalar.return_value = None
+        mock_sl.return_value = mock_s
+        asyncio.run(run_task())
+
+    assert connect_count >= 2
