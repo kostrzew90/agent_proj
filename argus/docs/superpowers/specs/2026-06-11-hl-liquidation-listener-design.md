@@ -56,20 +56,23 @@ Runtime loop
       ├── userEvents + liquidation key → handle_liquidation()
       └── userEvents + other keys (fills, etc.) → ignore
 
-handle_liquidation(wallet_address, event_ts)
+handle_liquidation(wallet_address, lid, event_ts)
+  └── dedup: skip if liquidations table already has raw_symbol='HL_LIQ:<lid>'
   └── load open wallet_positions for this source_id
   └── filter to positions where coin ∈ assets
   └── for each position → insert Liquidation(
           asset=coin,
           exchange='hyperliquid',
           side='long_liq' if side=='long' else 'short_liq',
-          price=entry_px,          # best available; not exact liq price
+          price=entry_px,          # whale's entry price; exact liq price not in HL event
           qty=abs(szi),
           notional_usd=position_value,
-          raw_symbol=coin,
+          raw_symbol='HL_LIQ:<lid>',
           ts=event_ts
       )
-  └── mark wallet_positions.open=False for liquidated wallet
+  └── DO NOT mark wallet_positions.open=False here
+      (HL liquidates positions selectively — isolated-margin positions can survive;
+       collect_wallet re-syncs true state from REST within 15 min)
 
 Dynamic re-sync (every 30 min)
   └── query sources for new wallets
@@ -123,12 +126,21 @@ HL `liquidation` event does NOT include the exact liquidation price per asset. W
 ## Data Flow
 
 ```
-HL WS → liquidation event for 0xABC
+HL WS → liquidation event for 0xABC (lid=12345)
+  → dedup: SELECT 1 FROM liquidations WHERE raw_symbol='HL_LIQ:12345' → skip if exists
   → SELECT wallet_positions WHERE source.handle='0xABC' AND open=true
   → filter: coin IN ('BTC','ETH','XRP',...) [assets table]
-  → INSERT INTO liquidations (asset=coin, exchange='hyperliquid', ...)
-  → UPDATE wallet_positions SET open=false WHERE source_id=X
+  → INSERT INTO liquidations (asset=coin, exchange='hyperliquid', raw_symbol='HL_LIQ:12345', ...)
+  → wallet_positions NOT touched (collect_wallet syncs REST truth within 15 min)
 ```
+
+### Claim lifecycle on liquidation (intentional design)
+
+Pending `Claim` records from a liquidated wallet remain `status='open'` and are evaluated at their scheduled 1h/24h/7d horizons based on price — not at the liquidation price.
+
+**Why this is correct:** Argus measures directional accuracy ("did price go the way this source predicted?"), not position survival. A whale who closes voluntarily at -15% also gets evaluated by horizon price, not exit price. Treating liquidation differently would make the metric inconsistent. A whale with correct direction but excessive leverage should score by price, not by leverage failure.
+
+**Consequence:** if a whale is liquidated at a loss but price recovers by the 24h horizon, the claim may score `hit=True`. This is accepted — it measures the signal's direction, not risk management quality. Revisit after 30d of data whether liquidation events actually predict future misses (as recommended by Fable).
 
 ---
 
@@ -159,8 +171,10 @@ HL WS → liquidation event for 0xABC
 | `test_parse_hl_liquidation_event` | Valid event → returns per-asset records for watchlist coins only |
 | `test_parse_hl_liquidation_event_unknown_coin` | Coin not in assets → skipped, no error |
 | `test_parse_hl_liquidation_event_no_open_positions` | No open positions → empty result, no crash |
+| `test_hl_liquidation_dedup` | Second event with same `lid` → no duplicate inserted |
 | `test_hl_listener_reconnect` | On exception → reconnects with backoff |
 | `test_hl_listener_dynamic_subscribe` | New wallet added mid-run → subscribed without restart |
+| `test_wallet_positions_not_modified_on_liquidation` | liquidation event → `wallet_positions.open` unchanged |
 
 ---
 
