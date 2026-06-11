@@ -115,3 +115,78 @@ def test_parse_zero_liquidation_id_is_valid():
     recs = parse_hl_liquidation(_event(lid=0), {"BTC"})
     assert len(recs) == 1
     assert recs[0]["raw_symbol"] == "HL_LIQ:0"
+
+from argus.models import Asset, Liquidation, Source, WalletPosition
+from argus.liquidations.hl_listener import insert_hl_liquidations
+
+
+def _btc(session):
+    a = Asset(symbol="BTC", kind="crypto", scorable=True)
+    session.add(a)
+    session.commit()
+    return a
+
+
+def _rec(lid=1, asset="BTC"):
+    from datetime import datetime, timezone
+    return {
+        "asset": asset,
+        "exchange": "hyperliquid",
+        "side": "long_liq",
+        "price": 60000.0,
+        "qty": 0.5,
+        "notional_usd": 30000.0,
+        "raw_symbol": f"HL_LIQ:{lid}",
+        "ts": datetime.now(timezone.utc),
+    }
+
+
+def test_insert_basic(session):
+    _btc(session)
+    n = insert_hl_liquidations(session, [_rec(lid=1)])
+    assert n == 1
+    row = session.query(Liquidation).one()
+    assert row.asset == "BTC"
+    assert row.exchange == "hyperliquid"
+    assert row.side == "long_liq"
+    assert row.raw_symbol == "HL_LIQ:1"
+    assert row.created_at is not None
+
+
+def test_insert_dedup_same_lid(session):
+    _btc(session)
+    insert_hl_liquidations(session, [_rec(lid=7)])
+    n = insert_hl_liquidations(session, [_rec(lid=7)])
+    assert n == 0
+    assert session.query(Liquidation).count() == 1
+
+
+def test_insert_different_lids(session):
+    _btc(session)
+    insert_hl_liquidations(session, [_rec(lid=1)])
+    insert_hl_liquidations(session, [_rec(lid=2)])
+    assert session.query(Liquidation).count() == 2
+
+
+def test_insert_empty(session):
+    n = insert_hl_liquidations(session, [])
+    assert n == 0
+
+
+def test_wallet_positions_not_modified(session):
+    from datetime import datetime, timezone
+    _btc(session)
+    src = Source(handle="0xabc", kind="hyperliquid", display_name="test", active=True)
+    session.add(src)
+    session.commit()
+    wp = WalletPosition(
+        source_id=src.id, coin="BTC", side="long",
+        szi=0.5, entry_px=60000.0, position_value=30000.0,
+        opened_ts=datetime.now(timezone.utc),
+        last_seen_ts=datetime.now(timezone.utc), open=True,
+    )
+    session.add(wp)
+    session.commit()
+    insert_hl_liquidations(session, [_rec(lid=99)])
+    session.refresh(wp)
+    assert wp.open is True

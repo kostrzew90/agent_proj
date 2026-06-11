@@ -45,3 +45,27 @@ def parse_hl_liquidation(event: dict, known_assets: set[str]) -> list[dict]:
             "ts": datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc),
         })
     return records
+
+
+
+def insert_hl_liquidations(session, records: list[dict]) -> int:
+    if not records:
+        return 0
+    lid_key = records[0]["raw_symbol"]
+    if session.scalar(select(Liquidation).where(Liquidation.raw_symbol == lid_key)):
+        return 0
+    now = datetime.now(timezone.utc)
+    for r in records:
+        session.add(Liquidation(
+            asset=r["asset"],
+            exchange=r["exchange"],
+            side=r["side"],
+            price=r["price"],
+            qty=r["qty"],
+            notional_usd=r["notional_usd"],
+            ts=r["ts"],
+            raw_symbol=r["raw_symbol"],
+            created_at=now,
+        ))
+    session.commit()
+    return len(records)
