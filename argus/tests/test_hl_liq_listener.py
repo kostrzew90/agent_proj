@@ -217,38 +217,39 @@ def test_load_known_assets(session):
 
 
 def test_wallet_task_reconnects():
+    # asyncio.sleep mock that returns immediately has no yield point,
+    # so wait_for timeout never fires — use real sleep(0) via a counter cap instead
     connect_count = 0
-
-    async def fake_connect(*args, **kwargs):
-        nonlocal connect_count
-        connect_count += 1
-        if connect_count == 1:
-            raise ConnectionError("forced")
-        ws = AsyncMock()
-        ws.__aenter__ = AsyncMock(return_value=ws)
-        ws.__aexit__ = AsyncMock(return_value=False)
-        ws.send = AsyncMock()
-        ws.recv = AsyncMock(side_effect=asyncio.CancelledError())
-        return ws
+    MAX_ATTEMPTS = 3
 
     async def run_task():
-        from argus.liquidations.hl_listener import _wallet_task
-        try:
-            await asyncio.wait_for(
-                _wallet_task("0xabc", frozenset({"BTC"})),
-                timeout=0.3,
-            )
-        except (asyncio.TimeoutError, asyncio.CancelledError):
-            pass
+        nonlocal connect_count
 
-    with patch("argus.liquidations.hl_listener.websockets.connect", side_effect=fake_connect), \
-         patch("argus.liquidations.hl_listener.SessionLocal") as mock_sl, \
-         patch("argus.liquidations.hl_listener.asyncio.sleep", new_callable=AsyncMock):
+        async def fake_connect(*args, **kwargs):
+            nonlocal connect_count
+            connect_count += 1
+            if connect_count >= MAX_ATTEMPTS:
+                # stop the loop by raising CancelledError on 3rd attempt
+                raise asyncio.CancelledError()
+            raise ConnectionError("forced disconnect")
+
         mock_s = MagicMock()
         mock_s.__enter__ = MagicMock(return_value=mock_s)
         mock_s.__exit__ = MagicMock(return_value=False)
         mock_s.scalar.return_value = None
-        mock_sl.return_value = mock_s
-        asyncio.run(run_task())
 
+        # Use real asyncio.sleep(0) — yields control without blocking
+        async def instant_sleep(_):
+            await asyncio.sleep(0)
+
+        with patch("argus.liquidations.hl_listener.websockets.connect", side_effect=fake_connect), \
+             patch("argus.liquidations.hl_listener.SessionLocal", return_value=mock_s), \
+             patch("argus.liquidations.hl_listener.asyncio.sleep", side_effect=instant_sleep):
+            from argus.liquidations.hl_listener import _wallet_task
+            try:
+                await _wallet_task("0xabc", frozenset({"BTC"}))
+            except asyncio.CancelledError:
+                pass
+
+    asyncio.run(run_task())
     assert connect_count >= 2
