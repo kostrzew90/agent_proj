@@ -33,11 +33,12 @@ def _passes_filter(t: dict, min_win_rate: float, min_trades: int, max_age_days: 
     except Exception:
         return False
 
-def sync_top_traders(session, top_n: int = 20, min_win_rate: float = 0.5,
+def sync_top_traders(session, top_n: int = 30, min_win_rate: float = 0.5,
                      min_trades: int = 50, max_age_days: int = 14) -> dict:
     now = datetime.now(timezone.utc)
-    stats = {"fetched": 0, "passed_filter": 0, "added": 0,
-             "skipped_existing": 0, "skipped_inactive": 0, "errors": 0}
+    stats = {"fetched": 0, "passed_filter": 0, "added": 0, "grade_updated": 0,
+             "skipped_existing": 0, "skipped_inactive": 0,
+             "not_on_leaderboard": 0, "errors": 0}
     try:
         traders = fetch_leaderboard(limit=max(top_n * 3, 100))
     except Exception as e:
@@ -45,8 +46,32 @@ def sync_top_traders(session, top_n: int = 20, min_win_rate: float = 0.5,
         stats["errors"] += 1
         return stats
     stats["fetched"] = len(traders)
+
+    # address → trader data for O(1) lookup
+    trader_map = {(t.get("address") or "").lower(): t for t in traders
+                  if (t.get("address") or "").startswith("0x")}
+
     passed = [t for t in traders if _passes_filter(t, min_win_rate, min_trades, max_age_days, now)]
     stats["passed_filter"] = len(passed)
+
+    # refresh grade for already-tracked HL wallets; warn about dropouts
+    hl_sources = list(session.scalars(
+        select(Source).where(Source.kind == "hyperliquid", Source.active == True)))
+    for src in hl_sources:
+        addr = src.handle.lower()
+        if addr in trader_map:
+            grade = trader_map[addr].get("grade") or "?"
+            expected = f"HL {grade} {addr[:8]}"
+            if src.display_name.startswith("HL ") and src.display_name != expected:
+                logger.info("hyperstats: grade change %s → %s", src.display_name, expected)
+                src.display_name = expected
+                stats["grade_updated"] += 1
+        elif src.display_name.startswith("HL "):
+            # not in current top-100 — log but don't auto-deactivate (needs N consecutive misses)
+            logger.warning("hyperstats: %s not in top-100 leaderboard", src.display_name)
+            stats["not_on_leaderboard"] += 1
+
+    # add new wallets from top_n of passed
     for t in passed[:top_n]:
         addr = (t.get("address") or "").lower()
         if not addr.startswith("0x"):
@@ -56,13 +81,14 @@ def sync_top_traders(session, top_n: int = 20, min_win_rate: float = 0.5,
             if existing.active:
                 stats["skipped_existing"] += 1
             else:
-                logger.info("hyperstats: %s tracked but manually deactivated — skipping", addr)
+                logger.info("hyperstats: %s manually deactivated — skipping", addr)
                 stats["skipped_inactive"] += 1
             continue
         grade = t.get("grade") or "?"
         session.add(Source(kind="hyperliquid", handle=addr,
                            display_name=f"HL {grade} {addr[:8]}", active=True))
         stats["added"] += 1
+
     session.commit()
     logger.info("hyperstats sync: %s", stats)
     return stats
