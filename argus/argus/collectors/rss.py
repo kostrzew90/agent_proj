@@ -90,8 +90,13 @@ def collect_rss(session, source, llm_budget=None) -> int:
             if cached is not None:
                 triples = [(c["asset"], c["direction"], c.get("reasoning", "")) for c in cached]
                 stats["cache_hit"] += 1
-            elif llm_budget.allow():
-                llm_claims = extract_claims_llm(text, assets, sector_map)
+            elif source.kind == "reddit" and llm_budget.allow():
+                try:
+                    llm_claims = extract_claims_llm(text, assets, sector_map)
+                except Exception as e:
+                    logger.warning("llm extract failed (no cache): %s", e)
+                    triples = []
+                    continue
                 cache_put(session, h, [{"asset": c.asset_symbol, "direction": c.direction,
                                         "reasoning": c.reasoning} for c in llm_claims])
                 triples = [(c.asset_symbol, c.direction, c.reasoning) for c in llm_claims]

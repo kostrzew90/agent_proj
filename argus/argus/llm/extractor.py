@@ -50,11 +50,12 @@ def _extract_json(raw: str):
 
 def extract_claims_llm(text: str, assets, sector_map: dict | None = None) -> list[LlmClaim]:
     known = {a.symbol for a in assets}
+    # call_llm exceptions (429, circuit open) propagate — caller must NOT cache on failure
+    raw = call_llm(build_prompt(text, assets, sector_map), system=_SYSTEM, max_tokens=400)
     try:
-        raw = call_llm(build_prompt(text, assets, sector_map), system=_SYSTEM, max_tokens=400)
         data = _extract_json(raw)
     except Exception as e:
-        logger.warning("llm extract failed: %s", e)
+        logger.warning("llm json parse failed: %s", e)
         return []
     if not isinstance(data, list):
         return []
