@@ -44,6 +44,29 @@ def _hyperliquid_job():
                 logging.getLogger(__name__).warning("HL collect failed %s: %s", src.handle, e)
         compute_consensus(s)
 
+def _insider_job():
+    from argus.collectors.insider import collect_insider, _EXCHANGE
+    from argus.models import Asset
+    with SessionLocal() as s:
+        stocks = list(s.scalars(
+            select(Asset).where(Asset.kind == "stock", Asset.scorable == True)  # noqa: E712
+        ))
+        for asset in stocks:
+            if asset.symbol not in _EXCHANGE:
+                continue
+            src = s.scalar(select(Source).where(
+                Source.kind == "insider", Source.handle == f"insider:{asset.symbol}"
+            ))
+            if src is None:
+                src = Source(kind="insider", handle=f"insider:{asset.symbol}",
+                             display_name=f"{asset.symbol} Insiders", active=True)
+                s.add(src); s.commit(); s.refresh(src)
+            try:
+                collect_insider(s, src, asset.symbol, asset)
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning("insider job failed %s: %s", asset.symbol, e)
+
 def _hyperstats_job():
     import os
     with SessionLocal() as s:
@@ -71,6 +94,7 @@ def bootstrap():
     sched.add_interval("score", _score_job, minutes=360)
     sched.add_interval("hyperliquid", _hyperliquid_job, minutes=15)
     sched.add_interval("hyperstats", _hyperstats_job, minutes=1440)
+    sched.add_interval("insider", _insider_job, minutes=720)
     sched.start()
 
 if __name__ == "__main__":
