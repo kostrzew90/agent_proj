@@ -7,6 +7,7 @@ from sqlalchemy import select, func, case
 from argus.db import SessionLocal
 from argus.models import Source, SourceScore, SourceAssetScore, Claim, Outcome, Asset, WalletPosition, Liquidation, LlmCall
 from argus.analytics import trend_lean
+from argus.scorer import argus_grade
 from argus.charts import get_candles
 from argus.hyperliquid import fetch_positions
 
@@ -96,13 +97,19 @@ _ADDR = re.compile(r"^0x[0-9a-fA-F]{40}$")
 async def wallets(session=Depends(get_session)):
     out = []
     for src in session.scalars(select(Source).where(Source.kind == "hyperliquid")):
-        scores = {sc.horizon: sc.hit_rate for sc in session.scalars(
+        score_rows = {sc.horizon: sc for sc in session.scalars(
             select(SourceScore).where(SourceScore.source_id == src.id))}
         active = session.scalar(select(func.count()).select_from(WalletPosition).where(
             WalletPosition.source_id == src.id, WalletPosition.open == True)) or 0  # noqa: E712
+        # pick best horizon for argus grade: 24h preferred, fallback 7d → 1h
+        sc = score_rows.get("24h") or score_rows.get("7d") or score_rows.get("1h")
+        grade = argus_grade(sc.decayed_score, sc.n_claims) if sc else "?"
         out.append({"id": src.id, "display_name": src.display_name, "handle": src.handle,
-                    "active": src.active, "acc_24h": scores.get("24h"),
-                    "acc_7d": scores.get("7d"), "acc_30d": scores.get("30d"),
+                    "active": src.active,
+                    "argus_grade": grade,
+                    "acc_24h": score_rows["24h"].hit_rate if "24h" in score_rows else None,
+                    "acc_7d":  score_rows["7d"].hit_rate  if "7d"  in score_rows else None,
+                    "acc_30d": score_rows["30d"].hit_rate if "30d" in score_rows else None,
                     "active_positions": active})
     return out
 

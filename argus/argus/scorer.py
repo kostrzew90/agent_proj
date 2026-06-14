@@ -4,6 +4,23 @@ from collections import defaultdict
 from sqlalchemy import select, delete
 from argus.models import Claim, Outcome, SourceAssetScore, SourceScore
 
+_GRADE_THRESHOLDS = [
+    (0.70, "S"),
+    (0.60, "A"),
+    (0.52, "B"),
+    (0.45, "C"),
+    (0.00, "D"),
+]
+
+def argus_grade(decayed_score: float, n_claims: int, min_claims: int = 5) -> str:
+    """Letter grade from Argus's own outcome data. '?' until min_claims reached."""
+    if n_claims < min_claims:
+        return "?"
+    for threshold, letter in _GRADE_THRESHOLDS:
+        if decayed_score >= threshold:
+            return letter
+    return "D"
+
 def _age_days(now: datetime, entry_ts: datetime) -> float:
     ets = entry_ts if entry_ts.tzinfo else entry_ts.replace(tzinfo=timezone.utc)
     return (now - ets).total_seconds() / 86400.0

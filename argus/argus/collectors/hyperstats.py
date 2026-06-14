@@ -4,7 +4,7 @@ from datetime import datetime, timezone, timedelta
 import httpx
 from sqlalchemy import select
 
-from argus.models import Source
+from argus.models import Source, SourceScore
 
 logger = logging.getLogger(__name__)
 _URL = "https://v2-api.hyperstats.org/api/traders"
@@ -54,21 +54,28 @@ def sync_top_traders(session, top_n: int = 30, min_win_rate: float = 0.5,
     passed = [t for t in traders if _passes_filter(t, min_win_rate, min_trades, max_age_days, now)]
     stats["passed_filter"] = len(passed)
 
+    _ARGUS_GRADE_MIN_CLAIMS = 5  # once Argus has this many claims, its grade takes over
+
     # refresh grade for already-tracked HL wallets; warn about dropouts
     hl_sources = list(session.scalars(
         select(Source).where(Source.kind == "hyperliquid", Source.active == True)))
     for src in hl_sources:
         addr = src.handle.lower()
+        # skip grade update if Argus already has enough data on this wallet
+        sc = session.scalar(select(SourceScore).where(
+            SourceScore.source_id == src.id, SourceScore.horizon == "24h"))
+        has_argus_data = sc is not None and sc.n_claims >= _ARGUS_GRADE_MIN_CLAIMS
         if addr in trader_map:
-            grade = trader_map[addr].get("grade") or "?"
-            expected = f"HL {grade} {addr[:8]}"
-            if src.display_name.startswith("HL ") and src.display_name != expected:
-                logger.info("hyperstats: grade change %s → %s", src.display_name, expected)
-                src.display_name = expected
-                stats["grade_updated"] += 1
+            if not has_argus_data:
+                grade = trader_map[addr].get("grade") or "?"
+                expected = f"HL {grade} {addr[:8]}"
+                if src.display_name.startswith("HL ") and src.display_name != expected:
+                    logger.info("hyperstats: grade init %s → %s", src.display_name, expected)
+                    src.display_name = expected
+                    stats["grade_updated"] += 1
         elif src.display_name.startswith("HL "):
-            # not in current top-100 — log but don't auto-deactivate (needs N consecutive misses)
-            logger.warning("hyperstats: %s not in top-100 leaderboard", src.display_name)
+            # not in current top-100 — log but keep tracking (Argus has its own opinion)
+            logger.info("hyperstats: %s not in top-100 — still tracking", src.display_name)
             stats["not_on_leaderboard"] += 1
 
     # add new wallets from top_n of passed
