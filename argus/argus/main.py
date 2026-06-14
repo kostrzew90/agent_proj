@@ -67,6 +67,30 @@ def _insider_job():
                 import logging
                 logging.getLogger(__name__).warning("insider job failed %s: %s", asset.symbol, e)
 
+def _edgar_job():
+    from argus.collectors.edgar import collect_edgar_insider, get_cik
+    from argus.models import Asset
+    with SessionLocal() as s:
+        stocks = list(s.scalars(
+            select(Asset).where(Asset.kind == "stock", Asset.scorable == True)  # noqa: E712
+        ))
+        for asset in stocks:
+            cik = get_cik(asset.symbol)
+            if cik is None:
+                continue
+            src = s.scalar(select(Source).where(
+                Source.kind == "edgar", Source.handle == f"edgar:{asset.symbol}"
+            ))
+            if src is None:
+                src = Source(kind="edgar", handle=f"edgar:{asset.symbol}",
+                             display_name=f"{asset.symbol} SEC Form4", active=True)
+                s.add(src); s.commit(); s.refresh(src)
+            try:
+                collect_edgar_insider(s, src, asset.symbol, cik, asset)
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning("edgar job failed %s: %s", asset.symbol, e)
+
 def _hyperstats_job():
     import os
     with SessionLocal() as s:
@@ -95,6 +119,7 @@ def bootstrap():
     sched.add_interval("hyperliquid", _hyperliquid_job, minutes=15)
     sched.add_interval("hyperstats", _hyperstats_job, minutes=1440)
     sched.add_interval("insider", _insider_job, minutes=720)
+    sched.add_interval("edgar", _edgar_job, minutes=360)
     sched.start()
 
 if __name__ == "__main__":
