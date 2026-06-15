@@ -11,7 +11,7 @@ from sqlalchemy import select
 
 from argus.collectors.insider import InsiderTransaction, _confidence
 from argus.models import Claim, ClaimAudit, Item, Source
-from argus.prices import get_spot_price
+from argus.prices import get_historical_price, get_spot_price
 
 logger = logging.getLogger(__name__)
 
@@ -175,18 +175,22 @@ def collect_edgar_insider(session, source: Source, symbol: str,
             session.add(item)
             session.flush()
 
+            # entry anchored to transaction date — not detection time
             try:
-                entry_price = get_spot_price(asset)
-            except Exception as e:
-                logger.warning("edgar: no price for %s: %s", symbol, e)
-                continue
+                entry_price = get_historical_price(asset, tx.date)
+            except Exception:
+                try:
+                    entry_price = get_spot_price(asset)
+                except Exception as e:
+                    logger.warning("edgar: no price for %s: %s", symbol, e)
+                    continue
 
             claim = Claim(
                 source_id=source.id, item_id=item.id,
                 asset=symbol, direction="bull",
                 confidence=_confidence(tx.total_value),
                 method="insider", entry_price=entry_price,
-                entry_ts=now, status="open",
+                entry_ts=tx.date, status="open",
             )
             session.add(claim)
             session.flush()

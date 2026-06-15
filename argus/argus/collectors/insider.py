@@ -8,7 +8,7 @@ from bs4 import BeautifulSoup
 from sqlalchemy import select
 
 from argus.models import Asset, Claim, ClaimAudit, Item, Source
-from argus.prices import get_spot_price
+from argus.prices import get_historical_price, get_spot_price
 
 logger = logging.getLogger(__name__)
 
@@ -164,18 +164,22 @@ def collect_insider(session, source: Source, symbol: str, asset) -> int:
         session.add(item)
         session.flush()
 
+        # entry anchored to transaction date — not detection time
         try:
-            entry_price = get_spot_price(asset)
-        except Exception as e:
-            logger.warning("insider: no price for %s: %s", symbol, e)
-            continue
+            entry_price = get_historical_price(asset, tx.date)
+        except Exception:
+            try:
+                entry_price = get_spot_price(asset)
+            except Exception as e:
+                logger.warning("insider: no price for %s: %s", symbol, e)
+                continue
 
         conf = _confidence(tx.total_value)
         claim = Claim(
             source_id=source.id, item_id=item.id,
             asset=symbol, direction="bull",
             confidence=conf, method="insider",
-            entry_price=entry_price, entry_ts=now,
+            entry_price=entry_price, entry_ts=tx.date,
             status="open",
         )
         session.add(claim)
