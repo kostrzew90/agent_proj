@@ -131,6 +131,15 @@ class Liquidation(Base):
     raw_symbol: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
+class MacroData(Base):
+    __tablename__ = "macro_data"
+    __table_args__ = (UniqueConstraint("series_id", "obs_date"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    series_id: Mapped[str] = mapped_column(String)             # FRED series id
+    obs_date: Mapped[datetime] = mapped_column(DateTime(timezone=False))
+    value: Mapped[float] = mapped_column(Float)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
 class LlmCache(Base):
     __tablename__ = "llm_cache"
     text_hash: Mapped[str] = mapped_column(String, primary_key=True)

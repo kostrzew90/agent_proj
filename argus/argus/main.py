@@ -67,6 +67,16 @@ def _insider_job():
                 import logging
                 logging.getLogger(__name__).warning("insider job failed %s: %s", asset.symbol, e)
 
+def _fred_job():
+    import os
+    api_key = os.getenv("FRED_API_KEY", "")
+    if not api_key:
+        import logging; logging.getLogger(__name__).warning("FRED_API_KEY not set — skipping")
+        return
+    from argus.collectors.fred import collect_fred
+    with SessionLocal() as s:
+        collect_fred(s, api_key=api_key, lookback=24)
+
 def _edgar_job():
     from argus.collectors.edgar import collect_edgar_insider, get_cik
     from argus.models import Asset
@@ -119,6 +129,7 @@ def bootstrap():
     sched.add_interval("hyperliquid", _hyperliquid_job, minutes=15)
     sched.add_interval("hyperstats", _hyperstats_job, minutes=1440)
     sched.add_interval("insider", _insider_job, minutes=720)
+    sched.add_interval("fred", _fred_job, minutes=1440)
     sched.add_interval("edgar", _edgar_job, minutes=360)
     sched.start()
 

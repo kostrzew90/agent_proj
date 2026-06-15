@@ -5,7 +5,7 @@ from fastapi import FastAPI, Depends, HTTPException
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select, func, case
 from argus.db import SessionLocal
-from argus.models import Source, SourceScore, SourceAssetScore, Claim, Outcome, Asset, WalletPosition, Liquidation, LlmCall
+from argus.models import Source, SourceScore, SourceAssetScore, Claim, Outcome, Asset, WalletPosition, Liquidation, LlmCall, MacroData
 from argus.analytics import trend_lean
 from argus.scorer import argus_grade
 from argus.charts import get_candles
@@ -190,6 +190,11 @@ async def llm_usage(window: str = "24h", session=Depends(get_session)):
           "cost_usd": round(float(cost or 0), 6), "avg_latency_ms": int(lat or 0)}
          for p, m, c, ok, ti, to, cost, lat in rows],
         key=lambda r: -r["calls"])
+
+@app.get("/api/macro")
+async def macro(session=Depends(get_session)):
+    from argus.collectors.fred import get_latest_macro, SERIES
+    return get_latest_macro(session)
 
 # static dashboard (created later in Task 12)
 _web = Path(__file__).parent / "web"
