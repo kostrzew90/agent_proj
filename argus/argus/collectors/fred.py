@@ -89,6 +89,59 @@ def collect_fred(session, api_key: str, lookback: int = 12) -> dict:
     return stats
 
 
+def macro_regime_score(latest: dict) -> float:
+    """Compute macro regime from latest FRED values.
+
+    Returns float [-1, +1]:
+      +1  = strong risk-on  (low rates, positive curve, weak USD)
+       0  = neutral
+      -1  = strong risk-off (high rates, inverted curve, strong USD)
+
+    Only uses series present in `latest`; missing series contribute 0.
+    """
+    score = 0.0
+
+    # Fed Funds Rate: low = risk-on, high = risk-off
+    dff = latest.get("DFF", {}).get("value")
+    if dff is not None:
+        if dff < 2.5:   score += 0.35
+        elif dff < 3.5: score += 0.15
+        elif dff < 4.5: score += 0.0
+        elif dff < 5.5: score -= 0.15
+        else:           score -= 0.35
+
+    # Yield curve (10Y-2Y): positive = healthy, inverted = recession risk
+    t2y = latest.get("T10Y2Y", {}).get("value")
+    if t2y is not None:
+        if t2y > 0.75:    score += 0.30
+        elif t2y > 0.25:  score += 0.15
+        elif t2y > -0.25: score += 0.0
+        elif t2y > -0.75: score -= 0.20
+        else:             score -= 0.35
+
+    # USD strength: strong dollar = bearish for crypto/risk assets
+    usd = latest.get("DTWEXBGS", {}).get("value")
+    if usd is not None:
+        if usd < 108:   score += 0.15
+        elif usd < 115: score += 0.05
+        elif usd < 122: score -= 0.05
+        else:           score -= 0.15
+
+    return max(-1.0, min(1.0, score))
+
+
+def macro_prior(regime: float, base_alpha: float = 2.0,
+                base_beta: float = 2.0, max_shift: float = 0.5) -> tuple[float, float]:
+    """Shift Bayesian prior (alpha, beta) based on macro regime.
+
+    regime=+1 → alpha shifts up by max_shift, beta shifts down
+    regime= 0 → no change
+    regime=-1 → alpha shifts down, beta shifts up
+    """
+    shift = regime * max_shift
+    return (base_alpha + shift, base_beta - shift)
+
+
 def get_latest_macro(session) -> dict:
     """Return latest value per series as {series_id: {value, date, label}}."""
     rows = session.execute(

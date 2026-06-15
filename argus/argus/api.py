@@ -193,8 +193,13 @@ async def llm_usage(window: str = "24h", session=Depends(get_session)):
 
 @app.get("/api/macro")
 async def macro(session=Depends(get_session)):
-    from argus.collectors.fred import get_latest_macro, SERIES
-    return get_latest_macro(session)
+    from argus.collectors.fred import get_latest_macro, macro_regime_score
+    latest = get_latest_macro(session)
+    regime = macro_regime_score(latest)
+    if regime > 0.25:    label = "risk-on"
+    elif regime < -0.25: label = "risk-off"
+    else:                label = "neutral"
+    return {"series": latest, "regime": round(regime, 3), "regime_label": label}
 
 # static dashboard (created later in Task 12)
 _web = Path(__file__).parent / "web"
