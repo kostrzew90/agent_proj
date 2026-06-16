@@ -158,3 +158,15 @@ class LlmCall(Base):
     latency_ms: Mapped[int] = mapped_column(Integer, default=0)
     ok: Mapped[bool] = mapped_column(Boolean)
     error: Mapped[str | None] = mapped_column(String, nullable=True)
+
+class LlmQueue(Base):
+    __tablename__ = "llm_queue"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    item_id: Mapped[int] = mapped_column(ForeignKey("items.id"), unique=True)
+    text_hash: Mapped[str] = mapped_column(String)
+    source_kind: Mapped[str] = mapped_column(String)        # reddit|news
+    status: Mapped[str] = mapped_column(String)             # pending|done|failed
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    enqueued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_error: Mapped[str | None] = mapped_column(String, nullable=True)
