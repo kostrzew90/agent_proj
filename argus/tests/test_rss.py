@@ -64,13 +64,18 @@ def test_collect_emits_sector_claim(session):
     assert c.direction == "bull" and c.confidence == 0.3
 
 def test_collect_rss_no_inline_llm(session):
-    """collect_rss must not call extract_claims_llm directly — it enqueues instead."""
-    with patch("argus.llm.extractor.extract_claims_llm") as mock_llm:
-        source = Source(handle="http://example.com/rss", kind="reddit", display_name="test", active=True)
-        session.add(source); session.commit()
-        with patch("feedparser.parse", return_value=MagicMock(entries=[])):
-            collect_rss(session, source)
-        mock_llm.assert_not_called()
+    """collect_rss enqueues for batch, never calls extract_claims_llm inline."""
+    source = Source(handle="http://example.com/rss", kind="reddit", display_name="test", active=True)
+    session.add(source); session.commit()
+    entry = SimpleNamespace(
+        id="z1", title="Fed signals dovish pivot", summary="",
+        link="http://x/z1", published_parsed=(2026, 6, 5, 0, 0, 0, 0, 0, 0)
+    )
+    with patch("argus.collectors.rss.enqueue_for_llm") as mock_enq, \
+         patch("feedparser.parse", return_value=SimpleNamespace(entries=[entry])), \
+         patch("argus.collectors.rss.load_sector_map", return_value={}):
+        collect_rss(session, source)
+    mock_enq.assert_called_once()
 
 def test_gap_fill_enqueues_when_rule_empty(session):
     """When rule parser finds no claims and source is reddit/news, item is enqueued."""
