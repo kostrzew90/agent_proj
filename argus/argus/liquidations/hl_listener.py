@@ -99,9 +99,9 @@ async def _receive_loop(ws, known_assets: frozenset[str]) -> None:
             msg = json.loads(raw)
             ch = msg.get("channel", "?")
             # Log any non-routine channel so we can confirm real event channel name
-            if ch not in ("pong", "subscriptionResponse"):
+            if ch not in ("pong", "subscriptionResponse", "user"):
                 logger.info("hl-diag ch=%r raw=%s", ch, raw[:400])
-            if ch != "userEvents":
+            if ch != "user":
                 continue
             records = parse_hl_liquidation(msg, known_assets)
             if records:
