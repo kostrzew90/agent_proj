@@ -1,7 +1,7 @@
 from datetime import datetime
 from sqlalchemy import (String, Float, Boolean, Integer, DateTime, ForeignKey, JSON, UniqueConstraint, Index)
 from sqlalchemy.orm import Mapped, mapped_column
-from argus.db import Base
+from argus.db import Base, TZDateTime
 
 class Asset(Base):
     __tablename__ = "assets"
@@ -30,8 +30,8 @@ class Item(Base):
     title: Mapped[str | None] = mapped_column(String, nullable=True)
     text: Mapped[str | None] = mapped_column(String, nullable=True)
     url: Mapped[str | None] = mapped_column(String, nullable=True)
-    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    published_at: Mapped[datetime | None] = mapped_column(TZDateTime(), nullable=True)
+    fetched_at: Mapped[datetime | None] = mapped_column(TZDateTime(), nullable=True)
 
 class Claim(Base):
     __tablename__ = "claims"
@@ -44,7 +44,7 @@ class Claim(Base):
     confidence: Mapped[float] = mapped_column(Float)
     method: Mapped[str] = mapped_column(String)               # position|rule|llm
     entry_price: Mapped[float] = mapped_column(Float)
-    entry_ts: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    entry_ts: Mapped[datetime] = mapped_column(TZDateTime())
     status: Mapped[str] = mapped_column(String, default="open")
 
 class ClaimAudit(Base):
@@ -59,7 +59,7 @@ class Price(Base):
     __tablename__ = "prices"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     asset: Mapped[str] = mapped_column(ForeignKey("assets.symbol"))
-    ts: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    ts: Mapped[datetime] = mapped_column(TZDateTime())
     price: Mapped[float] = mapped_column(Float)
 
 class Outcome(Base):
@@ -68,11 +68,11 @@ class Outcome(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     claim_id: Mapped[int] = mapped_column(ForeignKey("claims.id"))
     horizon: Mapped[str] = mapped_column(String)              # 1h|24h|7d
-    eval_ts: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    eval_ts: Mapped[datetime] = mapped_column(TZDateTime())
     price_at_horizon: Mapped[float] = mapped_column(Float)
     return_pct: Mapped[float] = mapped_column(Float)
     hit: Mapped[bool] = mapped_column(Boolean)
-    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(TZDateTime(), nullable=True)
 
 class SourceAssetScore(Base):
     __tablename__ = "source_asset_scores"
@@ -86,7 +86,7 @@ class SourceAssetScore(Base):
     hit_rate: Mapped[float] = mapped_column(Float)
     avg_return: Mapped[float] = mapped_column(Float)
     decayed_score: Mapped[float] = mapped_column(Float)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(TZDateTime())
 
 class SourceScore(Base):
     __tablename__ = "source_scores"
@@ -98,7 +98,7 @@ class SourceScore(Base):
     hit_rate: Mapped[float] = mapped_column(Float)
     avg_return: Mapped[float] = mapped_column(Float)
     decayed_score: Mapped[float] = mapped_column(Float)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(TZDateTime())
 
 class WalletPosition(Base):
     __tablename__ = "wallet_positions"
@@ -110,8 +110,8 @@ class WalletPosition(Base):
     szi: Mapped[float] = mapped_column(Float)
     entry_px: Mapped[float] = mapped_column(Float)
     position_value: Mapped[float] = mapped_column(Float)
-    opened_ts: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    last_seen_ts: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    opened_ts: Mapped[datetime] = mapped_column(TZDateTime())
+    last_seen_ts: Mapped[datetime] = mapped_column(TZDateTime())
     open: Mapped[bool] = mapped_column(Boolean)
 
 class Liquidation(Base):
@@ -127,9 +127,9 @@ class Liquidation(Base):
     price: Mapped[float] = mapped_column(Float)
     qty: Mapped[float] = mapped_column(Float)
     notional_usd: Mapped[float] = mapped_column(Float)
-    ts: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    ts: Mapped[datetime] = mapped_column(TZDateTime())
     raw_symbol: Mapped[str | None] = mapped_column(String, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(TZDateTime())
 
 class MacroData(Base):
     __tablename__ = "macro_data"
@@ -138,18 +138,18 @@ class MacroData(Base):
     series_id: Mapped[str] = mapped_column(String)             # FRED series id
     obs_date: Mapped[datetime] = mapped_column(DateTime(timezone=False))
     value: Mapped[float] = mapped_column(Float)
-    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    fetched_at: Mapped[datetime] = mapped_column(TZDateTime())
 
 class LlmCache(Base):
     __tablename__ = "llm_cache"
     text_hash: Mapped[str] = mapped_column(String, primary_key=True)
     result_json: Mapped[list] = mapped_column(JSON)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(TZDateTime())
 
 class LlmCall(Base):
     __tablename__ = "llm_calls"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    ts: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    ts: Mapped[datetime] = mapped_column(TZDateTime())
     provider: Mapped[str] = mapped_column(String)            # gemini|openrouter
     model: Mapped[str] = mapped_column(String)
     tokens_in: Mapped[int] = mapped_column(Integer, default=0)
@@ -167,6 +167,6 @@ class LlmQueue(Base):
     source_kind: Mapped[str] = mapped_column(String)        # reddit|news
     status: Mapped[str] = mapped_column(String)             # pending|done|failed
     attempts: Mapped[int] = mapped_column(Integer, default=0)
-    enqueued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    enqueued_at: Mapped[datetime] = mapped_column(TZDateTime())
+    processed_at: Mapped[datetime | None] = mapped_column(TZDateTime(), nullable=True)
     last_error: Mapped[str | None] = mapped_column(String, nullable=True)
