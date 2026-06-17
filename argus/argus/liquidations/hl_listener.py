@@ -13,11 +13,12 @@ from argus.models import Asset, Liquidation, Source
 logger = logging.getLogger(__name__)
 
 _HL_WS = "wss://api.hyperliquid.xyz/ws"
+_MAX_USERS_PER_CONN = 15   # HL hard limit: "Cannot track more than 15 total users"
 _MANAGER_INTERVAL = 300
-_MAX_BACKOFF = 30
-_CIRCUIT_BREAKER_WINDOW = 600
+_MAX_BACKOFF = 60
 _CIRCUIT_BREAKER_LIMIT = 5
-_CIRCUIT_BREAKER_SLEEP = 60
+_CIRCUIT_BREAKER_WINDOW = 600
+_CIRCUIT_BREAKER_SLEEP = 300
 
 
 def parse_hl_liquidation(event: dict, known_assets: set[str]) -> list[dict]:
@@ -47,7 +48,6 @@ def parse_hl_liquidation(event: dict, known_assets: set[str]) -> list[dict]:
     return records
 
 
-
 def insert_hl_liquidations(session, records: list[dict]) -> int:
     if not records:
         return 0
@@ -71,58 +71,104 @@ def insert_hl_liquidations(session, records: list[dict]) -> int:
     return len(records)
 
 
-def _load_wallets(session) -> set[str]:
-    return {s.handle for s in session.scalars(
+def _load_wallets(session) -> list[str]:
+    return [s.handle for s in session.scalars(
         select(Source).where(Source.kind == "hyperliquid", Source.active == True)  # noqa: E712
-    )}
+    )]
 
 
 def _load_known_assets(session) -> set[str]:
     return {a.symbol for a in session.scalars(select(Asset))}
 
 
-async def _wallet_task(addr: str, known_assets: frozenset[str]) -> None:
+async def _subscribe(ws, addr: str) -> None:
+    await ws.send(json.dumps(
+        {"method": "subscribe", "subscription": {"type": "userEvents", "user": addr}}
+    ))
+
+
+async def _ping_loop(ws) -> None:
+    while True:
+        await asyncio.sleep(30)
+        await ws.send(json.dumps({"method": "ping"}))
+
+
+async def _receive_loop(ws, known_assets: frozenset[str]) -> None:
+    async for raw in ws:
+        try:
+            msg = json.loads(raw)
+            ch = msg.get("channel", "?")
+            # Log any non-routine channel so we can confirm real event channel name
+            if ch not in ("pong", "subscriptionResponse"):
+                logger.info("hl-diag ch=%r raw=%s", ch, raw[:400])
+            if ch != "userEvents":
+                continue
+            records = parse_hl_liquidation(msg, known_assets)
+            if records:
+                with SessionLocal() as s:
+                    n = insert_hl_liquidations(s, records)
+                if n:
+                    logger.info("hl-listener: inserted %d liq records", n)
+        except Exception as e:
+            logger.warning("hl-listener: parse/insert error: %s", e)
+
+
+async def _refresh_loop(ws, subscribed: set[str]) -> None:
+    while True:
+        await asyncio.sleep(_MANAGER_INTERVAL)
+        with SessionLocal() as s:
+            current = set(_load_wallets(s))
+        for addr in current - subscribed:
+            if len(subscribed) >= _MAX_USERS_PER_CONN:
+                break
+            await _subscribe(ws, addr)
+            subscribed.add(addr)
+            logger.info("hl-listener: subscribed new wallet %s", addr[:10])
+
+
+async def _run_connection(wallets: list[str], known_assets: frozenset[str]) -> None:
+    async with websockets.connect(_HL_WS, ping_interval=None, ping_timeout=None) as ws:
+        subscribed: set[str] = set()
+        for addr in wallets:
+            await _subscribe(ws, addr)
+            subscribed.add(addr)
+        logger.info("hl-listener: connected, subscribed %d wallets", len(subscribed))
+
+        receive = asyncio.create_task(_receive_loop(ws, known_assets))
+        refresh = asyncio.create_task(_refresh_loop(ws, subscribed))
+        ping = asyncio.create_task(_ping_loop(ws))
+        done, pending = await asyncio.wait({receive, refresh, ping}, return_when=asyncio.FIRST_COMPLETED)
+        for t in pending:
+            t.cancel()
+            try:
+                await t
+            except (asyncio.CancelledError, Exception):
+                pass
+        for t in done:
+            if exc := t.exception():
+                raise exc
+
+
+async def _run_chunk_loop(chunk: list[str], known_assets: frozenset[str]) -> None:
     backoff = 1
     fails: list[float] = []
+    label = chunk[0][:10] if chunk else "?"
 
     while True:
-        connected_at = None
         try:
-            async with websockets.connect(_HL_WS, ping_interval=20, ping_timeout=20) as ws:
-                connected_at = time.time()
-                backoff = 1
-                await ws.send(json.dumps(
-                    {"method": "subscribe", "subscription": {"type": "userEvents", "user": addr}}
-                ))
-                logger.info("hl-liq [%s]: connected", addr[:10])
-
-                async for raw in ws:
-                    try:
-                        msg = json.loads(raw)
-                        if msg.get("channel") != "userEvents":
-                            continue
-                        records = parse_hl_liquidation(msg, known_assets)
-                        if records:
-                            with SessionLocal() as s:
-                                n = insert_hl_liquidations(s, records)
-                            if n:
-                                logger.info("hl-liq [%s]: inserted %d liq records (lid=%s)",
-                                            addr[:10], n, records[0]["raw_symbol"])
-                    except Exception as e:
-                        logger.warning("hl-liq [%s]: parse/insert error: %s", addr[:10], e)
-
+            await _run_connection(chunk, known_assets)
         except asyncio.CancelledError:
-            logger.info("hl-liq [%s]: task cancelled", addr[:10])
+            logger.info("hl-listener: chunk %s cancelled", label)
             return
         except Exception as e:
-            dur = (time.time() - connected_at) if connected_at else 0
-            logger.warning("hl-liq [%s]: disconnected after %.0fs: %s", addr[:10], dur, e)
+            logger.warning("hl-listener: chunk %s connection lost: %s", label, e)
             now = time.time()
             fails = [t for t in fails if now - t < _CIRCUIT_BREAKER_WINDOW] + [now]
             if len(fails) >= _CIRCUIT_BREAKER_LIMIT:
-                logger.warning("hl-liq [%s]: circuit breaker -> %ds", addr[:10], _CIRCUIT_BREAKER_SLEEP)
+                logger.warning("hl-listener: chunk %s circuit breaker -> %ds", label, _CIRCUIT_BREAKER_SLEEP)
                 await asyncio.sleep(_CIRCUIT_BREAKER_SLEEP)
                 fails = []
+                backoff = 1
             else:
                 await asyncio.sleep(backoff)
                 backoff = min(backoff * 2, _MAX_BACKOFF)
@@ -133,24 +179,13 @@ async def run() -> None:
         wallets = _load_wallets(s)
         known_assets = frozenset(_load_known_assets(s))
 
-    tasks: dict[str, asyncio.Task] = {}
-    for addr in wallets:
-        tasks[addr] = asyncio.create_task(_wallet_task(addr, known_assets))
-    logger.info("hl-listener: started %d wallet tasks", len(tasks))
+    if not wallets:
+        logger.warning("hl-listener: no wallets configured, exiting")
+        return
 
-    while True:
-        await asyncio.sleep(_MANAGER_INTERVAL)
-        with SessionLocal() as s:
-            current = _load_wallets(s)
-            known_assets = frozenset(_load_known_assets(s))
-        new = current - set(tasks)
-        for addr in new:
-            tasks[addr] = asyncio.create_task(_wallet_task(addr, known_assets))
-            logger.info("hl-listener: spawned task for new wallet %s", addr[:10])
-        for addr in list(tasks):
-            if tasks[addr].done():
-                logger.warning("hl-liq [%s]: task exited unexpectedly, restarting", addr[:10])
-                tasks[addr] = asyncio.create_task(_wallet_task(addr, known_assets))
+    chunks = [wallets[i:i + _MAX_USERS_PER_CONN] for i in range(0, len(wallets), _MAX_USERS_PER_CONN)]
+    logger.info("hl-listener: %d wallets → %d connections", len(wallets), len(chunks))
+    await asyncio.gather(*[_run_chunk_loop(chunk, known_assets) for chunk in chunks])
 
 
 def main() -> None:
