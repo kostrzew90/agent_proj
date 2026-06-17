@@ -10,19 +10,28 @@ from argus.evaluator import evaluate_due_claims
 from argus.scorer import recompute_scores
 from argus.liquidations.cleanup import prune_liquidations
 from argus.scheduler.apscheduler_impl import APScheduler
-from argus.models import Source
+from argus.models import Source, Asset
 from argus.collectors.hyperstats import sync_top_traders
 from sqlalchemy import select
 from datetime import datetime, timezone
 
 def _rss_job():
-    import os
-    from argus.collectors.rss import LlmBudget
-    budget = LlmBudget(int(os.getenv("ARGUS_LLM_MAX_PER_RUN", "20")))
     with SessionLocal() as s:
         for src in s.scalars(select(Source).where(
                 Source.kind.in_(["rss", "reddit", "news"]), Source.active == True)):  # noqa: E712
-            collect_rss(s, src, budget)
+            collect_rss(s, src)
+
+
+def _llm_batch_job():
+    from argus.llm.batch import process_llm_batch
+    from argus.collectors.rss import load_sector_map
+    batch_size = int(os.getenv("ARGUS_LLM_BATCH_SIZE", "8"))
+    with SessionLocal() as s:
+        assets = list(s.scalars(select(Asset).where(Asset.scorable == True)))  # noqa: E712
+        sector_map = load_sector_map()
+        stats = process_llm_batch(s, batch_size, assets, sector_map)
+    import logging
+    logging.getLogger(__name__).info("llm_batch: %s", stats)
 
 def _eval_job():
     with SessionLocal() as s:
@@ -124,6 +133,7 @@ def bootstrap():
             seed_sources(s, "config/wallets.yaml")
     sched = APScheduler()
     sched.add_interval("rss", _rss_job, minutes=30)
+    sched.add_interval("llm_batch", _llm_batch_job, minutes=120)
     sched.add_interval("evaluate", _eval_job, minutes=60)
     sched.add_interval("score", _score_job, minutes=360)
     sched.add_interval("hyperliquid", _hyperliquid_job, minutes=15)
