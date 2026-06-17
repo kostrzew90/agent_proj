@@ -161,3 +161,50 @@ def check_liq_silence(conn, state: dict) -> "CheckResult":
         ),
         logs_snippet="liq_and_items_silent",
     )
+
+
+def check_claims_drought(conn, state: dict) -> "CheckResult":
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT count(*) FROM claims WHERE entry_ts > now() - interval '12 hours'"
+        )
+        claims = cur.fetchone()[0]
+        cur.execute(
+            "SELECT count(*) FROM llm_queue "
+            "WHERE status='done' AND processed_at > now() - interval '12 hours'"
+        )
+        processed = cur.fetchone()[0]
+
+    if processed < 5:
+        return CheckResult(name="claims_drought", status=Status.OK, message="")
+
+    ratio = claims / processed
+    if ratio < 0.05:
+        return CheckResult(
+            name="claims_drought",
+            status=Status.UNKNOWN_ANOMALY,
+            message=(
+                f"🌵 argus-guardian: claims/processed ratio {ratio:.3f} (12h). "
+                "Extractor degraded?"
+            ),
+            logs_snippet="claims_drought",
+        )
+    return CheckResult(name="claims_drought", status=Status.OK, message="")
+
+
+def check_scheduler_heartbeat(state: dict) -> "CheckResult":
+    last_hb = state.get("last_heartbeat_at")
+    now = datetime.now(timezone.utc)
+    if last_hb is None:
+        return CheckResult(name="scheduler_heartbeat", status=Status.OK, message="")
+    if (now - last_hb) > timedelta(minutes=15):
+        return CheckResult(
+            name="scheduler_heartbeat",
+            status=Status.KNOWN_ISSUE,
+            message=(
+                "💀 argus-guardian: Argus scheduler silent 15min+ "
+                "(container running). Restarting."
+            ),
+            remediation=f"docker restart {_APP_CONTAINER}",
+        )
+    return CheckResult(name="scheduler_heartbeat", status=Status.OK, message="")

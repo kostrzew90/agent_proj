@@ -271,3 +271,66 @@ class TestCheckLiqSilence:
         result = check_liq_silence(conn, {})
         assert result.status == Status.UNKNOWN_ANOMALY
         assert "broader outage" in result.message.lower()
+
+
+# ── check_claims_drought ──────────────────────────────────────────────────────
+
+class TestCheckClaimsDrought:
+    def _make_conn(self, claims, processed):
+        conn = MagicMock()
+        cur = MagicMock()
+        cur.fetchone.side_effect = [(claims,), (processed,)]
+        conn.cursor.return_value.__enter__ = lambda s: cur
+        conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
+        return conn
+
+    def test_processed_under_5_returns_ok(self):
+        from checks import check_claims_drought, Status
+        conn = self._make_conn(claims=0, processed=3)
+        result = check_claims_drought(conn, {})
+        assert result.status == Status.OK
+
+    def test_ratio_above_threshold_returns_ok(self):
+        from checks import check_claims_drought, Status
+        conn = self._make_conn(claims=8, processed=100)  # 8% — normal
+        result = check_claims_drought(conn, {})
+        assert result.status == Status.OK
+
+    def test_near_zero_ratio_returns_unknown_anomaly(self):
+        from checks import check_claims_drought, Status
+        conn = self._make_conn(claims=0, processed=100)  # 0% — drought
+        result = check_claims_drought(conn, {})
+        assert result.status == Status.UNKNOWN_ANOMALY
+        assert "claims/processed ratio" in result.message
+
+    def test_ratio_just_below_threshold_returns_unknown_anomaly(self):
+        from checks import check_claims_drought, Status
+        conn = self._make_conn(claims=2, processed=100)  # 2% < 5%
+        result = check_claims_drought(conn, {})
+        assert result.status == Status.UNKNOWN_ANOMALY
+
+
+# ── check_scheduler_heartbeat ─────────────────────────────────────────────────
+
+class TestCheckSchedulerHeartbeat:
+    def test_no_heartbeat_yet_returns_ok(self):
+        """First run — guardian_state has no heartbeat row yet."""
+        from checks import check_scheduler_heartbeat, Status
+        result = check_scheduler_heartbeat({"last_heartbeat_at": None})
+        assert result.status == Status.OK
+
+    def test_recent_heartbeat_returns_ok(self):
+        from datetime import datetime, timezone, timedelta
+        from checks import check_scheduler_heartbeat, Status
+        state = {"last_heartbeat_at": datetime.now(timezone.utc) - timedelta(minutes=3)}
+        result = check_scheduler_heartbeat(state)
+        assert result.status == Status.OK
+
+    def test_stale_heartbeat_returns_known_issue(self):
+        from datetime import datetime, timezone, timedelta
+        from checks import check_scheduler_heartbeat, Status
+        state = {"last_heartbeat_at": datetime.now(timezone.utc) - timedelta(minutes=20)}
+        result = check_scheduler_heartbeat(state)
+        assert result.status == Status.KNOWN_ISSUE
+        assert "silent 15min+" in result.message
+        assert result.remediation is not None
