@@ -26,6 +26,7 @@ def enqueue_for_llm(session, item, source_kind: str, text: str) -> bool:
         attempts=0,
         enqueued_at=datetime.now(timezone.utc),
     ))
+    session.commit()
     return True
 
 
@@ -76,6 +77,7 @@ def process_llm_batch(session, batch_size: int, assets, sector_map) -> dict:
 
         ts = item.published_at or item.fetched_at or datetime.now(timezone.utc)
 
+        claims_before = stats["claims"]
         for sym, direction, reasoning in triples:
             asset = by_symbol.get(sym)
             if asset is None:
@@ -110,6 +112,8 @@ def process_llm_batch(session, batch_size: int, assets, sector_map) -> dict:
             ))
             stats["claims"] += 1
 
+        if stats["claims"] == claims_before:
+            logger.warning("llm_batch: item %d processed but produced 0 claims", entry.item_id)
         entry.status = "done"
         entry.processed_at = datetime.now(timezone.utc)
         session.commit()
