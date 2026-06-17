@@ -1,4 +1,5 @@
 import os
+import re
 import time
 import threading
 import logging
@@ -66,6 +67,14 @@ class _ProviderState:
             self._blocked_until = now + cooldown
             logger.warning("provider 429 streak=%d -> cooldown %ds", self._streak, cooldown)
 
+    def record_5xx(self):
+        now = time.time()
+        with self._lock:
+            self._window.append(now)
+            # flat 90s cooldown — transient server overload, not quota
+            if self._blocked_until < now + 90:
+                self._blocked_until = now + 90
+
     def record_error(self):
         with self._lock:
             self._window.append(time.time())
@@ -123,6 +132,18 @@ def _is_429(exc: Exception) -> bool:
     return "429" in str(exc) or (
         hasattr(exc, "response") and getattr(exc.response, "status_code", 0) == 429
     )
+
+
+def _sanitize(msg: str) -> str:
+    """Remove API keys from error strings before logging."""
+    return re.sub(r'key=[A-Za-z0-9_\-]+', 'key=***', msg)
+
+
+def _is_server_error(exc: Exception) -> bool:
+    if hasattr(exc, "response"):
+        return 500 <= getattr(exc.response, "status_code", 0) < 600
+    s = str(exc)
+    return any(code in s for code in ("500", "502", "503", "504"))
 
 
 def _gemini(prompt: str, system: str, max_tokens: int):
@@ -194,10 +215,12 @@ def call_llm(prompt: str, system: str = "", max_tokens: int = 512) -> str:
             if state:
                 if is429:
                     state.record_429()
+                elif _is_server_error(e):
+                    state.record_5xx()
                 else:
                     state.record_error()
             last_err = e
-            logger.warning("llm %s/%s failed%s: %s", provider, model, " [429]" if is429 else "", e)
+            logger.warning("llm %s/%s failed%s: %s", provider, model, " [429]" if is429 else "", _sanitize(str(e)))
 
     if all_skipped:
         info = "; ".join(
