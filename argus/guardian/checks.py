@@ -1,5 +1,6 @@
 import os
 from dataclasses import dataclass
+from datetime import datetime, timezone, timedelta
 from enum import Enum
 
 import docker
@@ -62,3 +63,32 @@ def check_container_liveness(state: dict) -> "CheckResult":
             remediation=f"docker restart {_APP_CONTAINER}",
         )
     return CheckResult(name="container_liveness", status=Status.OK, message="")
+
+
+def check_queue_runaway(conn, state: dict) -> "CheckResult":
+    with conn.cursor() as cur:
+        cur.execute("SELECT count(*) FROM llm_queue WHERE status='pending'")
+        depth = cur.fetchone()[0]
+
+    prev_depth = state.get("last_queue_depth") or 0
+    growth_start = state.get("last_queue_growth_start")
+    now = datetime.now(timezone.utc)
+
+    if depth > prev_depth:
+        if growth_start is None:
+            growth_start = now
+        update_state(conn, last_queue_depth=depth, last_queue_growth_start=growth_start)
+        growing_for = (now - growth_start).total_seconds()
+        if growing_for >= 1800:  # 30 minutes
+            return CheckResult(
+                name="queue_runaway",
+                status=Status.KNOWN_ISSUE,
+                message=(
+                    f"📬 argus-guardian: llm_queue growing 30min+ "
+                    f"(now {depth}, was {prev_depth}). Check llm_batch job."
+                ),
+            )
+    else:
+        update_state(conn, last_queue_depth=depth, last_queue_growth_start=None)
+
+    return CheckResult(name="queue_runaway", status=Status.OK, message="")

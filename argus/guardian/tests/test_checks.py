@@ -132,3 +132,63 @@ class TestCheckContainerLiveness:
         from checks import check_container_liveness, Status
         result = check_container_liveness({})
         assert result.status == Status.OK
+
+
+# ── check_queue_runaway ───────────────────────────────────────────────────────
+
+class TestCheckQueueRunaway:
+    def _make_conn(self, depth):
+        conn = MagicMock()
+        cur = MagicMock()
+        cur.fetchone.return_value = (depth,)
+        conn.cursor.return_value.__enter__ = lambda s: cur
+        conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
+        return conn
+
+    @patch("checks.update_state")
+    def test_growth_under_30min_returns_ok(self, mock_update):
+        from datetime import datetime, timezone, timedelta
+        from checks import check_queue_runaway, Status
+        conn = self._make_conn(depth=50)
+        state = {
+            "last_queue_depth": 40,
+            "last_queue_growth_start": datetime.now(timezone.utc) - timedelta(minutes=10),
+        }
+        result = check_queue_runaway(conn, state)
+        assert result.status == Status.OK
+
+    @patch("checks.update_state")
+    def test_growth_over_30min_returns_known_issue(self, mock_update):
+        from datetime import datetime, timezone, timedelta
+        from checks import check_queue_runaway, Status
+        conn = self._make_conn(depth=100)
+        state = {
+            "last_queue_depth": 40,
+            "last_queue_growth_start": datetime.now(timezone.utc) - timedelta(minutes=35),
+        }
+        result = check_queue_runaway(conn, state)
+        assert result.status == Status.KNOWN_ISSUE
+        assert "30min+" in result.message
+
+    @patch("checks.update_state")
+    def test_depth_drops_resets_growth_start(self, mock_update):
+        from datetime import datetime, timezone, timedelta
+        from checks import check_queue_runaway, Status
+        conn = self._make_conn(depth=20)
+        state = {
+            "last_queue_depth": 50,
+            "last_queue_growth_start": datetime.now(timezone.utc) - timedelta(minutes=40),
+        }
+        result = check_queue_runaway(conn, state)
+        assert result.status == Status.OK
+        # update_state called with last_queue_growth_start=None
+        call_kwargs = mock_update.call_args.kwargs
+        assert call_kwargs.get("last_queue_growth_start") is None
+
+    @patch("checks.update_state")
+    def test_first_run_no_growth_start_returns_ok(self, mock_update):
+        from checks import check_queue_runaway, Status
+        conn = self._make_conn(depth=10)
+        state = {"last_queue_depth": 0, "last_queue_growth_start": None}
+        result = check_queue_runaway(conn, state)
+        assert result.status == Status.OK
