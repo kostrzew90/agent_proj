@@ -12,16 +12,39 @@ services:
       retries: 10
   app:
     build: .
+    container_name: argus-app
     env_file: .env
     depends_on:
       db: {condition: service_healthy}
     ports: ["8080:8080"]
+    restart: unless-stopped
   liq-listener:
     build: .
+    container_name: argus-liq-listener
     env_file: .env
     depends_on:
       db: {condition: service_healthy}
     command: ["python", "-m", "argus.liquidations.hl_listener"]
     restart: unless-stopped
+  argus-guardian:
+    build:
+      context: ./guardian
+    container_name: argus-guardian
+    restart: unless-stopped
+    depends_on:
+      - app
+      - db
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      ARGUS_DB_URL: postgresql://argus:argus@db:5432/argus
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL: ${ARGUS_GEMINI_MODEL:-gemini-2.5-flash}
+      CHECK_INTERVAL_SECONDS: "300"
+      ARGUS_APP_CONTAINER: argus-app
+      ARGUS_LIQ_CONTAINER: argus-liq-listener
+      ARGUS_HEALTH_URL: http://app:8080/health
 volumes:
   argus-pg:
