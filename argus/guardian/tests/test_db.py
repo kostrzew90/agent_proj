@@ -37,8 +37,7 @@ def test_init_db_creates_table_and_seeds_row(mock_connect):
 
 # ── get_state ─────────────────────────────────────────────────────────────────
 
-@patch("db.psycopg2.connect")
-def test_get_state_returns_dict(mock_connect):
+def test_get_state_returns_dict():
     conn, cur = _make_conn(
         rows=[(1, 0)],
         description=[("id",), ("last_queue_depth",)],
@@ -50,8 +49,7 @@ def test_get_state_returns_dict(mock_connect):
     assert result["last_queue_depth"] == 0
 
 
-@patch("db.psycopg2.connect")
-def test_get_state_returns_empty_dict_when_no_row(mock_connect):
+def test_get_state_returns_empty_dict_when_no_row():
     conn, cur = _make_conn(rows=[None], description=[("id",)])
     cur.fetchone.return_value = None
     import db
@@ -61,8 +59,7 @@ def test_get_state_returns_empty_dict_when_no_row(mock_connect):
 
 # ── update_state ──────────────────────────────────────────────────────────────
 
-@patch("db.psycopg2.connect")
-def test_update_state_builds_correct_sql(mock_connect):
+def test_update_state_builds_correct_sql():
     conn, cur = _make_conn()
     import db
     db.update_state(conn, last_queue_depth=42, last_queue_growth_start=None)
@@ -73,8 +70,7 @@ def test_update_state_builds_correct_sql(mock_connect):
     conn.commit.assert_called_once()
 
 
-@patch("db.psycopg2.connect")
-def test_update_state_noop_when_no_kwargs(mock_connect):
+def test_update_state_noop_when_no_kwargs():
     conn, cur = _make_conn()
     import db
     db.update_state(conn)

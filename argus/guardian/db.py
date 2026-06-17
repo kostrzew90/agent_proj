@@ -7,7 +7,8 @@ def get_conn():
 
 
 def init_db():
-    with get_conn() as conn:
+    conn = get_conn()
+    try:
         with conn.cursor() as cur:
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS guardian_state (
@@ -28,6 +29,8 @@ def init_db():
                 "INSERT INTO guardian_state(id) VALUES(1) ON CONFLICT DO NOTHING"
             )
         conn.commit()
+    finally:
+        conn.close()
 
 
 def get_state(conn) -> dict:
