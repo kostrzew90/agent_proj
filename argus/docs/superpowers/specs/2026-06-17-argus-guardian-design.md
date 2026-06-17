@@ -110,7 +110,7 @@ CREATE TABLE guardian_state (
 -- Seed one row on startup: INSERT INTO guardian_state(id) VALUES(1) ON CONFLICT DO NOTHING;
 ```
 
-Auto-created by `Base.metadata.create_all()` in guardian startup (reuses Argus DB, same engine).
+Auto-created by raw SQL `CREATE TABLE IF NOT EXISTS` in guardian startup — guardian has no SQLAlchemy models, connects to Argus DB as a read/write client only.
 
 ## LLM diagnosis (llm_diagnose.py)
 
