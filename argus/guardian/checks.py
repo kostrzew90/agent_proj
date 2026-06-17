@@ -92,3 +92,40 @@ def check_queue_runaway(conn, state: dict) -> "CheckResult":
         update_state(conn, last_queue_depth=depth, last_queue_growth_start=None)
 
     return CheckResult(name="queue_runaway", status=Status.OK, message="")
+
+
+def check_llm_router(conn, state: dict) -> "CheckResult":
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT
+                count(*) FILTER (WHERE ok = true)  AS ok_count,
+                count(*) FILTER (WHERE ok = false) AS fail_count,
+                count(*) AS total
+            FROM llm_calls
+            WHERE ts > now() - interval '1 hour'
+        """)
+        row = cur.fetchone()
+    ok_count, fail_count, total = row
+
+    if total < 3:
+        return CheckResult(name="llm_router", status=Status.OK, message="")
+
+    if ok_count == 0:
+        return CheckResult(
+            name="llm_router",
+            status=Status.KNOWN_ISSUE,
+            message=(
+                f"🔴 argus-guardian: LLM all-failed "
+                f"({fail_count} errors/1h, 0 success). Providers exhausted."
+            ),
+        )
+
+    if total > 0 and fail_count / total > 0.8:
+        return CheckResult(
+            name="llm_router",
+            status=Status.UNKNOWN_ANOMALY,
+            message=f"🟡 argus-guardian: LLM high failure rate ({fail_count}/{total}/1h).",
+            logs_snippet="llm_router_degraded",
+        )
+
+    return CheckResult(name="llm_router", status=Status.OK, message="")

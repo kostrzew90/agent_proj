@@ -192,3 +192,42 @@ class TestCheckQueueRunaway:
         state = {"last_queue_depth": 0, "last_queue_growth_start": None}
         result = check_queue_runaway(conn, state)
         assert result.status == Status.OK
+
+
+# ── check_llm_router ──────────────────────────────────────────────────────────
+
+class TestCheckLlmRouter:
+    def _make_conn(self, ok_count, fail_count, total):
+        conn = MagicMock()
+        cur = MagicMock()
+        cur.fetchone.return_value = (ok_count, fail_count, total)
+        conn.cursor.return_value.__enter__ = lambda s: cur
+        conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
+        return conn
+
+    def test_total_under_3_returns_ok(self):
+        from checks import check_llm_router, Status
+        conn = self._make_conn(ok_count=0, fail_count=2, total=2)
+        result = check_llm_router(conn, {})
+        assert result.status == Status.OK
+
+    def test_all_failed_returns_known_issue(self):
+        from checks import check_llm_router, Status
+        conn = self._make_conn(ok_count=0, fail_count=10, total=10)
+        result = check_llm_router(conn, {})
+        assert result.status == Status.KNOWN_ISSUE
+        assert "all-failed" in result.message
+
+    def test_high_failure_rate_returns_unknown_anomaly(self):
+        from checks import check_llm_router, Status
+        # 85% fail rate: 17 fail, 3 ok, total 20
+        conn = self._make_conn(ok_count=3, fail_count=17, total=20)
+        result = check_llm_router(conn, {})
+        assert result.status == Status.UNKNOWN_ANOMALY
+        assert "high failure rate" in result.message
+
+    def test_50_percent_failure_returns_ok(self):
+        from checks import check_llm_router, Status
+        conn = self._make_conn(ok_count=5, fail_count=5, total=10)
+        result = check_llm_router(conn, {})
+        assert result.status == Status.OK
