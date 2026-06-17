@@ -16,15 +16,13 @@ def _make_conn(rows=None, description=None):
 
 # ── init_db ───────────────────────────────────────────────────────────────────
 
-@patch("db.psycopg2.connect")
-def test_init_db_creates_table_and_seeds_row(mock_connect):
+@patch("db.get_conn")
+def test_init_db_creates_table_and_seeds_row(mock_get_conn):
     conn = MagicMock()
     cur = MagicMock()
-    conn.__enter__ = lambda s: conn
-    conn.__exit__ = MagicMock(return_value=False)
     conn.cursor.return_value.__enter__ = lambda s: cur
     conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
-    mock_connect.return_value = conn
+    mock_get_conn.return_value = conn
 
     import db
     db.init_db()
