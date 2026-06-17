@@ -12,7 +12,7 @@ from argus.liquidations.cleanup import prune_liquidations
 from argus.scheduler.apscheduler_impl import APScheduler
 from argus.models import Source, Asset
 from argus.collectors.hyperstats import sync_top_traders
-from sqlalchemy import select
+from sqlalchemy import select, text
 from datetime import datetime, timezone
 
 def _rss_job():
@@ -124,6 +124,20 @@ def _hyperstats_job():
             import logging
             logging.getLogger(__name__).warning("hyperstats job failed: %s", e)
 
+def _heartbeat_job():
+    try:
+        with SessionLocal() as s:
+            s.execute(
+                text(
+                    "UPDATE guardian_state SET last_heartbeat_at = now(), "
+                    "updated_at = now() WHERE id = 1"
+                )
+            )
+            s.commit()
+    except Exception:
+        pass  # guardian_state may not exist yet; harmless
+
+
 def bootstrap():
     Base.metadata.create_all(engine)
     with SessionLocal() as s:
@@ -141,6 +155,7 @@ def bootstrap():
     sched.add_interval("insider", _insider_job, minutes=720)
     sched.add_interval("fred", _fred_job, minutes=1440)
     sched.add_interval("edgar", _edgar_job, minutes=360)
+    sched.add_interval("heartbeat", _heartbeat_job, minutes=5)
     sched.start()
 
 if __name__ == "__main__":
