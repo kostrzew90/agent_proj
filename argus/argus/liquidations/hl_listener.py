@@ -113,12 +113,14 @@ async def _receive_loop(ws, known_assets: frozenset[str]) -> None:
             logger.warning("hl-listener: parse/insert error: %s", e)
 
 
-async def _refresh_loop(ws, subscribed: set[str]) -> None:
+async def _refresh_loop(ws, subscribed: set[str], all_startup_wallets: frozenset[str]) -> None:
+    # Only subscribe wallets added to DB AFTER startup — never cross-chunk wallets
     while True:
         await asyncio.sleep(_MANAGER_INTERVAL)
         with SessionLocal() as s:
             current = set(_load_wallets(s))
-        for addr in current - subscribed:
+        new_wallets = current - all_startup_wallets
+        for addr in new_wallets - subscribed:
             if len(subscribed) >= _MAX_USERS_PER_CONN:
                 break
             await _subscribe(ws, addr)
@@ -126,7 +128,7 @@ async def _refresh_loop(ws, subscribed: set[str]) -> None:
             logger.info("hl-listener: subscribed new wallet %s", addr[:10])
 
 
-async def _run_connection(wallets: list[str], known_assets: frozenset[str]) -> None:
+async def _run_connection(wallets: list[str], known_assets: frozenset[str], all_startup_wallets: frozenset[str]) -> None:
     async with websockets.connect(_HL_WS, ping_interval=None, ping_timeout=None) as ws:
         subscribed: set[str] = set()
         for addr in wallets:
@@ -135,7 +137,7 @@ async def _run_connection(wallets: list[str], known_assets: frozenset[str]) -> N
         logger.info("hl-listener: connected, subscribed %d wallets", len(subscribed))
 
         receive = asyncio.create_task(_receive_loop(ws, known_assets))
-        refresh = asyncio.create_task(_refresh_loop(ws, subscribed))
+        refresh = asyncio.create_task(_refresh_loop(ws, subscribed, all_startup_wallets))
         ping = asyncio.create_task(_ping_loop(ws))
         done, pending = await asyncio.wait({receive, refresh, ping}, return_when=asyncio.FIRST_COMPLETED)
         for t in pending:
@@ -149,14 +151,14 @@ async def _run_connection(wallets: list[str], known_assets: frozenset[str]) -> N
                 raise exc
 
 
-async def _run_chunk_loop(chunk: list[str], known_assets: frozenset[str]) -> None:
+async def _run_chunk_loop(chunk: list[str], known_assets: frozenset[str], all_startup_wallets: frozenset[str]) -> None:
     backoff = 1
     fails: list[float] = []
     label = chunk[0][:10] if chunk else "?"
 
     while True:
         try:
-            await _run_connection(chunk, known_assets)
+            await _run_connection(chunk, known_assets, all_startup_wallets)
         except asyncio.CancelledError:
             logger.info("hl-listener: chunk %s cancelled", label)
             return
@@ -183,9 +185,10 @@ async def run() -> None:
         logger.warning("hl-listener: no wallets configured, exiting")
         return
 
+    all_startup_wallets = frozenset(wallets)
     chunks = [wallets[i:i + _MAX_USERS_PER_CONN] for i in range(0, len(wallets), _MAX_USERS_PER_CONN)]
     logger.info("hl-listener: %d wallets → %d connections", len(wallets), len(chunks))
-    await asyncio.gather(*[_run_chunk_loop(chunk, known_assets) for chunk in chunks])
+    await asyncio.gather(*[_run_chunk_loop(chunk, known_assets, all_startup_wallets) for chunk in chunks])
 
 
 def main() -> None:
