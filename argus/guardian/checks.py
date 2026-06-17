@@ -129,3 +129,35 @@ def check_llm_router(conn, state: dict) -> "CheckResult":
         )
 
     return CheckResult(name="llm_router", status=Status.OK, message="")
+
+
+def check_liq_silence(conn, state: dict) -> "CheckResult":
+    now = datetime.now(timezone.utc)
+    with conn.cursor() as cur:
+        cur.execute("SELECT max(ts) FROM liquidations")
+        last_liq = cur.fetchone()[0]
+        cur.execute("SELECT max(fetched_at) FROM items")
+        last_item = cur.fetchone()[0]
+
+    if last_liq and (now - last_liq) < timedelta(hours=6):
+        return CheckResult(name="liq_silence", status=Status.OK, message="")
+
+    if last_item and (now - last_item) < timedelta(minutes=30):
+        return CheckResult(
+            name="liq_silence",
+            status=Status.KNOWN_ISSUE,
+            message=(
+                "📡 argus-guardian: liq-listener silent 6h+ "
+                "(items still flowing). Check HL WebSocket."
+            ),
+        )
+
+    return CheckResult(
+        name="liq_silence",
+        status=Status.UNKNOWN_ANOMALY,
+        message=(
+            "📡 argus-guardian: liq-listener silent AND no items ingested. "
+            "Broader outage?"
+        ),
+        logs_snippet="liq_and_items_silent",
+    )

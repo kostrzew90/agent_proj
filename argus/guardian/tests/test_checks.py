@@ -231,3 +231,43 @@ class TestCheckLlmRouter:
         conn = self._make_conn(ok_count=5, fail_count=5, total=10)
         result = check_llm_router(conn, {})
         assert result.status == Status.OK
+
+
+# ── check_liq_silence ─────────────────────────────────────────────────────────
+
+class TestCheckLiqSilence:
+    def _make_conn(self, last_liq_age_h, last_item_age_m=None):
+        """last_liq_age_h: hours ago for last liquidation (None = no rows)
+           last_item_age_m: minutes ago for last item (None = no rows)"""
+        from datetime import datetime, timezone, timedelta
+        now = datetime.now(timezone.utc)
+        liq_ts = now - timedelta(hours=last_liq_age_h) if last_liq_age_h is not None else None
+        item_ts = now - timedelta(minutes=last_item_age_m) if last_item_age_m is not None else None
+
+        conn = MagicMock()
+        cur = MagicMock()
+        # Two fetchone calls: first for liquidations, second for items
+        cur.fetchone.side_effect = [(liq_ts,), (item_ts,)]
+        conn.cursor.return_value.__enter__ = lambda s: cur
+        conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
+        return conn
+
+    def test_recent_liq_returns_ok(self):
+        from checks import check_liq_silence, Status
+        conn = self._make_conn(last_liq_age_h=2)
+        result = check_liq_silence(conn, {})
+        assert result.status == Status.OK
+
+    def test_old_liq_recent_items_known_issue(self):
+        from checks import check_liq_silence, Status
+        conn = self._make_conn(last_liq_age_h=8, last_item_age_m=10)
+        result = check_liq_silence(conn, {})
+        assert result.status == Status.KNOWN_ISSUE
+        assert "liq-listener silent" in result.message
+
+    def test_old_liq_old_items_unknown_anomaly(self):
+        from checks import check_liq_silence, Status
+        conn = self._make_conn(last_liq_age_h=10, last_item_age_m=400)
+        result = check_liq_silence(conn, {})
+        assert result.status == Status.UNKNOWN_ANOMALY
+        assert "broader outage" in result.message.lower()
