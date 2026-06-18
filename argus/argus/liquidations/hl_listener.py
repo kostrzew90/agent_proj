@@ -14,7 +14,8 @@ logger = logging.getLogger(__name__)
 
 _HL_INFO_URL = "https://api.hyperliquid.xyz/info"
 _POLL_INTERVAL = int(os.environ.get("HL_POLL_INTERVAL", "60"))
-_CONCURRENCY = 5
+_CONCURRENCY = 1   # sequential — HL rate-limits bursts above ~20 req/s
+_REQUEST_DELAY = 0.2
 _REQUEST_TIMEOUT = 20
 
 
@@ -98,6 +99,7 @@ async def _poll_wallet(
     known_assets: frozenset[str],
 ) -> int:
     async with sem:
+        await asyncio.sleep(_REQUEST_DELAY)
         fills = await _fetch_fills(client, addr)
     records = parse_hl_liquidation(fills, known_assets)
     if not records:
