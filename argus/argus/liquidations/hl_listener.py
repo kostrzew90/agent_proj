@@ -88,6 +88,14 @@ async def _fetch_fills(client: httpx.AsyncClient, addr: str) -> list[dict]:
         json={"type": "userFills", "user": addr},
         timeout=_REQUEST_TIMEOUT,
     )
+    if resp.status_code == 429:
+        retry_after = float(resp.headers.get("Retry-After", "3"))
+        await asyncio.sleep(min(retry_after, 10))
+        resp = await client.post(
+            _HL_INFO_URL,
+            json={"type": "userFills", "user": addr},
+            timeout=_REQUEST_TIMEOUT,
+        )
     resp.raise_for_status()
     return resp.json()
 
