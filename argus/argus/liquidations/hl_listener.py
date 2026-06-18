@@ -14,8 +14,8 @@ logger = logging.getLogger(__name__)
 
 _HL_INFO_URL = "https://api.hyperliquid.xyz/info"
 _POLL_INTERVAL = int(os.environ.get("HL_POLL_INTERVAL", "60"))
-_CONCURRENCY = 1   # sequential — HL rate-limits bursts above ~20 req/s
-_REQUEST_DELAY = 0.2
+_CONCURRENCY = 1   # sequential — HL rate-limits at ~1.4 req/s
+_REQUEST_DELAY = 1.0  # 1 req/s → 43 wallets ≈ 65s per cycle
 _REQUEST_TIMEOUT = 20
 
 
