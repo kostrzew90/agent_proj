@@ -152,3 +152,126 @@ def test_compute_sizing_risk_tiers():
     assert compute_sizing(0.60, "BTC", "crypto")["risk_pct"] == 0.01
     assert compute_sizing(0.76, "BTC", "crypto")["risk_pct"] == 0.02
     assert compute_sizing(0.91, "BTC", "crypto")["risk_pct"] == 0.03
+
+
+# ---------------------------------------------------------------------------
+# Task 4: check_whale_signals + format_signal_message
+# ---------------------------------------------------------------------------
+from datetime import timedelta
+from argus.models import Source, SourceScore, WalletPosition, Asset
+from argus.signals import check_whale_signals, format_signal_message, SignalResult
+
+
+def _make_whale_source(session, handle="hl:abc", score=0.75, n=10):
+    src = Source(kind="hyperliquid", handle=handle, display_name=f"HL {handle[-6:]}", active=True)
+    session.add(src); session.flush()
+    session.add(SourceScore(
+        source_id=src.id, horizon="24h", n_claims=n,
+        hit_rate=score, avg_return=0.02, decayed_score=score,
+        updated_at=datetime.now(timezone.utc),
+    ))
+    session.commit()
+    return src
+
+
+def _make_position(session, source_id, coin="BTC", side="long", entry_px=67400.0,
+                   position_value=100_000.0, opened_minutes_ago=5):
+    now = datetime.now(timezone.utc)
+    wp = WalletPosition(
+        source_id=source_id, coin=coin, side=side, szi=1.0,
+        entry_px=entry_px, position_value=position_value,
+        opened_ts=now - timedelta(minutes=opened_minutes_ago),
+        last_seen_ts=now, open=True,
+    )
+    session.add(wp); session.commit()
+    return wp
+
+
+def test_whale_signal_generated(session):
+    session.add(Asset(symbol="BTC", kind="crypto", binance_symbol="BTCUSDT",
+                      scorable=True, active=True))
+    session.commit()
+    src = _make_whale_source(session, score=0.75, n=10)
+    _make_position(session, src.id, coin="BTC", opened_minutes_ago=5)
+    results = check_whale_signals(session)
+    assert len(results) == 1
+    assert results[0].asset == "BTC"
+    assert results[0].tier == "whale"
+    assert results[0].direction == "bull"
+
+
+def test_whale_signal_skipped_low_score(session):
+    session.add(Asset(symbol="ETH", kind="crypto", binance_symbol="ETHUSDT",
+                      scorable=True, active=True))
+    session.commit()
+    src = _make_whale_source(session, handle="hl:low", score=0.50, n=10)
+    _make_position(session, src.id, coin="ETH")
+    results = check_whale_signals(session)
+    assert results == []
+
+
+def test_whale_signal_skipped_low_n(session):
+    session.add(Asset(symbol="XRP", kind="crypto", binance_symbol="XRPUSDT",
+                      scorable=True, active=True))
+    session.commit()
+    src = _make_whale_source(session, handle="hl:lown", score=0.80, n=3)
+    _make_position(session, src.id, coin="XRP")
+    results = check_whale_signals(session)
+    assert results == []
+
+
+def test_whale_signal_skipped_old_position(session):
+    session.add(Asset(symbol="DOT", kind="crypto", binance_symbol="DOTUSDT",
+                      scorable=True, active=True))
+    session.commit()
+    src = _make_whale_source(session, handle="hl:old", score=0.75, n=10)
+    _make_position(session, src.id, coin="DOT", opened_minutes_ago=20)
+    results = check_whale_signals(session)
+    assert results == []
+
+
+def test_whale_signal_cooldown(session):
+    session.add(Asset(symbol="RUNE", kind="crypto", binance_symbol="RUNEUSDT",
+                      scorable=True, active=True))
+    session.commit()
+    src = _make_whale_source(session, handle="hl:rune", score=0.75, n=10)
+    _make_position(session, src.id, coin="RUNE")
+    session.add(SignalLog(
+        tier="whale", asset="RUNE", direction="bull", source_ids="[1]",
+        signal_strength=0.55, entry_price=1.0, stop_price=0.95,
+        position_pct=0.20, sent_at=datetime.now(timezone.utc) - timedelta(hours=1),
+    ))
+    session.commit()
+    results = check_whale_signals(session)
+    assert results == []
+
+
+def test_format_whale_message():
+    r = SignalResult(
+        tier="whale", asset="BTC", asset_kind="crypto", direction="bull",
+        source_ids=[1], source_labels=["HL abc123 · 0.75 · 75%@24h · n=10"],
+        signal_strength=0.125, entry_price=67400.0, stop_price=64030.0,
+        position_pct=0.20, risk_pct=0.01, stop_pct=0.05,
+        vol_tier="large", horizon="24h", window_str=None, whale_notional=100_000.0,
+    )
+    msg = format_signal_message(r)
+    assert "🐋" in msg
+    assert "BULLISH BTC/USDT" in msg
+    assert "67400" in msg
+    assert "64030" in msg
+    assert "20%" in msg
+
+
+def test_format_confluence_message():
+    r = SignalResult(
+        tier="confluence", asset="ETH", asset_kind="crypto", direction="bear",
+        source_ids=[1, 2], source_labels=["src A · 0.61", "src B · 0.63"],
+        signal_strength=0.84, entry_price=3400.0, stop_price=3638.0,
+        position_pct=0.143, risk_pct=0.01, stop_pct=0.07,
+        vol_tier="large", horizon="24h", window_str="1h45m", whale_notional=None,
+    )
+    msg = format_signal_message(r)
+    assert "⚡" in msg
+    assert "BEARISH ETH/USDT" in msg
+    assert "1h45m" in msg
+    assert "strength 0.84" in msg

@@ -91,3 +91,126 @@ def compute_sizing(strength: float, asset_symbol: str, asset_kind: str) -> dict:
     if asset_kind == "stock":
         pos = min(pos, 0.15)
     return {"risk_pct": rp, "stop_pct": sp, "position_pct": pos, "vol_tier": vt}
+
+
+def _is_on_cooldown(session, asset: str) -> bool:
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=_COOLDOWN_HOURS)
+    return session.scalar(
+        select(SignalLog).where(SignalLog.asset == asset, SignalLog.sent_at >= cutoff)
+    ) is not None
+
+
+def _max_n_claims(session, source_id: int) -> int:
+    return session.scalar(
+        select(func.max(SourceScore.n_claims)).where(SourceScore.source_id == source_id)
+    ) or 0
+
+
+def _get_source_score(session, source_id: int, horizon: str):
+    return session.scalar(
+        select(SourceScore).where(
+            SourceScore.source_id == source_id,
+            SourceScore.horizon == horizon,
+        )
+    )
+
+
+def _last_price(session, asset: str):
+    row = session.scalar(
+        select(Price).where(Price.asset == asset).order_by(Price.ts.desc())
+    )
+    return row.price if row else None
+
+
+def _save_signal(session, result) -> SignalLog:
+    log = SignalLog(
+        tier=result.tier,
+        asset=result.asset,
+        direction=result.direction,
+        source_ids=json.dumps(result.source_ids),
+        signal_strength=result.signal_strength,
+        entry_price=result.entry_price,
+        stop_price=result.stop_price,
+        position_pct=result.position_pct,
+        sent_at=datetime.now(timezone.utc),
+    )
+    session.add(log)
+    session.flush()
+    session.add(SignalOutcome(
+        signal_id=log.id,
+        asset=result.asset,
+        entry_price=result.entry_price,
+        outcome="open",
+    ))
+    session.commit()
+    return log
+
+
+def check_whale_signals(session) -> list:
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=_WHALE_LOOKBACK_MINUTES)
+    positions = list(session.scalars(
+        select(WalletPosition).where(
+            WalletPosition.open == True,   # noqa: E712
+            WalletPosition.opened_ts >= cutoff,
+        )
+    ))
+    results = []
+    for pos in positions:
+        source = session.get(Source, pos.source_id)
+        if source is None or source.kind != "hyperliquid":
+            continue
+        n = _max_n_claims(session, pos.source_id)
+        ss = _get_source_score(session, pos.source_id, "24h")
+        if ss is None or not passes_gate(ss.decayed_score, n):
+            continue
+        if _is_on_cooldown(session, pos.coin):
+            continue
+        eff = effective_score(ss.decayed_score, n)
+        sizing = compute_sizing(eff, pos.coin, "crypto")
+        direction = "bull" if pos.side == "long" else "bear"
+        sp = sizing["stop_pct"]
+        stop = pos.entry_px * (1 - sp) if direction == "bull" else pos.entry_px * (1 + sp)
+        label = (f"{source.display_name} · {ss.decayed_score:.2f} · "
+                 f"{ss.hit_rate:.0%}@24h · n={n}")
+        results.append(SignalResult(
+            tier="whale",
+            asset=pos.coin,
+            asset_kind="crypto",
+            direction=direction,
+            source_ids=[pos.source_id],
+            source_labels=[label],
+            signal_strength=eff,
+            entry_price=pos.entry_px,
+            stop_price=round(stop, 4),
+            position_pct=sizing["position_pct"],
+            risk_pct=sizing["risk_pct"],
+            stop_pct=sizing["stop_pct"],
+            vol_tier=sizing["vol_tier"],
+            horizon="24h",
+            window_str=None,
+            whale_notional=pos.position_value,
+        ))
+    return results
+
+
+def format_signal_message(result) -> str:
+    emoji = "🐋" if result.tier == "whale" else "⚡"
+    dir_str = "BULLISH" if result.direction == "bull" else "BEARISH"
+    suffix = "USDT" if result.asset_kind == "crypto" else "USD"
+    tier_str = ("WHALE SIGNAL" if result.tier == "whale"
+                else f"CONFLUENCE · strength {result.signal_strength:.2f}")
+    lines = [f"{emoji} {tier_str} · {dir_str} {result.asset}/{suffix}", ""]
+    for label in result.source_labels:
+        lines.append(f"• {label}")
+    if result.tier == "confluence" and result.window_str:
+        lines.append(f"Zgodność: {len(result.source_ids)} źródła · okno {result.window_str}")
+    if result.whale_notional is not None:
+        lines.append(f"Pozycja whale: ${result.whale_notional:,.0f} @ ${result.entry_price:.2f}")
+    lines += [
+        "",
+        f"Entry teraz: ~${result.entry_price:.2f}",
+        f"Stop-loss: ${result.stop_price:.2f} (-{result.stop_pct:.0%}, {result.vol_tier} cap)",
+        f"Pozycja: {result.position_pct:.0%} portfela (ryzyko {result.risk_pct:.0%})",
+        f"Horyzont: {result.horizon}",
+    ]
+    return "\n".join(lines)
