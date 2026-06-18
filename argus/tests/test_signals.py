@@ -275,3 +275,106 @@ def test_format_confluence_message():
     assert "BEARISH ETH/USDT" in msg
     assert "1h45m" in msg
     assert "strength 0.84" in msg
+
+
+# ---------------------------------------------------------------------------
+# Task 5: check_confluence_signals
+# ---------------------------------------------------------------------------
+from argus.models import Claim, Price
+from argus.signals import check_confluence_signals
+
+
+def _make_rss_source(session, handle, score=0.65, n=8):
+    src = Source(kind="rss", handle=handle, display_name=handle, active=True)
+    session.add(src); session.flush()
+    session.add(SourceScore(
+        source_id=src.id, horizon="24h", n_claims=n,
+        hit_rate=score, avg_return=0.01, decayed_score=score,
+        updated_at=datetime.now(timezone.utc),
+    ))
+    session.commit()
+    return src
+
+
+def _make_reddit_source(session, handle, score=0.65, n=8):
+    src = Source(kind="reddit", handle=handle, display_name=handle, active=True)
+    session.add(src); session.flush()
+    session.add(SourceScore(
+        source_id=src.id, horizon="24h", n_claims=n,
+        hit_rate=score, avg_return=0.01, decayed_score=score,
+        updated_at=datetime.now(timezone.utc),
+    ))
+    session.commit()
+    return src
+
+
+def _make_claim(session, source_id, asset, direction="bull", minutes_ago=30):
+    ts = datetime.now(timezone.utc) - timedelta(minutes=minutes_ago)
+    c = Claim(
+        source_id=source_id, asset=asset, direction=direction,
+        confidence=0.7, method="rule", entry_price=100.0, entry_ts=ts, status="open",
+    )
+    session.add(c); session.commit()
+    return c
+
+
+def _make_price(session, asset, price):
+    session.add(Price(asset=asset, ts=datetime.now(timezone.utc), price=price))
+    session.commit()
+
+
+def test_confluence_signal_generated(session):
+    session.add(Asset(symbol="SOL", kind="crypto", binance_symbol="SOLUSDT",
+                      scorable=True, active=True))
+    session.commit()
+    rss_src = _make_rss_source(session, "rss:theblock", score=0.65, n=8)
+    red_src = _make_reddit_source(session, "reddit:ssb", score=0.65, n=8)
+    _make_claim(session, rss_src.id, "SOL", "bull")
+    _make_claim(session, red_src.id, "SOL", "bull")
+    _make_price(session, "SOL", 150.0)
+    results = check_confluence_signals(session)
+    assert len(results) == 1
+    assert results[0].asset == "SOL"
+    assert results[0].tier == "confluence"
+
+
+def test_confluence_skipped_same_kind(session):
+    session.add(Asset(symbol="ONDO", kind="crypto", binance_symbol="ONDOUSDT",
+                      scorable=True, active=True))
+    session.commit()
+    r1 = _make_reddit_source(session, "reddit:a", score=0.65, n=8)
+    r2 = _make_reddit_source(session, "reddit:b", score=0.65, n=8)
+    _make_claim(session, r1.id, "ONDO", "bull")
+    _make_claim(session, r2.id, "ONDO", "bull")
+    _make_price(session, "ONDO", 1.0)
+    results = check_confluence_signals(session)
+    assert results == []
+
+
+def test_confluence_skipped_low_strength(session):
+    session.add(Asset(symbol="HBAR", kind="crypto", binance_symbol="HBARUSDT",
+                      scorable=True, active=True))
+    session.commit()
+    # n=5 → effective = 0.60 * (5/30) ≈ 0.10; combined(0.10, 0.10) ≈ 0.19 < 0.80
+    r = _make_rss_source(session, "rss:x", score=0.60, n=5)
+    rd = _make_reddit_source(session, "reddit:x", score=0.60, n=5)
+    _make_claim(session, r.id, "HBAR", "bull")
+    _make_claim(session, rd.id, "HBAR", "bull")
+    _make_price(session, "HBAR", 0.10)
+    results = check_confluence_signals(session)
+    assert results == []
+
+
+def test_confluence_top3_limit(session):
+    for sym, bs in [("BTC", "BTCUSDT"), ("ETH", "ETHUSDT"), ("XRP", "XRPUSDT"), ("DOT", "DOTUSDT")]:
+        session.add(Asset(symbol=sym, kind="crypto", binance_symbol=bs,
+                          scorable=True, active=True))
+        _make_price(session, sym, 100.0)
+    session.commit()
+    for sym in ["BTC", "ETH", "XRP", "DOT"]:
+        r = _make_rss_source(session, f"rss:{sym}", score=0.80, n=30)
+        rd = _make_reddit_source(session, f"red:{sym}", score=0.80, n=30)
+        _make_claim(session, r.id, sym, "bull")
+        _make_claim(session, rd.id, sym, "bull")
+    results = check_confluence_signals(session)
+    assert len(results) <= 3

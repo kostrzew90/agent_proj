@@ -193,6 +193,80 @@ def check_whale_signals(session) -> list:
     return results
 
 
+def check_confluence_signals(session) -> list:
+    window_cutoff = datetime.now(timezone.utc) - timedelta(hours=_CONFLUENCE_WINDOW_HOURS)
+    claims = list(session.scalars(
+        select(Claim).where(Claim.entry_ts >= window_cutoff)
+    ))
+
+    groups: dict = {}
+    for claim in claims:
+        source = session.get(Source, claim.source_id)
+        if source is None or source.kind not in _ELIGIBLE_KINDS:
+            continue
+        asset_row = session.scalar(select(Asset).where(Asset.symbol == claim.asset))
+        if asset_row is None:
+            continue
+        horizon = "7d" if asset_row.kind == "stock" else "24h"
+        n = _max_n_claims(session, claim.source_id)
+        ss = _get_source_score(session, claim.source_id, horizon)
+        if ss is None or not passes_gate(ss.decayed_score, n):
+            continue
+        key = (claim.asset, claim.direction)
+        groups.setdefault(key, []).append((claim, source, ss, n, asset_row))
+
+    results = []
+    for (asset, direction), entries in groups.items():
+        kinds = {e[1].kind for e in entries}
+        if len(kinds) < 2:
+            continue
+        if _is_on_cooldown(session, asset):
+            continue
+        asset_row = entries[0][4]
+        horizon = "7d" if asset_row.kind == "stock" else "24h"
+        eff_scores = [e[2].decayed_score * min(1.0, e[3] / 7.0) for e in entries]
+        strength = combined_strength(eff_scores)
+        if strength < _CONFLUENCE_MIN_STRENGTH:
+            continue
+        entry_price = _last_price(session, asset)
+        if entry_price is None:
+            logger.warning("confluence: no price for %s, skipping", asset)
+            continue
+        sizing = compute_sizing(strength, asset, asset_row.kind)
+        sp = sizing["stop_pct"]
+        stop = entry_price * (1 - sp) if direction == "bull" else entry_price * (1 + sp)
+        timestamps = [e[0].entry_ts for e in entries]
+        window_mins = int((max(timestamps) - min(timestamps)).total_seconds() / 60)
+        window_str = (f"{window_mins // 60}h{window_mins % 60}m"
+                      if window_mins >= 60 else f"{window_mins}m")
+        labels = [
+            f"{e[1].display_name} · {e[2].decayed_score:.2f} · "
+            f"{e[2].hit_rate:.0%}@{horizon} · n={e[3]}"
+            for e in entries
+        ]
+        results.append(SignalResult(
+            tier="confluence",
+            asset=asset,
+            asset_kind=asset_row.kind,
+            direction=direction,
+            source_ids=[e[0].source_id for e in entries],
+            source_labels=labels,
+            signal_strength=strength,
+            entry_price=entry_price,
+            stop_price=round(stop, 4),
+            position_pct=sizing["position_pct"],
+            risk_pct=sizing["risk_pct"],
+            stop_pct=sizing["stop_pct"],
+            vol_tier=sizing["vol_tier"],
+            horizon=horizon,
+            window_str=window_str,
+            whale_notional=None,
+        ))
+
+    results.sort(key=lambda r: r.signal_strength, reverse=True)
+    return results[:_CONFLUENCE_MAX_SIGNALS]
+
+
 def format_signal_message(result) -> str:
     emoji = "🐋" if result.tier == "whale" else "⚡"
     dir_str = "BULLISH" if result.direction == "bull" else "BEARISH"
