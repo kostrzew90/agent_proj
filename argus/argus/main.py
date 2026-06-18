@@ -138,6 +138,20 @@ def _heartbeat_job():
         pass  # guardian_state may not exist yet; harmless
 
 
+def _whale_signal_job():
+    from argus.signals import send_signals
+    with SessionLocal() as s:
+        send_signals(s)
+
+
+def _signal_outcomes_job():
+    from argus.signals import evaluate_signal_outcomes
+    import logging as _logging
+    with SessionLocal() as s:
+        n = evaluate_signal_outcomes(s)
+    _logging.getLogger(__name__).info("signal_outcomes: evaluated %d", n)
+
+
 def bootstrap():
     Base.metadata.create_all(engine)
     with SessionLocal() as s:
@@ -156,6 +170,8 @@ def bootstrap():
     sched.add_interval("fred", _fred_job, minutes=1440)
     sched.add_interval("edgar", _edgar_job, minutes=360)
     sched.add_interval("heartbeat", _heartbeat_job, minutes=5)
+    sched.add_interval("whale_signal", _whale_signal_job, minutes=10)
+    sched.add_interval("signal_outcomes", _signal_outcomes_job, minutes=360)
     sched.start()
 
 if __name__ == "__main__":
