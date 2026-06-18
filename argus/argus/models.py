@@ -170,3 +170,31 @@ class LlmQueue(Base):
     enqueued_at: Mapped[datetime] = mapped_column(TZDateTime())
     processed_at: Mapped[datetime | None] = mapped_column(TZDateTime(), nullable=True)
     last_error: Mapped[str | None] = mapped_column(String, nullable=True)
+
+class SignalLog(Base):
+    __tablename__ = "signal_log"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tier: Mapped[str] = mapped_column(String)           # "whale" | "confluence"
+    asset: Mapped[str] = mapped_column(String)
+    direction: Mapped[str] = mapped_column(String)      # "bull" | "bear"
+    source_ids: Mapped[str] = mapped_column(String)     # JSON list of ints
+    signal_strength: Mapped[float] = mapped_column(Float)
+    entry_price: Mapped[float] = mapped_column(Float)
+    stop_price: Mapped[float] = mapped_column(Float)
+    position_pct: Mapped[float] = mapped_column(Float)
+    sent_at: Mapped[datetime] = mapped_column(TZDateTime())
+
+
+class SignalOutcome(Base):
+    __tablename__ = "signal_outcomes"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    signal_id: Mapped[int] = mapped_column(ForeignKey("signal_log.id"))
+    asset: Mapped[str] = mapped_column(String)
+    entry_price: Mapped[float] = mapped_column(Float)
+    price_24h: Mapped[float | None] = mapped_column(Float, nullable=True)
+    price_7d: Mapped[float | None] = mapped_column(Float, nullable=True)
+    max_favorable_excursion: Mapped[float | None] = mapped_column(Float, nullable=True)
+    max_adverse_excursion: Mapped[float | None] = mapped_column(Float, nullable=True)
+    hit_stop: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    outcome: Mapped[str | None] = mapped_column(String, nullable=True)  # open|win|loss|stopped
+    evaluated_at: Mapped[datetime | None] = mapped_column(TZDateTime(), nullable=True)
