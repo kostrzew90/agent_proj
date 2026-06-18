@@ -1,62 +1,83 @@
+import asyncio
 from datetime import datetime, timezone
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from argus.liquidations.hl_listener import parse_hl_liquidation
+
+from argus.liquidations.hl_listener import (
+    _load_known_assets,
+    _load_wallets,
+    _poll_all,
+    insert_hl_liquidations,
+    parse_hl_liquidation,
+)
+from argus.models import Asset, Liquidation, Source, WalletPosition
 
 
-def _event(lid=42, coin="BTC", side_dir="Liquidated Long", px="60000", sz="0.5", ts_ms=1700000000000):
+# ─── helpers ────────────────────────────────────────────────────────────────
+
+def _fill(lid=42, coin="BTC", side_dir="Liquidated Long", px="60000", sz="0.5", ts_ms=1700000000000):
     return {
-        "channel": "userEvents",
-        "data": {
-            "fills": [
-                {
-                    "coin": coin,
-                    "px": px,
-                    "sz": sz,
-                    "side": "A",
-                    "time": ts_ms,
-                    "dir": side_dir,
-                    "closedPnl": "-1000.0",
-                    "liquidationId": lid,
-                    "hash": "0xabc",
-                    "oid": 123,
-                    "crossed": True,
-                    "fee": "1.5",
-                    "tid": 456,
-                    "feeToken": "USDC",
-                }
-            ]
-        },
+        "coin": coin,
+        "px": px,
+        "sz": sz,
+        "side": "A",
+        "time": ts_ms,
+        "dir": side_dir,
+        "closedPnl": "-1000.0",
+        "liquidationId": lid,
+        "hash": "0xabc",
+        "oid": 123,
+        "crossed": True,
+        "fee": "1.5",
+        "tid": 456,
+        "feeToken": "USDC",
     }
 
 
-def _non_liq_event():
+def _non_liq_fill():
     return {
-        "channel": "userEvents",
-        "data": {
-            "fills": [
-                {
-                    "coin": "BTC",
-                    "px": "61000",
-                    "sz": "0.1",
-                    "side": "B",
-                    "time": 1700000000000,
-                    "dir": "Open Long",
-                    "closedPnl": "0",
-                    "liquidationId": None,
-                    "hash": "0xdef",
-                    "oid": 789,
-                    "crossed": False,
-                    "fee": "0.5",
-                    "tid": 111,
-                    "feeToken": "USDC",
-                }
-            ]
-        },
+        "coin": "BTC",
+        "px": "61000",
+        "sz": "0.1",
+        "side": "B",
+        "time": 1700000000000,
+        "dir": "Open Long",
+        "closedPnl": "0",
+        "liquidationId": None,
+        "hash": "0xdef",
+        "oid": 789,
+        "crossed": False,
+        "fee": "0.5",
+        "tid": 111,
+        "feeToken": "USDC",
     }
 
+
+def _rec(lid=1, asset="BTC"):
+    return {
+        "asset": asset,
+        "exchange": "hyperliquid",
+        "side": "long_liq",
+        "price": 60000.0,
+        "qty": 0.5,
+        "notional_usd": 30000.0,
+        "raw_symbol": f"HL_LIQ:{lid}",
+        "ts": datetime.now(timezone.utc),
+    }
+
+
+def _btc(session):
+    a = Asset(symbol="BTC", kind="crypto", scorable=True)
+    session.add(a)
+    session.commit()
+    return a
+
+
+# ─── parse_hl_liquidation ────────────────────────────────────────────────────
 
 def test_parse_returns_liquidation_fill():
-    recs = parse_hl_liquidation(_event(), {"BTC"})
+    recs = parse_hl_liquidation([_fill()], {"BTC"})
     assert len(recs) == 1
     r = recs[0]
     assert r["asset"] == "BTC"
@@ -71,75 +92,38 @@ def test_parse_returns_liquidation_fill():
 
 
 def test_parse_short_liquidation():
-    recs = parse_hl_liquidation(_event(side_dir="Liquidated Short"), {"BTC"})
+    recs = parse_hl_liquidation([_fill(side_dir="Liquidated Short")], {"BTC"})
     assert recs[0]["side"] == "short_liq"
 
 
 def test_parse_skips_non_liquidation_fill():
-    recs = parse_hl_liquidation(_non_liq_event(), {"BTC"})
+    recs = parse_hl_liquidation([_non_liq_fill()], {"BTC"})
     assert recs == []
 
 
 def test_parse_skips_unknown_coin():
-    recs = parse_hl_liquidation(_event(coin="SOL"), {"BTC", "ETH"})
+    recs = parse_hl_liquidation([_fill(coin="SOL")], {"BTC", "ETH"})
     assert recs == []
 
 
 def test_parse_empty_fills():
-    event = {"channel": "userEvents", "data": {"fills": []}}
-    recs = parse_hl_liquidation(event, {"BTC"})
-    assert recs == []
-
-
-def test_parse_no_fills_key():
-    event = {"channel": "userEvents", "data": {}}
-    recs = parse_hl_liquidation(event, {"BTC"})
+    recs = parse_hl_liquidation([], {"BTC"})
     assert recs == []
 
 
 def test_parse_mixed_fills():
-    event = {
-        "channel": "userEvents",
-        "data": {
-            "fills": [
-                _event(lid=1)["data"]["fills"][0],
-                _non_liq_event()["data"]["fills"][0],
-            ]
-        },
-    }
-    recs = parse_hl_liquidation(event, {"BTC"})
+    recs = parse_hl_liquidation([_fill(lid=1), _non_liq_fill()], {"BTC"})
     assert len(recs) == 1
     assert recs[0]["raw_symbol"] == "HL_LIQ:1"
 
+
 def test_parse_zero_liquidation_id_is_valid():
-    recs = parse_hl_liquidation(_event(lid=0), {"BTC"})
+    recs = parse_hl_liquidation([_fill(lid=0)], {"BTC"})
     assert len(recs) == 1
     assert recs[0]["raw_symbol"] == "HL_LIQ:0"
 
-from argus.models import Asset, Liquidation, Source, WalletPosition
-from argus.liquidations.hl_listener import insert_hl_liquidations
 
-
-def _btc(session):
-    a = Asset(symbol="BTC", kind="crypto", scorable=True)
-    session.add(a)
-    session.commit()
-    return a
-
-
-def _rec(lid=1, asset="BTC"):
-    from datetime import datetime, timezone
-    return {
-        "asset": asset,
-        "exchange": "hyperliquid",
-        "side": "long_liq",
-        "price": 60000.0,
-        "qty": 0.5,
-        "notional_usd": 30000.0,
-        "raw_symbol": f"HL_LIQ:{lid}",
-        "ts": datetime.now(timezone.utc),
-    }
-
+# ─── insert_hl_liquidations ──────────────────────────────────────────────────
 
 def test_insert_basic(session):
     _btc(session)
@@ -168,13 +152,21 @@ def test_insert_different_lids(session):
     assert session.query(Liquidation).count() == 2
 
 
+def test_insert_batch_partial_dedup(session):
+    """When batch has mix of new and existing lids, only new ones are inserted."""
+    _btc(session)
+    insert_hl_liquidations(session, [_rec(lid=1)])
+    n = insert_hl_liquidations(session, [_rec(lid=1), _rec(lid=2)])
+    assert n == 1
+    assert session.query(Liquidation).count() == 2
+
+
 def test_insert_empty(session):
     n = insert_hl_liquidations(session, [])
     assert n == 0
 
 
 def test_wallet_positions_not_modified(session):
-    from datetime import datetime, timezone
     _btc(session)
     src = Source(handle="0xabc", kind="hyperliquid", display_name="test", active=True)
     session.add(src)
@@ -192,10 +184,7 @@ def test_wallet_positions_not_modified(session):
     assert wp.open is True
 
 
-import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
-from argus.liquidations.hl_listener import _load_wallets, _load_known_assets
-
+# ─── _load_wallets / _load_known_assets ──────────────────────────────────────
 
 def test_load_wallets(session):
     session.add(Source(handle="0xaaa", kind="hyperliquid", active=True, display_name="a"))
@@ -204,7 +193,7 @@ def test_load_wallets(session):
     session.add(Source(handle="0xddd", kind="hyperliquid", active=False, display_name="d"))
     session.commit()
     addrs = _load_wallets(session)
-    assert addrs == {"0xaaa", "0xbbb"}
+    assert set(addrs) == {"0xaaa", "0xbbb"}
 
 
 def test_load_known_assets(session):
@@ -216,40 +205,34 @@ def test_load_known_assets(session):
     assert "TOTAL" in assets
 
 
-def test_wallet_task_reconnects():
-    # asyncio.sleep mock that returns immediately has no yield point,
-    # so wait_for timeout never fires — use real sleep(0) via a counter cap instead
-    connect_count = 0
-    MAX_ATTEMPTS = 3
+# ─── _poll_all ───────────────────────────────────────────────────────────────
 
-    async def run_task():
-        nonlocal connect_count
+def test_poll_all_returns_sum_of_inserts():
+    async def run():
+        async def fake_poll_wallet(client, sem, addr, known_assets):
+            return {"0xaaa": 2, "0xbbb": 0, "0xccc": 1}.get(addr, 0)
 
-        async def fake_connect(*args, **kwargs):
-            nonlocal connect_count
-            connect_count += 1
-            if connect_count >= MAX_ATTEMPTS:
-                # stop the loop by raising CancelledError on 3rd attempt
-                raise asyncio.CancelledError()
-            raise ConnectionError("forced disconnect")
+        with patch("argus.liquidations.hl_listener._poll_wallet", side_effect=fake_poll_wallet):
+            return await _poll_all(["0xaaa", "0xbbb", "0xccc"], frozenset({"BTC"}))
 
-        mock_s = MagicMock()
-        mock_s.__enter__ = MagicMock(return_value=mock_s)
-        mock_s.__exit__ = MagicMock(return_value=False)
-        mock_s.scalar.return_value = None
+    total = asyncio.run(run())
+    assert total == 3
 
-        # Use real asyncio.sleep(0) — yields control without blocking
-        async def instant_sleep(_):
-            await asyncio.sleep(0)
 
-        with patch("argus.liquidations.hl_listener.websockets.connect", side_effect=fake_connect), \
-             patch("argus.liquidations.hl_listener.SessionLocal", return_value=mock_s), \
-             patch("argus.liquidations.hl_listener.asyncio.sleep", side_effect=instant_sleep):
-            from argus.liquidations.hl_listener import _wallet_task
-            try:
-                await _wallet_task("0xabc", frozenset({"BTC"}))
-            except asyncio.CancelledError:
-                pass
+def test_poll_all_skips_erroring_wallet():
+    async def run():
+        async def fake_poll_wallet(client, sem, addr, known_assets):
+            if addr == "0xbad":
+                raise RuntimeError("network error")
+            return 1
 
-    asyncio.run(run_task())
-    assert connect_count >= 2
+        with patch("argus.liquidations.hl_listener._poll_wallet", side_effect=fake_poll_wallet):
+            return await _poll_all(["0xgood", "0xbad"], frozenset({"BTC"}))
+
+    total = asyncio.run(run())
+    assert total == 1
+
+
+def test_poll_all_empty_wallets():
+    total = asyncio.run(_poll_all([], frozenset({"BTC"})))
+    assert total == 0
