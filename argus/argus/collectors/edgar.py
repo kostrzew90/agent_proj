@@ -130,8 +130,10 @@ def parse_form4_xml(xml: str) -> list[InsiderTransaction]:
 
 
 def collect_edgar_insider(session, source: Source, symbol: str,
-                          cik: int, asset) -> int:
+                          cik: int, asset, days_back: int = 365) -> int:
+    from datetime import timedelta
     now = datetime.now(timezone.utc)
+    cutoff = (now - timedelta(days=days_back)).strftime("%Y-%m-%d")
     try:
         filings = _fetch_submissions(cik)
     except Exception as e:
@@ -140,6 +142,8 @@ def collect_edgar_insider(session, source: Source, symbol: str,
 
     created = 0
     for filing in filings:
+        if filing.get("filing_date", "") < cutoff:
+            continue
         if not filing.get("primary_doc", "").endswith(".xml"):
             continue
         try:

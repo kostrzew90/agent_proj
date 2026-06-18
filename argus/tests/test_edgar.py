@@ -240,3 +240,17 @@ def test_collect_price_error_skips():
                side_effect=Exception("no price")):
         n = collect_edgar_insider(session, _make_source(), "XOMA", 754811, _make_asset())
     assert n == 0
+
+
+def test_collect_skips_old_filing():
+    """Filings older than days_back are skipped entirely (no HTTP fetch)."""
+    session = _make_session()
+    old_filing = {"filing_date": "2019-05-06", "accession": "old-acc",
+                  "primary_doc": "old.xml", "cik": 754811}
+    with patch("argus.collectors.edgar._fetch_submissions",
+               return_value=[old_filing]) as mock_sub, \
+         patch("argus.collectors.edgar._fetch_form4_xml") as mock_fetch:
+        n = collect_edgar_insider(session, _make_source(), "BYND", 12345,
+                                  _make_asset("BYND"), days_back=365)
+    assert n == 0
+    mock_fetch.assert_not_called()
