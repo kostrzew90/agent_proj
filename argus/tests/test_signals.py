@@ -80,3 +80,75 @@ def test_signal_outcome_links_to_log(session):
     session.commit()
     assert so.id is not None
     assert so.signal_id == log.id
+
+
+from argus.signals import (
+    passes_gate, effective_score, combined_strength,
+    vol_tier, compute_sizing,
+)
+
+
+def test_passes_gate_true():
+    assert passes_gate(0.65, 6) is True
+
+
+def test_passes_gate_false_low_score():
+    assert passes_gate(0.55, 10) is False
+
+
+def test_passes_gate_false_low_n():
+    assert passes_gate(0.70, 4) is False
+
+
+def test_effective_score_full_confidence():
+    assert effective_score(0.75, 30) == 0.75
+
+
+def test_effective_score_partial():
+    assert abs(effective_score(0.80, 15) - 0.40) < 1e-9
+
+
+def test_effective_score_low_n():
+    assert abs(effective_score(0.75, 5) - 0.125) < 1e-6
+
+
+def test_combined_strength_two_equal():
+    assert abs(combined_strength([0.6, 0.6]) - 0.84) < 1e-9
+
+
+def test_combined_strength_single():
+    assert combined_strength([0.7]) == 0.7
+
+
+def test_combined_strength_empty():
+    assert combined_strength([]) == 0.0
+
+
+def test_vol_tier_large_cap():
+    assert vol_tier("BTC") == "large"
+    assert vol_tier("ETH") == "large"
+
+
+def test_vol_tier_default_mid():
+    assert vol_tier("SOL") == "mid"
+    assert vol_tier("XOMA") == "mid"
+
+
+def test_compute_sizing_crypto_large():
+    s = compute_sizing(0.60, "BTC", "crypto")
+    assert s["risk_pct"] == 0.01
+    assert s["stop_pct"] == 0.05
+    assert abs(s["position_pct"] - 0.20) < 1e-9
+    assert s["vol_tier"] == "large"
+
+
+def test_compute_sizing_stock_cap():
+    # mid cap stock: risk 1%, stop 4% → 25% but capped at 15%
+    s = compute_sizing(0.60, "LCID", "stock")
+    assert s["position_pct"] == 0.15
+
+
+def test_compute_sizing_risk_tiers():
+    assert compute_sizing(0.60, "BTC", "crypto")["risk_pct"] == 0.01
+    assert compute_sizing(0.76, "BTC", "crypto")["risk_pct"] == 0.02
+    assert compute_sizing(0.91, "BTC", "crypto")["risk_pct"] == 0.03
