@@ -9,6 +9,7 @@ from argus.models import (
     Asset, Claim, Price, Source, SourceScore,
     SignalLog, SignalOutcome, WalletPosition,
 )
+from argus.telegram import send_message
 
 logger = logging.getLogger(__name__)
 
@@ -265,6 +266,53 @@ def check_confluence_signals(session) -> list:
 
     results.sort(key=lambda r: r.signal_strength, reverse=True)
     return results[:_CONFLUENCE_MAX_SIGNALS]
+
+
+def evaluate_signal_outcomes(session) -> int:
+    now = datetime.now(timezone.utc)
+    cutoff_24h = now - timedelta(hours=24)
+    open_outcomes = list(session.scalars(
+        select(SignalOutcome)
+        .join(SignalLog, SignalOutcome.signal_id == SignalLog.id)
+        .where(SignalOutcome.outcome == "open")
+        .where(SignalLog.sent_at <= cutoff_24h)
+    ))
+    updated = 0
+    for so in open_outcomes:
+        signal = session.get(SignalLog, so.signal_id)
+        current_price = _last_price(session, so.asset)
+        if current_price is None:
+            continue
+        age_hours = (now - signal.sent_at).total_seconds() / 3600
+        if age_hours >= 24 and so.price_24h is None:
+            so.price_24h = current_price
+        if age_hours >= 168 and so.price_7d is None:
+            so.price_7d = current_price
+        if signal.direction == "bull":
+            hit_stop = current_price <= signal.stop_price
+        else:
+            hit_stop = current_price >= signal.stop_price
+        if hit_stop:
+            so.hit_stop = True
+            so.outcome = "stopped"
+        elif so.price_7d is not None:
+            ret = (so.price_7d - so.entry_price) / so.entry_price
+            so.outcome = "win" if (signal.direction == "bull") == (ret > 0) else "loss"
+        so.evaluated_at = now
+        updated += 1
+    session.commit()
+    return updated
+
+
+def send_signals(session) -> None:
+    whale = check_whale_signals(session)
+    confluence = check_confluence_signals(session)
+    for result in whale + confluence:
+        msg = format_signal_message(result)
+        send_message(msg)
+        _save_signal(session, result)
+        logger.info("signal sent: %s %s %s strength=%.2f",
+                    result.tier, result.direction, result.asset, result.signal_strength)
 
 
 def format_signal_message(result) -> str:

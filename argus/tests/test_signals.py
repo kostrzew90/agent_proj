@@ -378,3 +378,72 @@ def test_confluence_top3_limit(session):
         _make_claim(session, rd.id, sym, "bull")
     results = check_confluence_signals(session)
     assert len(results) <= 3
+
+
+# ---------------------------------------------------------------------------
+# Task 6: evaluate_signal_outcomes + send_signals
+# ---------------------------------------------------------------------------
+from argus.signals import evaluate_signal_outcomes, send_signals
+
+
+def _make_signal_log(session, asset="BTC", direction="bull",
+                     entry=67400.0, stop=64030.0, hours_ago=25):
+    log = SignalLog(
+        tier="whale", asset=asset, direction=direction,
+        source_ids="[1]", signal_strength=0.55,
+        entry_price=entry, stop_price=stop, position_pct=0.20,
+        sent_at=datetime.now(timezone.utc) - timedelta(hours=hours_ago),
+    )
+    session.add(log); session.flush()
+    so = SignalOutcome(signal_id=log.id, asset=asset, entry_price=entry, outcome="open")
+    session.add(so); session.commit()
+    return log, so
+
+
+def test_evaluate_sets_price_24h(session):
+    session.add(Asset(symbol="BTC", kind="crypto", binance_symbol="BTCUSDT",
+                      scorable=True, active=True))
+    session.commit()
+    log, so = _make_signal_log(session, hours_ago=25)
+    _make_price(session, "BTC", 68000.0)
+    n = evaluate_signal_outcomes(session)
+    assert n == 1
+    session.refresh(so)
+    assert so.price_24h == 68000.0
+    assert so.outcome in ("win", "loss", "open", "stopped")
+
+
+def test_evaluate_marks_stopped(session):
+    session.add(Asset(symbol="ETH", kind="crypto", binance_symbol="ETHUSDT",
+                      scorable=True, active=True))
+    session.commit()
+    log, so = _make_signal_log(session, asset="ETH", direction="bull",
+                               entry=3400.0, stop=3230.0, hours_ago=25)
+    _make_price(session, "ETH", 3000.0)  # below stop
+    evaluate_signal_outcomes(session)
+    session.refresh(so)
+    assert so.hit_stop is True
+    assert so.outcome == "stopped"
+
+
+def test_evaluate_skips_recent_signals(session):
+    session.add(Asset(symbol="XRP", kind="crypto", binance_symbol="XRPUSDT",
+                      scorable=True, active=True))
+    session.commit()
+    log, so = _make_signal_log(session, asset="XRP", hours_ago=5)
+    _make_price(session, "XRP", 1.0)
+    n = evaluate_signal_outcomes(session)
+    assert n == 0
+
+
+def test_send_signals_calls_telegram(session):
+    from unittest.mock import patch
+    session.add(Asset(symbol="BTC", kind="crypto", binance_symbol="BTCUSDT",
+                      scorable=True, active=True))
+    session.commit()
+    src = _make_whale_source(session, handle="hl:send", score=0.75, n=10)
+    _make_position(session, src.id, coin="BTC", opened_minutes_ago=5)
+    with patch("argus.signals.send_message") as mock_send:
+        send_signals(session)
+    mock_send.assert_called_once()
+    assert "BTC" in mock_send.call_args.args[0]
