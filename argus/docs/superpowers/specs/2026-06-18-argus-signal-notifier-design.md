@@ -5,18 +5,18 @@
 **Goal:** Argus wysyła Telegramem alerty inwestycyjne z rekomendacją pozycji gdy wiarygodne źródła generują sygnał.
 
 **Data:** 2026-06-18
-**Status:** Zaakceptowany, zaktualizowany po recenzji Opus (2026-06-18).
+**Status:** Zaakceptowany. Dwie rundy recenzji (user + Opus) zintegrowane.
 
 ---
 
 ## Kontekst
 
-Argus od ~15 dni uczy się wiarygodności źródeł (hit_rate per source per horyzont). Zebrane dane (scorer rankings z 2026-06-18) pokazują realną hierarchię:
+Argus od ~15 dni uczy się wiarygodności źródeł (hit_rate per source per horyzont). Zebrane dane (scorer rankings z 2026-06-18):
 
-- **Najlepsze źródła:** r/SatoshiStreetBets (80% hit@24h, n=5), HL whale 0x9321 (75% hit@24h, n=4)
+- **Najlepsze:** r/SatoshiStreetBets (80% hit@24h, n=5), HL whale 0x9321 (75% hit@24h, n=4)
 - **Słabe:** r/CryptoCurrency (26% hit@24h, n=66), Yahoo Finance (~17%)
 
-Brakuje warstwy która **działa na tych naukach** — system dotąd zbiera i ocenia, ale nie powiadamia.
+Brakuje warstwy która **działa na tych naukach** — system zbiera i ocenia, ale nie powiadamia.
 
 ---
 
@@ -24,77 +24,101 @@ Brakuje warstwy która **działa na tych naukach** — system dotąd zbiera i oc
 
 ### Horyzont inwestycyjny
 
-- **Krypto:** short-term (24h) — szybkie wejście/wyjście
-- **Akcje:** swing (7d) — kilkudniowe pozycje
+- **Krypto:** short-term (24h)
+- **Akcje:** swing (7d)
 
-### Scoring źródeł — effective_score
+### Scoring — dwa zastosowania effective_score
 
-Surowy `decayed_score` jest korygowany przez liczbę ewaluowanych claimów:
+`effective_score` służy **wyłącznie do sizingu** (im więcej danych, tym większa pozycja). Do przejścia gateów używany jest surowy `decayed_score` z twardym progiem `n_claims`.
 
 ```
 effective_score = decayed_score × min(1.0, n_claims / 30)
 ```
 
-Przykład: źródło A (score=0.75, n=8) → effective=0.75×0.27=**0.20**; źródło B (score=0.72, n=120) → effective=0.72×1.0=**0.72**. B jest wiarygodniejsze mimo niższego raw score.
+`n_claims` = max po wszystkich horyzontach z `source_scores` dla danego źródła (nie `source_asset_scores` — per-coin ma n=1-2 i byłoby gorsze).
 
-`n_claims` = max po wszystkich horyzontach z `source_scores` dla danego źródła.
+Horyzont score lookup: krypto → `24h`, akcje → `7d`.
 
-### Dwa tryby wyzwalania
+### Gate kwalifikacyjny (wejście do sygnału)
 
-**Tier 1 — Whale Alert (tylko krypto, natychmiastowy)**
+Twarde progi — żadnych mnożników:
 
-Wyzwalacz: HL whale z `effective_score ≥ 0.55` otwiera lub zmienia pozycję (nowy wpis w `wallet_positions` z ostatnich 10 minut).
+```
+decayed_score ≥ 0.60  AND  n_claims ≥ 5
+```
 
-Alert wysyłany w ciągu 10 minut od wykrycia. Tier 1 nie wymaga confluence — whale move sam w sobie jest sygnałem.
+Przy obecnych danych (n=4-5) kilka źródeł jest na granicy — system będzie milczeć dopóki nie uzbiera n≥5 na horyzoncie 24h. To jest zamierzone: lepiej zero sygnałów niż szum.
 
-**Tier 2 — Confluence Alert (krypto + akcje)**
+Tylko `source.kind in ('hyperliquid', 'reddit', 'news', 'rss')` — macro/FRED/edgar wykluczone z gateów (kierunek macro nie mapuje się na trade).
 
-Wyzwalacz: ≥ 2 źródła z **różnych kategorii** (`source.kind`) zgadzają się co do tego samego assetu i kierunku (bullish/bearish) w oknie **2 godzin**. Każde źródło musi mieć `effective_score ≥ 0.55`.
+### Tier 1 — Whale Alert (tylko krypto, natychmiastowy)
 
-Siła confluence liczona probabilistycznie (nie średnia):
+Wyzwalacz: HL whale który przeszedł gate otwiera lub flips pozycję — nowy wpis w `wallet_positions` z ostatnich 10 minut.
+
+Alert w ciągu 10 minut. Tier 1 nie wymaga confluence.
+
+### Tier 2 — Confluence Alert (krypto + akcje)
+
+Wyzwalacz: ≥ 2 źródła z **różnych `source.kind`** zgadzają się co do assetu i kierunku w oknie **2 godzin**. Każde źródło musi przejść gate.
+
+Dwa źródła tego samego kind (np. 2 subreddity) = nie confluence.
+
+Siła confluence (probabilistyczna, nie średnia):
 ```
 combined_strength = 1 − Π(1 − effective_score_i)
 ```
-Przykład: dwa źródła 0.61+0.61 → combined=0.84. Dwa źródła 0.80+0.80 → combined=0.96.
 
-Minimum `combined_strength ≥ 0.75` żeby sygnał przeszedł.
+Minimalne progi:
+- `combined_strength ≥ 0.80` (próg podniesiony z 0.75 — przy 2×0.60 daje 0.84, przy 2×0.55 daje 0.80, więc realny filtr)
+- Maksymalnie **top 3 sygnały per cykl** (ranking po `combined_strength`) — ochrona przed spamem gdy rynek rusza wiele assetów naraz
 
-Różne `source.kind` = np. `reddit` + `hyperliquid`, `reddit` + `news`. Dwa źródła tego samego rodzaju nie tworzą confluence.
-
-Alert wysyłany co 15 minut (job scan). **Maksymalnie top 3 sygnały per cykl** (ranking po `combined_strength`) — zapobiega spamowi gdy market rusza jednocześnie wiele assetów.
+Scan co 15 minut.
 
 ---
 
 ## Sizing recommendation
 
-Formuła: `position% = risk% / stop_loss%`
+### Entry price
 
-Signal strength do sizingu = `combined_strength` (Tier 2) lub `effective_score` (Tier 1).
+- **Tier 1 whale:** `wallet_positions.entry_px` (faktyczna cena wejścia whala)
+- **Tier 2 confluence:** ostatnia cena z tabeli `prices` dla danego assetu (już istnieje w systemie)
 
-| Signal strength | Ryzyko na trade | Pozycja (przy stop 5%) | Pozycja (przy stop 3%) |
+### Stop-loss według volatility tier
+
+Stały % (nie ATR — jawnie poza scope). Tier assignowany per asset w `config/assets.yaml` (pole `vol_tier`):
+
+| Vol tier | Przykłady | Stop krypto | Stop akcje |
 |---|---|---|---|
-| 0.55 – 0.75 | 1% portfela | 20% portfela | 33% portfela |
-| 0.75 – 0.90 | 2% portfela | 40% portfela | 67% portfela |
-| 0.90+ | 3% portfela | 60% portfela | max 50% |
+| large | BTC, ETH | 5% | 3% |
+| mid | SOL, ADA, AVAX, większość akcji | 7% | 4% |
+| small | DOGE, SHIB, mniejsze alts | 10% | 5% |
 
-**Stop-loss według volatility tier (stały %, nie ATR):**
+Default: `mid`.
 
-| Tier | Przykłady | Stop krypto | Stop akcje |
-|---|---|---|---|
-| Large cap | BTC, ETH | 5% | 3% |
-| Mid cap | SOL, ADA, AVAX, większość akcji | 7% | 4% |
-| Small cap | DOGE, SHIB, mniejsze alts | 10% | 5% |
+### Formuła i limity
 
-Tier assignowany per asset w `config/assets.yaml` (pole `vol_tier: large|mid|small`). Default: `mid`.
-
-Entry price: spot w momencie alertu; dla Tier 1 whale: cena otwarcia pozycji z `wallet_positions.entry_px`.
-
-**Przykład:** Whale (effective_score=0.55) otwiera long BTC@$67,400 (large cap):
+**Krypto (futures — dźwignia możliwa):**
 ```
-Signal strength: 0.55 → ryzyko 1%
-Stop: $64,030 (-5%)
-Pozycja: 20% portfela
+position% = risk% / stop%
 ```
+
+**Akcje (spot — bez dźwigni):**
+```
+position% = min(risk% / stop%, 15%)
+```
+Cap 15% bo 60% w jeden ticker na spocie jest niewykonalne.
+
+| Signal strength (effective_score / combined_strength) | Ryzyko na trade |
+|---|---|
+| 0.55 – 0.75 | 1% portfela |
+| 0.75 – 0.90 | 2% portfela |
+| 0.90+ | 3% portfela |
+
+**Przykład** — Whale (decayed=0.75, n=8, effective=0.20) otwiera long BTC@$67,400 (large cap):
+- Gate: 0.75 ≥ 0.60 ✓, n=8 ≥ 5 ✓
+- Sizing: effective=0.20 → ryzyko 1%
+- Stop: $64,030 (-5%)
+- Pozycja: 1%/5% = **20% portfela**
 
 ---
 
@@ -105,8 +129,8 @@ Pozycja: 20% portfela
 🐋 WHALE SIGNAL · BULLISH ETH/USDT
 
 Whale: 0x9321...d75a
-Effective score: 0.55 · 75% hit@24h · n=8
-Pozycja: $2.1M long @ $3,420
+Score: 0.60 (75%@24h, n=8)
+Pozycja whale: $2.1M long @ $3,420
 
 Entry teraz: ~$3,445
 Stop-loss: $3,273 (-5%, large cap)
@@ -118,8 +142,8 @@ Horyzont: 24h
 ```
 ⚡ CONFLUENCE · BULLISH BTC/USDT · strength 0.84
 
-• r/SatoshiStreetBets · eff. 0.61 · 80%@24h
-• HL whale 0x5078 · eff. 0.61 · 60%@24h
+• r/SatoshiStreetBets · 0.64 · 80%@24h · n=12
+• HL whale 0x5078 · 0.61 · 60%@24h · n=6
 Zgodność: 2 źródła · okno 1h45m
 
 Entry teraz: ~$67,400
@@ -128,6 +152,8 @@ Pozycja: 20% portfela (ryzyko 1%)
 Horyzont: 24h
 ```
 
+Telegram błąd → log warning, nie retry (sygnał time-sensitive, stary alert bezużyteczny).
+
 ---
 
 ## Architektura
@@ -135,99 +161,94 @@ Horyzont: 24h
 ### Nowe pliki
 
 **`argus/signals.py`**
-- `effective_score(source_score: float, n_claims: int) -> float`
-- `combined_strength(scores: list[float]) -> float` — probabilistyczna kombinacja
+- `passes_gate(decayed_score: float, n_claims: int) -> bool`
+- `effective_score(decayed_score: float, n_claims: int) -> float`
+- `combined_strength(scores: list[float]) -> float`
+- `compute_sizing(strength: float, vol_tier: str, asset_type: str) -> dict`
 - `check_whale_signals(session) -> list[SignalResult]`
 - `check_confluence_signals(session) -> list[SignalResult]`
-- `compute_sizing(strength: float, vol_tier: str, asset_type: str) -> dict`
 - `format_signal_message(signal: SignalResult) -> str`
 
 **`argus/telegram.py`**
-- `send_message(text: str) -> None` — POST do Telegram Bot API
-- Reużywa `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` z `.env` (ten sam bot co Guardian)
-- Błąd → log, nie retry (sygnał time-sensitive)
+- `send_message(text: str) -> None`
+- Wzorzec z `guardian/telegram.py` (POST sendMessage, swallow errors + log)
+- Env: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` (już w `.env` na VPS)
 
 ### Zmiany w istniejących plikach
 
-**`argus/models.py`**
+**`argus/models.py`** — dwie nowe tabele:
 
-Nowa tabela `signal_log`:
 ```python
 class SignalLog(Base):
     __tablename__ = "signal_log"
     id: int (PK)
     tier: str           # "whale" | "confluence"
-    asset: str          # "BTC"
+    asset: str
     direction: str      # "bullish" | "bearish"
-    source_ids: str     # JSON list of source IDs
+    source_ids: str     # JSON list
     signal_strength: float
     entry_price: float
     stop_price: float
     position_pct: float
     sent_at: datetime
-```
 
-Nowa tabela `signal_outcomes` (wypełniana przez ewaluator co 24h/7d):
-```python
 class SignalOutcome(Base):
     __tablename__ = "signal_outcomes"
     id: int (PK)
-    signal_id: int (FK signal_log.id)
+    signal_id: int      # FK signal_log.id
     asset: str
     entry_price: float
     price_24h: float | None
     price_7d: float | None
-    max_favorable_excursion: float | None  # max zysk po wejściu
-    max_adverse_excursion: float | None    # max strata po wejściu
-    hit_stop: bool | None                  # czy stop-loss uderzony
-    outcome: str | None                    # "win" | "loss" | "open"
+    max_favorable_excursion: float | None
+    max_adverse_excursion: float | None
+    hit_stop: bool | None
+    outcome: str | None  # "win" | "loss" | "stopped" | "open"
     evaluated_at: datetime | None
 ```
 
-`signal_outcomes` to najważniejsza tabela projektu — po 2-3 miesiącach pozwoli mierzyć realną skuteczność alertów, nie tylko jakość źródeł.
+`signal_outcomes` to najważniejsza tabela projektu — po 2-3 miesiącach pozwoli mierzyć skuteczność alertów (nie tylko źródeł) i stroić progi automatycznie.
 
-**`argus/main.py`**
-Trzy nowe jopy w schedulerze:
-- `_whale_signal_job` — co 10 minut
-- `_confluence_signal_job` — co 15 minut
-- `_signal_outcomes_job` — co 6h (ewaluuje otwarte sygnały starsze niż 24h)
+**`argus/main.py`** — trzy nowe jopy:
+- `_whale_signal_job` — co 10 min
+- `_confluence_signal_job` — co 15 min
+- `_signal_outcomes_job` — co 6h (ewaluuje otwarte sygnały ≥24h)
 
 ### Cooldown
 
-- **2h per asset** — żaden asset nie generuje więcej niż 1 alertu na 2 godziny (niezależnie od tier)
-- Sprawdzane przez `signal_log.sent_at` + `signal_log.asset`
+**2h per asset, cross-tier** — jeden cooldown obejmuje oba tiery. Whale alert na BTC blokuje confluence alert na BTC przez 2h. Sprawdzane atomowo z `signal_log` przed każdym `send_message`.
 
 ### Flow danych
 
 ```
 _whale_signal_job (co 10min)
   → wallet_positions WHERE created_at > now()-10min
-  → JOIN source_scores, oblicz effective_score
-  → FILTER: effective_score >= 0.55
-  → cooldown check (signal_log, asset, 2h)
+  → JOIN source_scores WHERE decayed_score >= 0.60 AND n_claims >= 5
+  → cooldown check (signal_log, asset, 2h) — cross-tier
   → compute_sizing(effective_score, vol_tier, "crypto")
+  → entry_price = wallet_positions.entry_px
   → format + send_message()
-  → INSERT signal_log (z entry_price, stop_price, position_pct)
-  → INSERT signal_outcomes (outcome="open")
+  → INSERT signal_log + signal_outcomes(outcome="open")
 
 _confluence_signal_job (co 15min)
-  → claims WHERE entry_ts > now()-2h
-  → JOIN source_scores, oblicz effective_score per source
-  → FILTER: effective_score >= 0.55
+  → claims WHERE entry_ts > now()-2h AND source.kind IN ('hyperliquid','reddit','news','rss')
+  → JOIN source_scores WHERE decayed_score >= 0.60 AND n_claims >= 5
   → GROUP BY (asset, direction)
   → FILTER: >= 2 różne source.kind w grupie
-  → combined_strength = 1 - Π(1 - eff_score_i)
-  → FILTER: combined_strength >= 0.75
-  → SORT BY combined_strength DESC, TAKE top 3
-  → cooldown check per asset
+  → combined_strength = 1 - Π(1 - effective_score_i)
+  → FILTER: combined_strength >= 0.80
+  → SORT DESC, TAKE top 3
+  → cooldown check per asset — cross-tier
+  → entry_price = last price FROM prices WHERE asset=asset
   → compute_sizing(combined_strength, vol_tier, asset_type)
   → format + send_message()
-  → INSERT signal_log + signal_outcomes
+  → INSERT signal_log + signal_outcomes(outcome="open")
 
 _signal_outcomes_job (co 6h)
   → signal_outcomes WHERE outcome="open" AND signal_log.sent_at < now()-24h
-  → fetch current price (Binance/yfinance)
-  → update price_24h, price_7d, hit_stop, outcome
+  → fetch price (prices table lub yfinance/Binance fallback)
+  → update price_24h/price_7d, hit_stop, MFE, MAE
+  → outcome = "stopped" jeśli hit_stop, "win" jeśli price > entry+stop, "loss" inaczej
   → log summary
 ```
 
@@ -235,37 +256,26 @@ _signal_outcomes_job (co 6h)
 
 ## Out of scope
 
-- Exit signals (kiedy wyjść z pozycji) — poza zakresem tego incrementu
-- Auto-execution przez API giełdy — ręczne wykonanie przez usera
-- Portfolio tracking (ile mam otwartych pozycji) — poza zakresem
-- Push notifications inne niż Telegram
-- ATR-based stop-loss — stały % wystarczy na tym etapie
+- Exit signals
+- Auto-execution przez API giełdy
+- Portfolio tracking
+- ATR-based stop-loss
 
 ---
 
-## Progi kwalifikacyjne — podsumowanie
+## Progi — podsumowanie
 
-| Parametr | Wartość |
-|---|---|
-| Min effective_score (Tier 1 whale) | ≥ 0.55 |
-| Min effective_score (Tier 2 każde źródło) | ≥ 0.55 |
-| Confidence factor | min(1.0, n_claims/30) |
-| Confluence: min źródeł | 2 z różnych `kind` |
-| Confluence: combined_strength min | ≥ 0.75 |
-| Confluence: okno czasowe | 2h |
-| Confluence: max sygnałów per cykl | 3 (top by strength) |
-| Cooldown per asset | 2h |
-| Tier 1 scan interval | 10 min |
-| Tier 2 scan interval | 15 min |
-| Signal outcomes eval interval | 6h |
-
----
-
-## Rozwiązane pytania (z recenzji Opus 2026-06-18)
-
-1. **n_claims próg** — nie ma twardego progu; zamiast tego `effective_score = score × min(1.0, n/30)` naturalnie deprecjonuje źródła z małą próbką.
-2. **Ważenie confluence** — probabilistyczne `1 - Π(1-score_i)` zamiast średniej.
-3. **Stop-loss** — tier-based (large/mid/small cap), nie flat 5%.
-4. **Spam** — top 3 per cykl + cooldown 2h per asset.
-5. **Mierzenie skuteczności alertów** — `signal_outcomes` od pierwszego dnia.
-6. **Horyzont score lookup** — Tier 1 i krypto Tier 2: `24h`; akcje Tier 2: `7d`.
+| Parametr | Wartość | Uzasadnienie |
+|---|---|---|
+| Gate: min decayed_score | ≥ 0.60 | twardo, bez mnożnika |
+| Gate: min n_claims | ≥ 5 | twardo |
+| effective_score mnożnik | n/30 | tylko do sizingu, nie do gate |
+| Confluence: min źródeł | 2 z różnych kind | dekorelacja |
+| Confluence: min combined_strength | ≥ 0.80 | realny filtr |
+| Confluence: okno | 2h | |
+| Confluence: max per cykl | top 3 | antyspam |
+| Cooldown per asset | 2h cross-tier | |
+| Akcje: cap pozycji | 15% | spot limit |
+| Tier 1 scan | co 10 min | |
+| Tier 2 scan | co 15 min | |
+| Outcomes eval | co 6h | |
