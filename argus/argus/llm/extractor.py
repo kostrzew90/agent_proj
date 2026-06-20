@@ -29,8 +29,8 @@ def build_prompt(text: str, assets, sector_map: dict | None) -> str:
         f"Mapowania sektorowe:\n{sectors}\n\n"
         "Z poniższego tekstu wyciągnij TYLKO powiązania kierunkowe z dozwolonych assetów.\n"
         "Zwróć claim WYŁĄCZNIE gdy w tekście jest bezpośrednie lub bardzo silne uzasadnienie. "
-        "Jeśli powiązanie jest słabe, spekulacyjne lub wymaga dużej interpretacji — zwróć pustą listę [].\n"
-        'Zwróć WYŁĄCZNIE JSON: [{"asset":"SYM","direction":"bull|bear|neutral","reasoning":"krótko"}]\n\n'
+        "Jeśli powiązanie jest słabe, spekulacyjne, neutralne lub wymaga dużej interpretacji — zwróć pustą listę [].\n"
+        'Zwróć WYŁĄCZNIE JSON: [{"asset":"SYM","direction":"bull|bear","reasoning":"krótko"}]\n\n'
         f"Tekst:\n{text}"
     )
 
@@ -65,6 +65,6 @@ def extract_claims_llm(text: str, assets, sector_map: dict | None = None) -> lis
             continue
         sym = (d.get("asset") or "").upper()
         direction = d.get("direction")
-        if sym in known and direction in ("bull", "bear", "neutral"):
+        if sym in known and direction in ("bull", "bear"):
             out.append(LlmClaim(sym, direction, LLM_DEFAULT_CONFIDENCE, (d.get("reasoning") or "")[:500]))
     return out

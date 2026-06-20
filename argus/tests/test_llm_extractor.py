@@ -31,3 +31,8 @@ def test_bad_json_returns_empty():
 def test_llm_error_returns_empty():
     with patch.object(ex, "call_llm", side_effect=RuntimeError("down")):
         assert ex.extract_claims_llm("x", ASSETS) == []
+
+def test_neutral_direction_rejected():
+    raw = '[{"asset":"BTC","direction":"neutral","reasoning":"no direct link"}]'
+    with patch.object(ex, "call_llm", return_value=raw):
+        assert ex.extract_claims_llm("noise", ASSETS) == []
