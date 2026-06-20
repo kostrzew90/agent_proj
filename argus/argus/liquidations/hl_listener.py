@@ -13,9 +13,9 @@ from argus.models import Asset, Liquidation, Source
 logger = logging.getLogger(__name__)
 
 _HL_INFO_URL = "https://api.hyperliquid.xyz/info"
-_POLL_INTERVAL = int(os.environ.get("HL_POLL_INTERVAL", "60"))
-_CONCURRENCY = 1   # sequential — HL rate-limits at ~1.4 req/s
-_REQUEST_DELAY = 1.0  # 1 req/s → 43 wallets ≈ 65s per cycle
+_POLL_INTERVAL = int(os.environ.get("HL_POLL_INTERVAL", "120"))
+_CONCURRENCY = 1   # sequential — HL rate-limits at ~0.5 req/s
+_REQUEST_DELAY = 2.0  # 0.5 req/s → 43 wallets ≈ 90s per cycle
 _REQUEST_TIMEOUT = 20
 
 

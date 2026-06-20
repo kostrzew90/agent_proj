@@ -1,7 +1,10 @@
+import logging
 from datetime import datetime, timedelta, timezone
 from sqlalchemy import select
 from argus.models import Asset, Claim, Outcome
 from argus.prices import get_historical_price
+
+logger = logging.getLogger(__name__)
 
 HORIZONS = {"1h": timedelta(hours=1), "24h": timedelta(hours=24), "7d": timedelta(days=7), "30d": timedelta(days=30)}
 THRESHOLDS = {"1h": 0.005, "24h": 0.015, "7d": 0.04, "30d": 0.08}
@@ -41,7 +44,11 @@ def evaluate_due_claims(session, now: datetime) -> int:
                 continue
             if now < entry_ts + delta:
                 continue
-            price = get_historical_price(asset, entry_ts + delta)
+            try:
+                price = get_historical_price(asset, entry_ts + delta)
+            except Exception as e:
+                logger.warning("eval: skip %s %s %s — %s", c.asset, h, entry_ts + delta, e)
+                continue
             ret = (price - c.entry_price) / c.entry_price
             session.add(Outcome(claim_id=c.id, horizon=h, eval_ts=now,
                                 price_at_horizon=price, return_pct=ret,
