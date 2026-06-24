@@ -447,3 +447,113 @@ def test_send_signals_calls_telegram(session):
         send_signals(session)
     mock_send.assert_called_once()
     assert "BTC" in mock_send.call_args.args[0]
+
+
+# ---------------------------------------------------------------------------
+# Task 4: check_liquidation_signals (Tier 3, gated on SourceAssetScore)
+# ---------------------------------------------------------------------------
+from argus.models import SourceAssetScore
+from argus.signals import check_liquidation_signals
+
+
+def _cascade_source(session):
+    src = Source(kind="derived", handle="liq-cascade", display_name="Liquidation Cascade", active=True)
+    session.add(src)
+    session.commit()
+    return src
+
+
+def _asset_score(session, source_id, asset, decayed_score, n_claims, hit_rate=0.7, horizon="24h"):
+    session.add(SourceAssetScore(source_id=source_id, asset=asset, horizon=horizon,
+                                  n_claims=n_claims, n_hits=int(n_claims * hit_rate),
+                                  hit_rate=hit_rate, avg_return=0.02, decayed_score=decayed_score,
+                                  updated_at=datetime.now(timezone.utc)))
+    session.commit()
+
+
+def test_liquidation_signal_fires_when_gate_passes(session):
+    session.add(Asset(symbol="BTC", kind="crypto", scorable=True))
+    session.commit()
+    src = _cascade_source(session)
+    _asset_score(session, src.id, "BTC", decayed_score=0.70, n_claims=6)
+    session.add(Claim(source_id=src.id, asset="BTC", direction="bull", confidence=0.6,
+                       method="rule", entry_price=50000.0, entry_ts=datetime.now(timezone.utc),
+                       status="open"))
+    session.commit()
+    results = check_liquidation_signals(session)
+    assert len(results) == 1
+    assert results[0].tier == "liq_cascade"
+    assert results[0].asset == "BTC"
+    assert results[0].direction == "bull"
+
+
+def test_liquidation_signal_blocked_when_gate_fails(session):
+    session.add(Asset(symbol="BTC", kind="crypto", scorable=True))
+    session.commit()
+    src = _cascade_source(session)
+    _asset_score(session, src.id, "BTC", decayed_score=0.40, n_claims=6)  # below 0.60 gate
+    session.add(Claim(source_id=src.id, asset="BTC", direction="bull", confidence=0.6,
+                       method="rule", entry_price=50000.0, entry_ts=datetime.now(timezone.utc),
+                       status="open"))
+    session.commit()
+    assert check_liquidation_signals(session) == []
+
+
+def test_liquidation_signal_ignores_stale_claims(session):
+    session.add(Asset(symbol="BTC", kind="crypto", scorable=True))
+    session.commit()
+    src = _cascade_source(session)
+    _asset_score(session, src.id, "BTC", decayed_score=0.70, n_claims=6)
+    old_ts = datetime.now(timezone.utc) - timedelta(hours=5)
+    session.add(Claim(source_id=src.id, asset="BTC", direction="bull", confidence=0.6,
+                       method="rule", entry_price=50000.0, entry_ts=old_ts, status="open"))
+    session.commit()
+    assert check_liquidation_signals(session) == []
+
+
+def test_liquidation_signal_uses_per_asset_score_not_mixed(session):
+    """The key regression test for the SourceAssetScore fix: a great BTC score and a
+    terrible ETH score on the SAME source must not bleed into each other."""
+    session.add(Asset(symbol="BTC", kind="crypto", scorable=True))
+    session.add(Asset(symbol="ETH", kind="crypto", scorable=True))
+    session.commit()
+    src = _cascade_source(session)
+    _asset_score(session, src.id, "BTC", decayed_score=0.80, n_claims=10)  # passes gate
+    _asset_score(session, src.id, "ETH", decayed_score=0.20, n_claims=10)  # fails gate
+    now = datetime.now(timezone.utc)
+    session.add(Claim(source_id=src.id, asset="BTC", direction="bull", confidence=0.6,
+                       method="rule", entry_price=50000.0, entry_ts=now, status="open"))
+    session.add(Claim(source_id=src.id, asset="ETH", direction="bear", confidence=0.6,
+                       method="rule", entry_price=3000.0, entry_ts=now, status="open"))
+    session.commit()
+    results = check_liquidation_signals(session)
+    assert len(results) == 1
+    assert results[0].asset == "BTC"
+
+
+def test_liquidation_signal_respects_cooldown(session):
+    session.add(Asset(symbol="BTC", kind="crypto", scorable=True))
+    session.commit()
+    src = _cascade_source(session)
+    _asset_score(session, src.id, "BTC", decayed_score=0.70, n_claims=6)
+    session.add(Claim(source_id=src.id, asset="BTC", direction="bull", confidence=0.6,
+                       method="rule", entry_price=50000.0, entry_ts=datetime.now(timezone.utc),
+                       status="open"))
+    session.add(SignalLog(tier="liq_cascade", asset="BTC", direction="bull",
+                          source_ids="[]", signal_strength=0.5, entry_price=50000.0,
+                          stop_price=47500.0, position_pct=0.03,
+                          sent_at=datetime.now(timezone.utc)))
+    session.commit()
+    assert check_liquidation_signals(session) == []
+
+
+def test_format_signal_message_handles_liq_cascade_tier():
+    from argus.signals import format_signal_message, SignalResult
+    result = SignalResult(tier="liq_cascade", asset="BTC", asset_kind="crypto", direction="bull",
+                          source_ids=[1], source_labels=["Liquidation Cascade · 0.70 · 70%@24h · n=6"],
+                          signal_strength=0.5, entry_price=50000.0, stop_price=47500.0,
+                          position_pct=0.03, risk_pct=0.02, stop_pct=0.05, vol_tier="large",
+                          horizon="24h", window_str=None, whale_notional=None)
+    msg = format_signal_message(result)
+    assert "LIQUIDATION CASCADE" in msg
+    assert "BTC" in msg

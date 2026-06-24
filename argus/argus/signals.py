@@ -6,7 +6,7 @@ from math import prod
 from sqlalchemy import select, func
 
 from argus.models import (
-    Asset, Claim, Price, Source, SourceScore,
+    Asset, Claim, Price, Source, SourceScore, SourceAssetScore,
     SignalLog, SignalOutcome, WalletPosition,
 )
 from argus.telegram import send_message
@@ -116,6 +116,16 @@ def _get_source_score(session, source_id: int, horizon: str):
     )
 
 
+def _get_source_asset_score(session, source_id: int, asset: str, horizon: str):
+    return session.scalar(
+        select(SourceAssetScore).where(
+            SourceAssetScore.source_id == source_id,
+            SourceAssetScore.asset == asset,
+            SourceAssetScore.horizon == horizon,
+        )
+    )
+
+
 def _last_price(session, asset: str):
     row = session.scalar(
         select(Price).where(Price.asset == asset).order_by(Price.ts.desc())
@@ -190,6 +200,50 @@ def check_whale_signals(session) -> list:
             horizon="24h",
             window_str=None,
             whale_notional=pos.position_value,
+        ))
+    return results
+
+
+def check_liquidation_signals(session) -> list:
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=_WHALE_LOOKBACK_MINUTES)
+    source = session.scalar(select(Source).where(Source.kind == "derived", Source.handle == "liq-cascade"))
+    if source is None:
+        return []
+    claims = list(session.scalars(
+        select(Claim).where(Claim.source_id == source.id, Claim.entry_ts >= cutoff)
+    ))
+    results = []
+    for claim in claims:
+        asset_row = session.scalar(select(Asset).where(Asset.symbol == claim.asset))
+        if asset_row is None:
+            continue
+        ss = _get_source_asset_score(session, source.id, claim.asset, "24h")
+        if ss is None or not passes_gate(ss.decayed_score, ss.n_claims):
+            continue
+        if _is_on_cooldown(session, claim.asset):
+            continue
+        eff = effective_score(ss.decayed_score, ss.n_claims)
+        sizing = compute_sizing(eff, claim.asset, asset_row.kind)
+        sp = sizing["stop_pct"]
+        stop = claim.entry_price * (1 - sp) if claim.direction == "bull" else claim.entry_price * (1 + sp)
+        label = f"Liquidation Cascade · {ss.decayed_score:.2f} · {ss.hit_rate:.0%}@24h · n={ss.n_claims}"
+        results.append(SignalResult(
+            tier="liq_cascade",
+            asset=claim.asset,
+            asset_kind=asset_row.kind,
+            direction=claim.direction,
+            source_ids=[source.id],
+            source_labels=[label],
+            signal_strength=eff,
+            entry_price=claim.entry_price,
+            stop_price=round(stop, 4),
+            position_pct=sizing["position_pct"],
+            risk_pct=sizing["risk_pct"],
+            stop_pct=sizing["stop_pct"],
+            vol_tier=sizing["vol_tier"],
+            horizon="24h",
+            window_str=None,
+            whale_notional=None,
         ))
     return results
 
@@ -307,7 +361,8 @@ def evaluate_signal_outcomes(session) -> int:
 def send_signals(session) -> None:
     whale = check_whale_signals(session)
     confluence = check_confluence_signals(session)
-    for result in whale + confluence:
+    liq_cascade = check_liquidation_signals(session)
+    for result in whale + confluence + liq_cascade:
         msg = format_signal_message(result)
         send_message(msg)
         _save_signal(session, result)
@@ -316,11 +371,15 @@ def send_signals(session) -> None:
 
 
 def format_signal_message(result) -> str:
-    emoji = "🐋" if result.tier == "whale" else "⚡"
+    emoji = {"whale": "🐋", "confluence": "⚡", "liq_cascade": "🌊"}[result.tier]
     dir_str = "BULLISH" if result.direction == "bull" else "BEARISH"
     suffix = "USDT" if result.asset_kind == "crypto" else "USD"
-    tier_str = ("WHALE SIGNAL" if result.tier == "whale"
-                else f"CONFLUENCE · strength {result.signal_strength:.2f}")
+    if result.tier == "whale":
+        tier_str = "WHALE SIGNAL"
+    elif result.tier == "confluence":
+        tier_str = f"CONFLUENCE · strength {result.signal_strength:.2f}"
+    else:
+        tier_str = f"LIQUIDATION CASCADE · strength {result.signal_strength:.2f}"
     lines = [f"{emoji} {tier_str} · {dir_str} {result.asset}/{suffix}", ""]
     for label in result.source_labels:
         lines.append(f"• {label}")
