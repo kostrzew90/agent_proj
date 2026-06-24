@@ -1,0 +1,5 @@
+# Direction rule per asset, decided by docs/superpowers/plans backtest (Task 6).
+# "contrarian": long_liq cascade -> bull, short_liq cascade -> bear
+# "continuation": long_liq cascade -> bear, short_liq cascade -> bull
+# An asset with no entry here gets NO claims emitted (insufficient backtest data) — see Task 6.
+direction_rule: {}
