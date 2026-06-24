@@ -13,7 +13,7 @@ from argus.scheduler.apscheduler_impl import APScheduler
 from argus.models import Source, Asset
 from argus.collectors.hyperstats import sync_top_traders
 from sqlalchemy import select, text
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 def _rss_job():
     with SessionLocal() as s:
@@ -52,6 +52,36 @@ def _hyperliquid_job():
                 import logging
                 logging.getLogger(__name__).warning("HL collect failed %s: %s", src.handle, e)
         compute_consensus(s)
+
+def _liq_cascade_job():
+    from argus.liquidations.cascade import (
+        detect_cascades, annotate_price_context, compute_notional_p95,
+        load_direction_rules, emit_cascade_claims,
+    )
+    from argus.models import Liquidation
+    import logging
+    window_minutes = int(os.getenv("ARGUS_LIQ_CASCADE_WINDOW_MIN", "30"))
+    min_notional = float(os.getenv("ARGUS_LIQ_CASCADE_MIN_NOTIONAL", "50000"))
+    lookback = timedelta(minutes=window_minutes * 2 + 60)
+    try:
+        with SessionLocal() as s:
+            cutoff = datetime.now(timezone.utc) - lookback
+            liqs = list(s.scalars(
+                select(Liquidation).where(Liquidation.ts >= cutoff).order_by(Liquidation.ts)
+            ))
+            cascades = detect_cascades(liqs, window_minutes, min_notional)
+            if not cascades:
+                return
+            annotate_price_context(s, cascades)
+            rules = load_direction_rules()
+            p95 = compute_notional_p95(s)
+            n = emit_cascade_claims(s, cascades, rules, p95)
+            logging.getLogger(__name__).info(
+                "liq_cascade: detected %d cascades, emitted %d claims", len(cascades), n
+            )
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("liq_cascade job failed: %s", e)
 
 def _insider_job():
     from argus.collectors.insider import collect_insider, _EXCHANGE
@@ -172,6 +202,7 @@ def bootstrap():
     sched.add_interval("heartbeat", _heartbeat_job, minutes=5)
     sched.add_interval("whale_signal", _whale_signal_job, minutes=10)
     sched.add_interval("signal_outcomes", _signal_outcomes_job, minutes=360)
+    sched.add_interval("liq_cascade", _liq_cascade_job, minutes=30)
     sched.start()
 
 if __name__ == "__main__":
