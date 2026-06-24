@@ -5,6 +5,7 @@ RUN pip install --no-cache-dir --trusted-host pypi.org --trusted-host files.pyth
 COPY argus ./argus
 COPY config ./config
 COPY tests ./tests
+COPY scripts ./scripts
 COPY pytest.ini .
 ENV PYTHONUNBUFFERED=1
 CMD ["python", "-m", "argus.main"]
