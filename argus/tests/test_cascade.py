@@ -202,7 +202,7 @@ def test_emit_cascade_claims_confidence_scales_with_cascade_size(session):
     session.add(Asset(symbol="BTC", kind="crypto", scorable=True, binance_symbol="BTCUSDT"))
     session.commit()
     small = _cascade(notional=1000.0)
-    huge = _cascade(notional=1000000.0)
+    huge = _cascade(notional=1000000.0, start_offset=100, end_offset=120)
     with patch("argus.liquidations.cascade.get_historical_price", return_value=50000.0):
         emit_cascade_claims(session, [small], direction_rule={"BTC": "contrarian"}, notional_p95=10000.0)
         small_conf = session.query(Claim).one().confidence
@@ -221,6 +221,19 @@ def test_emit_cascade_claims_dedups_same_window(session):
     with patch("argus.liquidations.cascade.get_historical_price", return_value=50000.0):
         n1 = emit_cascade_claims(session, [cascade], direction_rule={"BTC": "contrarian"}, notional_p95=10000.0)
         n2 = emit_cascade_claims(session, [cascade], direction_rule={"BTC": "contrarian"}, notional_p95=10000.0)
+    assert n1 == 1
+    assert n2 == 0
+    assert session.query(Claim).count() == 1
+
+
+def test_emit_cascade_claims_dedups_by_window_start_even_if_window_end_changes(session):
+    session.add(Asset(symbol="BTC", kind="crypto", scorable=True, binance_symbol="BTCUSDT"))
+    session.commit()
+    first = _cascade(notional=60000.0, start_offset=0, end_offset=20)
+    second = _cascade(notional=90000.0, start_offset=0, end_offset=35)  # same window_start, different end/notional
+    with patch("argus.liquidations.cascade.get_historical_price", return_value=50000.0):
+        n1 = emit_cascade_claims(session, [first], direction_rule={"BTC": "contrarian"}, notional_p95=10000.0)
+        n2 = emit_cascade_claims(session, [second], direction_rule={"BTC": "contrarian"}, notional_p95=10000.0)
     assert n1 == 1
     assert n2 == 0
     assert session.query(Claim).count() == 1

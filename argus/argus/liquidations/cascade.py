@@ -130,8 +130,7 @@ def emit_cascade_claims(session, cascades: list[CascadeEvent], direction_rule: d
         rule = direction_rule.get(cascade.asset)
         if rule is None:
             continue
-        raw_key = (f"LIQ_CASCADE:{cascade.asset}:{cascade.side}:{cascade.window_start.isoformat()}"
-                   f":{cascade.window_end.isoformat()}:{cascade.total_notional}")
+        raw_key = f"LIQ_CASCADE:{cascade.asset}:{cascade.side}:{cascade.window_start.isoformat()}"
         existing = session.scalar(select(ClaimAudit).where(ClaimAudit.raw_text == raw_key))
         if existing is not None:
             continue
