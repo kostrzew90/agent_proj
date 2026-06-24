@@ -211,7 +211,7 @@ def call_llm(prompt: str, system: str = "", max_tokens: int = 512) -> str:
         except Exception as e:
             latency = int((time.time() - t0) * 1000)
             is429 = _is_429(e)
-            _record(provider, model, {}, latency, False, str(e))
+            _record(provider, model, {}, latency, False, _sanitize(str(e)))
             if state:
                 if is429:
                     state.record_429()
