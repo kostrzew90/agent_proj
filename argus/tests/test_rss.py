@@ -65,10 +65,11 @@ def test_collect_emits_sector_claim(session):
 
 def test_collect_rss_no_inline_llm(session):
     """collect_rss enqueues for batch, never calls extract_claims_llm inline."""
+    session.add(Asset(symbol="BTC", kind="crypto", binance_symbol="BTCUSDT", scorable=True))
     source = Source(handle="http://example.com/rss", kind="reddit", display_name="test", active=True)
     session.add(source); session.commit()
     entry = SimpleNamespace(
-        id="z1", title="Fed signals dovish pivot", summary="",
+        id="z1", title="Fed signals dovish pivot for BTC", summary="",
         link="http://x/z1", published_parsed=(2026, 6, 5, 0, 0, 0, 0, 0, 0)
     )
     with patch("argus.collectors.rss.enqueue_for_llm") as mock_enq, \
@@ -78,11 +79,12 @@ def test_collect_rss_no_inline_llm(session):
     mock_enq.assert_called_once()
 
 def test_gap_fill_enqueues_when_rule_empty(session):
-    """When rule parser finds no claims and source is reddit/news, item is enqueued."""
+    """When rule parser finds no claims and source is reddit/news, item is enqueued
+    (given the item mentions a watchlist asset, otherwise the pre-filter skips it)."""
     from argus.models import LlmQueue
     session.add(Asset(symbol="BTC", kind="crypto", binance_symbol="BTCUSDT", scorable=True))
     src = Source(kind="reddit", handle="http://f", display_name="r/crypto"); session.add(src); session.commit()
-    entry = SimpleNamespace(id="g1", title="Fed signals dovish pivot", summary="",
+    entry = SimpleNamespace(id="g1", title="Fed signals dovish pivot for BTC", summary="",
                             link="http://x/g1", published_parsed=(2026, 6, 5, 0, 0, 0, 0, 0, 0))
     feed = SimpleNamespace(entries=[entry])
     with patch("argus.collectors.rss.feedparser.parse", return_value=feed), \
@@ -112,6 +114,97 @@ def test_non_reddit_news_source_not_enqueued(session):
     src = Source(kind="rss", handle="http://other", display_name="other"); session.add(src); session.commit()
     entry = SimpleNamespace(id="o1", title="Fed signals dovish pivot", summary="",
                             link="http://x/o1", published_parsed=(2026, 6, 5, 0, 0, 0, 0, 0, 0))
+    feed = SimpleNamespace(entries=[entry])
+    with patch("argus.collectors.rss.feedparser.parse", return_value=feed), \
+         patch("argus.collectors.rss.load_sector_map", return_value={}):
+        collect_rss(session, src)
+    assert session.query(LlmQueue).count() == 0
+
+
+# --- pre-filter: only enqueue items that mention a watchlist asset/alias ---
+
+def test_prefilter_reddit_symbol_mention_enqueued(session):
+    """Reddit item mentioning a watchlist symbol as a standalone word passes the pre-filter."""
+    from argus.models import LlmQueue
+    session.add(Asset(symbol="BTC", kind="crypto", binance_symbol="BTCUSDT", scorable=True))
+    src = Source(kind="reddit", handle="http://pf1", display_name="r/pf1"); session.add(src); session.commit()
+    entry = SimpleNamespace(id="pf1", title="BTC network activity update", summary="",
+                            link="http://x/pf1", published_parsed=(2026, 6, 5, 0, 0, 0, 0, 0, 0))
+    feed = SimpleNamespace(entries=[entry])
+    with patch("argus.collectors.rss.feedparser.parse", return_value=feed), \
+         patch("argus.collectors.rss.load_sector_map", return_value={}):
+        collect_rss(session, src)
+    assert session.query(LlmQueue).count() == 1
+
+
+def test_prefilter_reddit_cashtag_enqueued(session):
+    """Reddit item mentioning a watchlist symbol as a $CASHTAG passes the pre-filter."""
+    from argus.models import LlmQueue
+    session.add(Asset(symbol="ETH", kind="crypto", binance_symbol="ETHUSDT", scorable=True))
+    src = Source(kind="reddit", handle="http://pf2", display_name="r/pf2"); session.add(src); session.commit()
+    entry = SimpleNamespace(id="pf2", title="Watch $ETH before the close", summary="",
+                            link="http://x/pf2", published_parsed=(2026, 6, 5, 0, 0, 0, 0, 0, 0))
+    feed = SimpleNamespace(entries=[entry])
+    with patch("argus.collectors.rss.feedparser.parse", return_value=feed), \
+         patch("argus.collectors.rss.load_sector_map", return_value={}):
+        collect_rss(session, src)
+    assert session.query(LlmQueue).count() == 1
+
+
+def test_prefilter_news_sector_alias_enqueued(session):
+    """News item mentioning a sector alias (no direct symbol) passes the pre-filter."""
+    from argus.models import LlmQueue
+    session.add(Asset(symbol="XOMA", kind="stock", yf_symbol="XOMA", scorable=True))
+    src = Source(kind="news", handle="http://pf3", display_name="Newswire"); session.add(src); session.commit()
+    entry = SimpleNamespace(id="pf3", title="New biotech breakthrough in gene therapy", summary="",
+                            link="http://x/pf3", published_parsed=(2026, 6, 5, 0, 0, 0, 0, 0, 0))
+    feed = SimpleNamespace(entries=[entry])
+    smap = {"biotech": {"aliases": ["biotech", "fda approval"], "tickers": ["XOMA"], "confidence": 0.3}}
+    with patch("argus.collectors.rss.feedparser.parse", return_value=feed), \
+         patch("argus.collectors.rss.load_sector_map", return_value=smap):
+        collect_rss(session, src)
+    assert session.query(LlmQueue).count() == 1
+
+
+def test_prefilter_generic_item_skipped(session):
+    """Item with no watchlist/sector mention is not enqueued and enqueue_skipped is counted."""
+    from argus.models import LlmQueue
+    session.add(Asset(symbol="BTC", kind="crypto", binance_symbol="BTCUSDT", scorable=True))
+    src = Source(kind="reddit", handle="http://pf4", display_name="r/pf4"); session.add(src); session.commit()
+    entry = SimpleNamespace(id="pf4", title="Local weather turns colder this weekend", summary="",
+                            link="http://x/pf4", published_parsed=(2026, 6, 5, 0, 0, 0, 0, 0, 0))
+    feed = SimpleNamespace(entries=[entry])
+    with patch("argus.collectors.rss.feedparser.parse", return_value=feed), \
+         patch("argus.collectors.rss.load_sector_map", return_value={}), \
+         patch("argus.collectors.rss.logger") as mock_logger:
+        collect_rss(session, src)
+    assert session.query(LlmQueue).count() == 0
+    logged_stats = mock_logger.info.call_args.args[-1]
+    assert logged_stats["enqueue_skipped"] == 1
+    assert logged_stats["enqueued"] == 0
+
+
+def test_prefilter_case_insensitive_match(session):
+    """Lowercase mention mid-sentence still matches the watchlist symbol."""
+    from argus.models import LlmQueue
+    session.add(Asset(symbol="BTC", kind="crypto", binance_symbol="BTCUSDT", scorable=True))
+    src = Source(kind="reddit", handle="http://pf5", display_name="r/pf5"); session.add(src); session.commit()
+    entry = SimpleNamespace(id="pf5", title="Some folks think btc is going nowhere today", summary="",
+                            link="http://x/pf5", published_parsed=(2026, 6, 5, 0, 0, 0, 0, 0, 0))
+    feed = SimpleNamespace(entries=[entry])
+    with patch("argus.collectors.rss.feedparser.parse", return_value=feed), \
+         patch("argus.collectors.rss.load_sector_map", return_value={}):
+        collect_rss(session, src)
+    assert session.query(LlmQueue).count() == 1
+
+
+def test_prefilter_no_substring_false_positive(session):
+    """A word containing the symbol as a substring ('solid' vs SOL) must not match."""
+    from argus.models import LlmQueue
+    session.add(Asset(symbol="SOL", kind="crypto", binance_symbol="SOLUSDT", scorable=True))
+    src = Source(kind="reddit", handle="http://pf6", display_name="r/pf6"); session.add(src); session.commit()
+    entry = SimpleNamespace(id="pf6", title="This proposal seems solid to most of us", summary="",
+                            link="http://x/pf6", published_parsed=(2026, 6, 5, 0, 0, 0, 0, 0, 0))
     feed = SimpleNamespace(entries=[entry])
     with patch("argus.collectors.rss.feedparser.parse", return_value=feed), \
          patch("argus.collectors.rss.load_sector_map", return_value={}):

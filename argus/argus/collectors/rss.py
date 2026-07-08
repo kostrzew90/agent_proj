@@ -1,4 +1,5 @@
 import os
+import re
 import calendar
 import logging
 from datetime import datetime, timezone
@@ -18,6 +19,27 @@ def load_sector_map(path: str = "config/sectors.yaml") -> dict:
     if os.path.exists(path):
         return yaml.safe_load(open(path, encoding="utf-8")) or {}
     return {}
+
+
+def _build_watchlist_pattern(assets, sector_map: dict) -> re.Pattern | None:
+    """Compile a single word-boundary regex matching any watchlist symbol
+    (incl. optional $ cashtag prefix) or sector alias. Returns None if no
+    terms are known (pre-filter then never matches, caller should treat
+    that as "let it through" upstream if desired)."""
+    terms = {re.escape(a.symbol) for a in assets if a.symbol}
+    for sec in (sector_map or {}).values():
+        terms.update(re.escape(alias) for alias in sec.get("aliases", []))
+    if not terms:
+        return None
+    joined = "|".join(sorted(terms, key=len, reverse=True))
+    return re.compile(rf"(?<![a-z0-9])\$?(?:{joined})(?![a-z0-9])", re.IGNORECASE)
+
+
+def _mentions_watchlist(text: str, pattern: "re.Pattern | None") -> bool:
+    """True if text mentions a watchlist asset symbol or sector alias.
+    `pattern` is a precompiled regex from _build_watchlist_pattern, built
+    once per collect_rss call rather than per item."""
+    return bool(pattern and pattern.search(text))
 
 
 def _published(entry):
@@ -42,9 +64,10 @@ def collect_rss(session, source) -> int:
     assets = list(session.scalars(select(Asset).where(Asset.scorable == True)))  # noqa: E712
     by_symbol = {a.symbol: a for a in assets}
     sector_map = load_sector_map()
+    watchlist_pattern = _build_watchlist_pattern(assets, sector_map)
     now = datetime.now(timezone.utc)
     created = 0
-    stats = {"items": 0, "enqueued": 0, "rule_claims": 0}
+    stats = {"items": 0, "enqueued": 0, "rule_claims": 0, "enqueue_skipped": 0}
     for entry in feed.entries:
         ext = getattr(entry, "id", None) or getattr(entry, "link", None)
         if ext is None:
@@ -70,8 +93,11 @@ def collect_rss(session, source) -> int:
                            "rule", PARSER_VERSION, asdict(pc), text, spot, now)
                 stats["rule_claims"] += 1
         elif source.kind in ("reddit", "news"):
-            enqueue_for_llm(session, item, source.kind, text)
-            stats["enqueued"] += 1
+            if _mentions_watchlist(text, watchlist_pattern):
+                enqueue_for_llm(session, item, source.kind, text)
+                stats["enqueued"] += 1
+            else:
+                stats["enqueue_skipped"] += 1
     session.commit()
     logger.info("collect_rss %s: %s", source.display_name, stats)
     return created
