@@ -1,8 +1,8 @@
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select, case
+from sqlalchemy import select, case, update
 
 from argus.models import Claim, ClaimAudit, Item, LlmQueue
 from argus.llm.cache import cache_get, cache_put, text_hash
@@ -12,6 +12,18 @@ from argus.prices import get_historical_price, get_spot_price
 logger = logging.getLogger(__name__)
 
 _MAX_ATTEMPTS = int(os.getenv("ARGUS_LLM_MAX_ATTEMPTS", "5"))
+_QUEUE_TTL_DAYS = int(os.getenv("ARGUS_LLM_QUEUE_TTL_DAYS", "3"))
+
+
+def expire_stale_pending(session) -> int:
+    cutoff = datetime.now(timezone.utc) - timedelta(days=_QUEUE_TTL_DAYS)
+    result = session.execute(
+        update(LlmQueue)
+        .where(LlmQueue.status == "pending", LlmQueue.enqueued_at < cutoff)
+        .values(status="expired")
+    )
+    session.commit()
+    return result.rowcount
 
 
 def enqueue_for_llm(session, item, source_kind: str, text: str) -> bool:

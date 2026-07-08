@@ -23,14 +23,17 @@ def _rss_job():
 
 
 def _llm_batch_job():
-    from argus.llm.batch import process_llm_batch
+    from argus.llm.batch import expire_stale_pending, process_llm_batch
     from argus.collectors.rss import load_sector_map
+    import logging
     batch_size = int(os.getenv("ARGUS_LLM_BATCH_SIZE", "8"))
     with SessionLocal() as s:
+        expired = expire_stale_pending(s)
+        if expired > 0:
+            logging.getLogger(__name__).info("llm_batch: expired %d stale pending entries", expired)
         assets = list(s.scalars(select(Asset).where(Asset.scorable == True)))  # noqa: E712
         sector_map = load_sector_map()
         stats = process_llm_batch(s, batch_size, assets, sector_map)
-    import logging
     logging.getLogger(__name__).info("llm_batch: %s", stats)
 
 def _eval_job():

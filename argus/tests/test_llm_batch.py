@@ -1,10 +1,10 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 from sqlalchemy import select
 
 from argus.models import Asset, Claim, ClaimAudit, Item, LlmCache, LlmQueue, Source
-from argus.llm.batch import enqueue_for_llm, process_llm_batch
+from argus.llm.batch import enqueue_for_llm, expire_stale_pending, process_llm_batch
 from argus.llm.extractor import LlmClaim
 
 
@@ -331,3 +331,72 @@ def test_reddit_processed_before_news(session):
         process_llm_batch(session, 1, [asset], {})
 
     assert processed_texts == ["reddit text"]
+
+
+# ---------------------------------------------------------------------------
+# Task 7 — expire_stale_pending: queue TTL
+# ---------------------------------------------------------------------------
+
+def _queue_entry(session, ext, status="pending", age_days=0):
+    src = session.scalar(select(Source).where(Source.kind == "reddit"))
+    if src is None:
+        src = _src(session)
+    item = _item(session, src, ext=ext)
+    entry = LlmQueue(
+        item_id=item.id,
+        text_hash=f"ttl{ext}" + "x" * 60,
+        source_kind="reddit",
+        status=status,
+        attempts=0,
+        enqueued_at=datetime.now(timezone.utc) - timedelta(days=age_days),
+    )
+    session.add(entry)
+    session.commit()
+    return entry
+
+
+def test_expire_stale_pending_marks_old_entries_expired(session):
+    entry = _queue_entry(session, "ttl1", status="pending", age_days=4)
+    count = expire_stale_pending(session)
+    session.refresh(entry)
+    assert count == 1
+    assert entry.status == "expired"
+
+
+def test_expire_stale_pending_leaves_fresh_pending_untouched(session):
+    entry = _queue_entry(session, "ttl2", status="pending", age_days=1)
+    count = expire_stale_pending(session)
+    session.refresh(entry)
+    assert count == 0
+    assert entry.status == "pending"
+
+
+def test_expire_stale_pending_ignores_done_and_failed(session):
+    done_entry = _queue_entry(session, "ttl3", status="done", age_days=10)
+    failed_entry = _queue_entry(session, "ttl4", status="failed", age_days=10)
+    count = expire_stale_pending(session)
+    session.refresh(done_entry)
+    session.refresh(failed_entry)
+    assert count == 0
+    assert done_entry.status == "done"
+    assert failed_entry.status == "failed"
+
+
+def test_expire_stale_pending_respects_ttl_env_override(session, monkeypatch):
+    monkeypatch.setattr("argus.llm.batch._QUEUE_TTL_DAYS", 10)
+    entry = _queue_entry(session, "ttl5", status="pending", age_days=4)
+    count = expire_stale_pending(session)
+    session.refresh(entry)
+    assert count == 0
+    assert entry.status == "pending"
+
+
+def test_process_llm_batch_skips_expired_entries(session):
+    asset = Asset(symbol="BTC", kind="crypto", binance_symbol="BTCUSDT", scorable=True)
+    session.add(asset)
+    session.commit()
+    _queue_entry(session, "ttl6", status="expired", age_days=10)
+    with patch("argus.llm.batch.extract_claims_llm") as mock_llm:
+        stats = process_llm_batch(session, 8, [asset], {})
+    assert not mock_llm.called
+    assert stats["processed"] == 0
