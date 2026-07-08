@@ -11,10 +11,12 @@ import httpx
 logger = logging.getLogger(__name__)
 
 GEMINI_KEY = os.getenv("GEMINI_API_KEY", "")
+GROQ_KEY = os.getenv("GROQ_API_KEY", "")
 OPENROUTER_KEY = os.getenv("OPENROUTER_API_KEY", "")
 ALLOW_PAID = os.getenv("ARGUS_LLM_ALLOW_PAID", "false").lower() == "true"
 PAID_MODEL = os.getenv("ARGUS_LLM_PAID_MODEL", "openai/gpt-4o-mini")
 GEMINI_MODEL = os.getenv("ARGUS_GEMINI_MODEL", "gemini-flash-latest")
+GROQ_MODEL = os.getenv("ARGUS_GROQ_MODEL", "llama-3.3-70b-versatile")
 OR_FREE_MODEL = os.getenv("ARGUS_OR_FREE_MODEL", "meta-llama/llama-3.3-70b-instruct:free")
 TG_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TG_CHAT = os.getenv("TELEGRAM_CHAT_ID", "")
@@ -22,10 +24,11 @@ TG_CHAT = os.getenv("TELEGRAM_CHAT_ID", "")
 _PRICING = {"openai/gpt-4o-mini": (0.15, 0.60)}
 
 # Per-provider RPM caps (conservative, below free-tier limits)
-# Gemini Flash free: 15 RPM → 10; OpenRouter free: 20 RPM → 8
+# Gemini Flash free: 15 RPM → 10; OpenRouter free: 20 RPM → 8; Groq free: 30 RPM → 20
 _RPM_LIMITS = {
     "gemini":     int(os.getenv("ARGUS_GEMINI_RPM", "10")),
     "openrouter": int(os.getenv("ARGUS_OR_RPM", "8")),
+    "groq":       int(os.getenv("ARGUS_GROQ_RPM", "20")),
 }
 _MAX_COOLDOWN = 960  # 16 min max backoff after repeated 429s
 
@@ -181,13 +184,33 @@ def _openrouter(model: str, prompt: str, system: str, max_tokens: int):
     return out, usage
 
 
+def _groq(prompt: str, system: str, max_tokens: int):
+    if not GROQ_KEY:
+        raise RuntimeError("no groq key")
+    r = httpx.post("https://api.groq.com/openai/v1/chat/completions",
+                   headers={"Authorization": f"Bearer {GROQ_KEY}"},
+                   json={"model": GROQ_MODEL,
+                         "messages": [{"role": "system", "content": system},
+                                      {"role": "user", "content": prompt}],
+                         "max_tokens": max_tokens, "temperature": 0},
+                   timeout=60)
+    r.raise_for_status()
+    j = r.json()
+    out = j["choices"][0]["message"]["content"]
+    u = j.get("usage", {})
+    usage = {"tokens_in": u.get("prompt_tokens", 0), "tokens_out": u.get("completion_tokens", 0)}
+    return out, usage
+
+
 # ── Public API ────────────────────────────────────────────────────────────────
 
 def call_llm(prompt: str, system: str = "", max_tokens: int = 512) -> str:
     attempts = [
         ("gemini",     GEMINI_MODEL,  lambda: _gemini(prompt, system, max_tokens)),
-        ("openrouter", OR_FREE_MODEL, lambda: _openrouter(OR_FREE_MODEL, prompt, system, max_tokens)),
     ]
+    if GROQ_KEY:
+        attempts.append(("groq", GROQ_MODEL, lambda: _groq(prompt, system, max_tokens)))
+    attempts.append(("openrouter", OR_FREE_MODEL, lambda: _openrouter(OR_FREE_MODEL, prompt, system, max_tokens)))
     if ALLOW_PAID:
         attempts.append(("openrouter", PAID_MODEL, lambda: _openrouter(PAID_MODEL, prompt, system, max_tokens)))
 
