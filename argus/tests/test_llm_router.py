@@ -1,6 +1,15 @@
 import time
 from unittest.mock import patch
+import pytest
 import argus.llm.router as router
+
+@pytest.fixture(autouse=True)
+def _isolate_router_env(monkeypatch):
+    # Deterministic regardless of host/container env: no groq unless a test
+    # explicitly sets GROQ_KEY, and no leftover cooldowns between tests.
+    monkeypatch.setattr(router, "GROQ_KEY", "")
+    for s in router._STATES.values():
+        s._blocked_until = 0.0; s._streak = 0; s._window.clear()
 
 def test_cost_free_zero_paid_nonzero():
     assert router._cost("meta-llama/llama-3.3-70b-instruct:free", {"tokens_in": 1000, "tokens_out": 1000}) == 0.0
