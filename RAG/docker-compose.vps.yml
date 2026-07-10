@@ -1,0 +1,117 @@
+# RAG na VPS (Jarvis Faza 1) — bez LangFuse, bez Flower, worker x1, Ollama CPU (embeddingi)
+services:
+  rag-postgres:
+    image: pgvector/pgvector:pg16
+    container_name: rag-postgres
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5434:5432"
+    environment:
+      POSTGRES_USER: ${RAG_DB_USER:-rag}
+      POSTGRES_PASSWORD: ${RAG_DB_PASSWORD:-ragpass}
+      POSTGRES_DB: ${RAG_DB_NAME:-rag}
+    volumes:
+      - rag-postgres-data:/var/lib/postgresql/data
+      - ./db-init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${RAG_DB_USER:-rag} -d ${RAG_DB_NAME:-rag}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rag-redis:
+    image: redis:7-alpine
+    container_name: rag-redis
+    restart: unless-stopped
+    volumes:
+      - rag-redis-data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rag-ollama:
+    image: ollama/ollama:latest
+    container_name: rag-ollama
+    restart: unless-stopped
+    volumes:
+      - rag-ollama-data:/root/.ollama
+    deploy:
+      resources:
+        limits:
+          memory: 3g
+
+  rag-api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: rag-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      RAG_DB_HOST: rag-postgres
+      RAG_DB_PORT: 5432
+      REDIS_URL: redis://rag-redis:6379/0
+      OLLAMA_URL: http://rag-ollama:11434
+    volumes:
+      - rag-uploads:/data/uploads
+      - rag-watch:/data/watch
+    depends_on:
+      rag-postgres:
+        condition: service_healthy
+      rag-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  rag-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: rag-worker
+    restart: unless-stopped
+    command: celery -A tasks.celery_app worker --loglevel=info --concurrency=1 -Q default,documents,crawl
+    env_file:
+      - .env
+    environment:
+      RAG_DB_HOST: rag-postgres
+      RAG_DB_PORT: 5432
+      REDIS_URL: redis://rag-redis:6379/0
+      OLLAMA_URL: http://rag-ollama:11434
+      WHISPER_MODEL_SIZE: small
+      WHISPER_THREADS: "2"
+    volumes:
+      - rag-uploads:/data/uploads
+      - rag-watch:/data/watch
+    depends_on:
+      rag-postgres:
+        condition: service_healthy
+      rag-redis:
+        condition: service_healthy
+
+  rag-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: rag-frontend
+    restart: unless-stopped
+    ports:
+      - "3003:80"
+    depends_on:
+      rag-api:
+        condition: service_healthy
+
+volumes:
+  rag-postgres-data:
+  rag-redis-data:
+  rag-ollama-data:
+  rag-uploads:
+  rag-watch:
