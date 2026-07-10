@@ -214,6 +214,21 @@ Każdy krok to zamknięta, działająca jednostka. Nie przechodzimy dalej dopók
 - **Stan po sesji**: Kod gotowy, wymaga rebuild kontenerów
 - **Następny krok**: Rebuild wszystkich → smoke test UI → bugfixing
 
+### Sesja 10 — 2026-07-10 (Jarvis Faza 1, Task 4: deploy na VPS)
+- **Wykonano**:
+  - Deploy stacka RAG na Oracle VPS (`~/rag`, `docker-compose.vps.yml`) — 6 kontenerów `rag-*` Up (api/postgres/redis healthy)
+  - Build obrazów: ~9 min (docling+torch, obrazy api/worker po 4.26 GB)
+  - `qwen3-embedding:0.6b` pobrany do rag-ollama (639 MB)
+  - Health OK, login admina z seedu db-init działa (JWT) — hasło seedowe `admin`, DO ZMIANY
+  - **Wydajność embeddingów (CPU VPS)**: warmup (load modelu) 9.12 s; 1 chunk **0.37 s** (kryterium < 2 s ✅); 10 chunków **1.35 s** (kryterium < 30 s ✅) — API embeddings NIEpotrzebne
+  - **E2E czat ✅**: upload txt → chunk+embedding → `POST /chat/{id}/query` → odpowiedź "…stolicą Polski jest Warszawa [1]" z cytowaniem źródła i judge 1.0/1.0/1.0 (generacja przez Gemini OpenAI-compat)
+  - RAM po deployu: available ~11 GiB (kryterium ≥ 2 GB ✅); wszystkie `argus-*` Up bez restartu
+- **Znalezione problemy**:
+  - Schema drift: `chat_context.document_id` istnieje w modelu (`core/database.py`), brak w `db-init/01-init-rag.sql` → chat 500. Hotfix na VPS: `ALTER TABLE chat_context ADD COLUMN document_id …`. **TODO: dodać kolumnę do db-init w repo**
+  - `core/rewriter.py:16` — jedyne miejsce tworzące `OpenRouterClient` bez `base_url` → na VPS rewriter dostaje 401 z openrouter.ai i fallbackuje do oryginalnego query (nieblokujące). **TODO: przekazać `settings.ai.openrouter_base_url` jak w chat_service/judge/reranker**
+  - Upload < ~100 znaków daje 0 chunków (status ready, brak treści w indeksie) — zachowanie chunkera, odnotowane
+- **Następny krok**: fix db-init + rewriter base_url w repo; zmiana hasła admina na VPS
+
 ---
 
 ## Następna sesja: START HERE
