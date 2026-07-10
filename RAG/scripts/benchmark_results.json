@@ -1,0 +1,23 @@
+{
+  "models": [
+    {
+      "name": "qwen3-embedding:0.6b",
+      "provider": "ollama",
+      "dimensions": 1024,
+      "total_time_s": 388.235,
+      "avg_time_ms_per_chunk": 4852.9,
+      "total_chunks": 80,
+      "intra_consistency": 0.633
+    },
+    {
+      "name": "text-embedding-004",
+      "provider": "gemini",
+      "dimensions": 3072,
+      "total_time_s": 53.91,
+      "avg_time_ms_per_chunk": 673.9,
+      "total_chunks": 80,
+      "intra_consistency": 0.8316
+    }
+  ],
+  "note_cross_model": "Dimensions differ — direct cosine comparison not applicable."
+}

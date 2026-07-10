@@ -1,0 +1,124 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body, #root {
+    @apply h-full;
+  }
+
+  body {
+    @apply bg-gray-900 text-gray-100 font-sans antialiased;
+  }
+
+  /* Custom scrollbar for dark theme */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-gray-800;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-600 rounded;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-500;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply bg-gray-700 hover:bg-gray-600 text-gray-100 px-4 py-2 rounded-md text-sm font-medium transition-colors;
+  }
+
+  .btn-danger {
+    @apply bg-red-700 hover:bg-red-600 text-white px-3 py-1.5 rounded-md text-sm font-medium transition-colors;
+  }
+
+  .input-field {
+    @apply bg-gray-800 border border-gray-600 text-gray-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-500 w-full;
+  }
+
+  .card {
+    @apply bg-gray-800 rounded-lg border border-gray-700 p-4;
+  }
+}
+
+/* Prose styles for markdown rendering */
+.prose-dark {
+  @apply text-gray-200;
+}
+
+.prose-dark h1,
+.prose-dark h2,
+.prose-dark h3,
+.prose-dark h4 {
+  @apply text-gray-100 font-semibold mt-4 mb-2;
+}
+
+.prose-dark h1 { @apply text-xl; }
+.prose-dark h2 { @apply text-lg; }
+.prose-dark h3 { @apply text-base; }
+
+.prose-dark p {
+  @apply mb-3 leading-relaxed;
+}
+
+.prose-dark ul, .prose-dark ol {
+  @apply mb-3 pl-5;
+}
+
+.prose-dark ul { @apply list-disc; }
+.prose-dark ol { @apply list-decimal; }
+
+.prose-dark li {
+  @apply mb-1;
+}
+
+.prose-dark code {
+  @apply bg-gray-700 text-blue-300 px-1.5 py-0.5 rounded text-sm font-mono;
+}
+
+.prose-dark pre {
+  @apply bg-gray-900 rounded-lg p-4 mb-3 overflow-x-auto;
+}
+
+.prose-dark pre code {
+  @apply bg-transparent p-0 text-gray-300;
+}
+
+.prose-dark blockquote {
+  @apply border-l-4 border-blue-500 pl-4 text-gray-400 italic mb-3;
+}
+
+.prose-dark a {
+  @apply text-blue-400 hover:text-blue-300 underline;
+}
+
+.prose-dark table {
+  @apply w-full border-collapse mb-3;
+}
+
+.prose-dark th {
+  @apply bg-gray-700 text-gray-200 font-semibold px-3 py-2 text-left border border-gray-600;
+}
+
+.prose-dark td {
+  @apply px-3 py-2 border border-gray-700;
+}
+
+.prose-dark strong {
+  @apply text-gray-100 font-semibold;
+}
+
+.prose-dark em {
+  @apply italic;
+}
