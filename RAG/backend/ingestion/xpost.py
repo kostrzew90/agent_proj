@@ -1,17 +1,20 @@
 """
 RAG System — X (Twitter) Post Scraper + GitHub README Fetcher
-Extracts post content via FxTwitter API, finds GitHub links, fetches READMEs.
+Extracts post content via VxTwitter API (primary) or Twitter oEmbed (fallback),
+finds GitHub links, and fetches READMEs.
 """
 
 import re
 import logging
 from dataclasses import dataclass, field
+from html.parser import HTMLParser
 
 import httpx
 
 logger = logging.getLogger("rag.ingestion.xpost")
 
-FXTWITTER_API = "https://api.fxtwitter.com"
+VXTWITTER_API = "https://api.vxtwitter.com"
+OEMBED_API = "https://publish.twitter.com/oembed"
 
 
 @dataclass
@@ -62,8 +65,28 @@ def extract_github_urls(text: str) -> list[tuple[str, str]]:
     return result
 
 
+class _HTMLTextStripper(HTMLParser):
+    """Minimal HTML-to-text converter for oEmbed html field."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._parts: list[str] = []
+
+    def handle_data(self, data: str) -> None:
+        self._parts.append(data)
+
+    def get_text(self) -> str:
+        return " ".join(part.strip() for part in self._parts if part.strip())
+
+
+def _strip_html(html: str) -> str:
+    parser = _HTMLTextStripper()
+    parser.feed(html)
+    return parser.get_text()
+
+
 async def fetch_post(url: str) -> XPostData:
-    """Fetch X post content via FxTwitter API."""
+    """Fetch X post content via VxTwitter API (primary) or Twitter oEmbed (fallback)."""
     post = XPostData(url=url)
 
     info = extract_tweet_info(url)
@@ -72,58 +95,70 @@ async def fetch_post(url: str) -> XPostData:
 
     username, tweet_id = info
 
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        # Try FxTwitter API
+    async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+        # 1. Try VxTwitter API
         try:
-            resp = await client.get(f"{FXTWITTER_API}/{username}/status/{tweet_id}")
+            resp = await client.get(f"{VXTWITTER_API}/{username}/status/{tweet_id}")
             if resp.status_code == 200:
                 data = resp.json()
-                tweet = data.get("tweet", {})
-                post.text = tweet.get("text", "")
-                post.author = tweet.get("author", {}).get("name", username)
-                logger.info("Fetched X post by %s: %d chars", post.author, len(post.text))
-            else:
-                logger.warning("FxTwitter returned %d, trying direct scrape", resp.status_code)
-                raise ValueError(f"FxTwitter API returned {resp.status_code}")
-        except Exception as e:
-            # Fallback: try nitter or basic scrape
-            logger.warning("FxTwitter failed (%s), trying Nitter", e)
-            nitter_hosts = [
-                "nitter.privacydev.net",
-                "nitter.poast.org",
-                "nitter.lucabased.xyz",
-                "xcancel.com",
-                "nitter.woodland.cafe",
-            ]
-            for nitter_host in nitter_hosts:
-                try:
-                    # Health check: HEAD request with short timeout
-                    try:
-                        health = await client.head(f"https://{nitter_host}", timeout=3.0)
-                        if health.status_code >= 500:
-                            logger.debug("Nitter %s unhealthy (HTTP %d), skipping", nitter_host, health.status_code)
-                            continue
-                    except Exception:
-                        logger.debug("Nitter %s unreachable, skipping", nitter_host)
-                        continue
+                post.text = data.get("text", "")
+                post.author = data.get("user_name", username)
+                logger.info("Fetched X post via VxTwitter by %s: %d chars", post.author, len(post.text))
+                return post
+            logger.warning("VxTwitter returned HTTP %d", resp.status_code)
+        except Exception as exc:
+            logger.warning("VxTwitter request failed: %s", exc)
 
-                    nitter_url = f"https://{nitter_host}/{username}/status/{tweet_id}"
-                    resp = await client.get(nitter_url, follow_redirects=True, timeout=10.0)
-                    if resp.status_code == 200:
-                        text = resp.text
-                        match = re.search(r'class="tweet-content[^"]*"[^>]*>(.*?)</div>', text, re.DOTALL)
-                        if match:
-                            content = re.sub(r"<[^>]+>", " ", match.group(1)).strip()
-                            post.text = content
-                            post.author = username
-                            logger.info("Fetched via Nitter (%s): %d chars", nitter_host, len(post.text))
-                            break
-                except Exception:
-                    continue
+        # 2. Fallback: Twitter oEmbed API
+        try:
+            oembed_url = f"{OEMBED_API}?url={url}&omit_script=true"
+            resp = await client.get(oembed_url)
+            if resp.status_code == 200:
+                data = resp.json()
+                raw_html = data.get("html", "")
+                post.text = _strip_html(raw_html)
+                post.author = data.get("author_name", username)
+                logger.info("Fetched X post via oEmbed by %s: %d chars", post.author, len(post.text))
+                return post
+            logger.warning("oEmbed returned HTTP %d", resp.status_code)
+        except Exception as exc:
+            logger.warning("oEmbed request failed: %s", exc)
 
-    if not post.text:
-        raise ValueError("Could not fetch post content from any source")
+    raise ValueError(f"Could not fetch post content from any source for: {url}")
 
+
+async def create_post_from_text(url: str, text: str, author: str = "unknown") -> XPostData:
+    """Create XPostData from user-provided text (paste fallback).
+
+    Extracts GitHub URLs from the text and fetches their READMEs,
+    then composes raw_content exactly like process_xpost does.
+    """
+    post = XPostData(url=url, author=author, text=text)
+
+    github_pairs = extract_github_urls(text)
+    logger.info("Found %d GitHub repos in pasted text", len(github_pairs))
+
+    for owner, repo in github_pairs:
+        try:
+            github_repo = await fetch_github_readme(owner, repo)
+            post.repos.append(github_repo)
+        except Exception as exc:
+            logger.warning("Failed to fetch %s/%s: %s", owner, repo, exc)
+
+    parts = [
+        f"# X Post by {post.author}\n",
+        f"Source: {post.url}\n",
+        f"\n{post.text}\n",
+    ]
+    for repo in post.repos:
+        parts.append(f"\n---\n\n## GitHub: {repo.owner}/{repo.name}\n")
+        if repo.description:
+            parts.append(f"**{repo.description}**\n")
+        parts.append(f"URL: {repo.url}\n")
+        if repo.readme:
+            parts.append(f"\n{repo.readme}\n")
+
+    post.raw_content = "\n".join(parts)
     return post
 
 

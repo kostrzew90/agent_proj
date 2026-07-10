@@ -181,9 +181,9 @@ class LLMReranker:
         """
         t0 = time.monotonic()
         effective_top_k = top_k if top_k is not None else settings.retrieval.reranker_top_k
-        llm_weight: float = getattr(settings.retrieval, "reranker_llm_weight", 0.7)
-        max_per_section: int = getattr(settings.retrieval, "reranker_max_per_section", 2)
-        content_truncate: int = getattr(settings.retrieval, "reranker_content_truncate", 600)
+        llm_weight: float = settings.retrieval.reranker_llm_weight
+        max_per_section: int = settings.retrieval.reranker_max_per_section
+        content_truncate: int = settings.retrieval.reranker_content_truncate
         fallback_used = False
 
         if not results:
@@ -213,7 +213,7 @@ class LLMReranker:
         if not ranked_scores:
             if not fallback_used:
                 logger.warning("LLM reranker returned no valid scores — using RRF order")
-                fallback_used = True
+            fallback_used = True
             elapsed_ms = (time.monotonic() - t0) * 1000
             logger.info(
                 "rerank query=%r n_in=%d n_out=%d latency_ms=%.0f fallback=%s",

@@ -18,7 +18,7 @@ logger = logging.getLogger("rag.ingestion.youtube")
 def extract_video_id(url: str) -> str | None:
     """Extract YouTube video ID from various URL formats."""
     patterns = [
-        r"(?:v=|youtu\.be/|embed/|shorts/)([a-zA-Z0-9_-]{11})",
+        r"(?:v=|youtu\.be/|embed/|shorts/|live/)([a-zA-Z0-9_-]{11})",
         r"^([a-zA-Z0-9_-]{11})$",
     ]
     for pattern in patterns:

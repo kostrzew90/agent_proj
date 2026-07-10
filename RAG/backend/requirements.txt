@@ -34,11 +34,24 @@ tiktoken==0.8.0
 httpx==0.28.1
 aiofiles==24.1.0
 
+# === Web Crawling ===
+trafilatura==1.12.0
+html2text==2024.2.26
+
+# === YouTube ===
+yt-dlp>=2024.11.0
+
+# === Audio/Video Transcription ===
+faster-whisper>=1.0.0
+
 # === Watch Folder ===
 watchdog==6.0.0
 
 # === LangFuse ===
 langfuse==2.58.0
+
+# === Rate Limiting ===
+slowapi>=0.1.9
 
 # === Utilities ===
 orjson==3.10.14

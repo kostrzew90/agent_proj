@@ -177,6 +177,7 @@ class ChatContext(Base):
     chat_id = Column(Integer, ForeignKey("chat_sessions.id", ondelete="CASCADE"))
     folder_id = Column(Integer, ForeignKey("folders.id", ondelete="SET NULL"))
     tag_id = Column(Integer, ForeignKey("tags.id", ondelete="SET NULL"))
+    document_id = Column(Integer, ForeignKey("documents.id", ondelete="SET NULL"))
 
     chat_session = relationship("ChatSession", back_populates="contexts")
 

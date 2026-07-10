@@ -36,6 +36,11 @@ class ChatService:
             self.llm = AsyncLLMClient()
             logger.info("LLM: Ollama (%s)", settings.ai.llm_model)
 
+    async def close(self):
+        await self.reranker.close()
+        await self.rewriter.llm.close()
+        await self.llm.close()
+
     async def create_session(
         self,
         db: AsyncSession,

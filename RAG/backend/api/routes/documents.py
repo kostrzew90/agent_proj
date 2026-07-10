@@ -544,6 +544,8 @@ async def ingest_youtube(
 
 class XPostIngestRequest(BaseModel):
     url: str
+    text: str | None = None
+    author: str | None = None
     folder_id: int | None = None
     tag_ids: list[int] = []
 
@@ -556,8 +558,8 @@ async def ingest_xpost(
 ):
     """Ingest X/Twitter post → extract GitHub repos → analyze → embed → index."""
     import re
-    # Validate URL
-    if not re.search(r"(twitter\.com|x\.com)/\w+/status/\d+", request.url):
+    # Validate URL (skip if text is provided — paste mode)
+    if not request.text and not re.search(r"(twitter\.com|x\.com)/\w+/status/\d+", request.url):
         raise HTTPException(status_code=400, detail="Invalid X/Twitter post URL")
 
     # Check duplicate
@@ -590,7 +592,7 @@ async def ingest_xpost(
     await db.refresh(task)
 
     from tasks.xpost_ingest_task import ingest_xpost as celery_ingest
-    celery_result = celery_ingest.delay(request.url, user.id, task.id)
+    celery_result = celery_ingest.delay(request.url, user.id, task.id, request.text, request.author)
     task.celery_task_id = celery_result.id
     await db.commit()
 
