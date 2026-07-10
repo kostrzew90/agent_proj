@@ -8,6 +8,10 @@
 
 Za ~3 miesiące (do połowy października 2026) mieć dane zamiast hipotez do decyzji: który wertykał "dokument → akcja" staje się produktem SaaS na drodze do pełnego etatu użytkownika. Po drodze: pierwszy przychód z wdrożeń.
 
+Teza strategiczna: największy potencjał nie tkwi w AI samym w sobie, tylko we wzorcu dokument → decyzja → akcja (mail, PDF, faktura, wezwanie, decyzja administracyjna, pismo sądowe, umowa, reklamacja). AI jest silnikiem; produktem jest automatyzacja pracy z dokumentami, nie kolejny chatbot.
+
+Oba tory prowadzone są roboczo jako "Concierge AI" — usługa wspomagana AI, nie SaaS. Produkt wyłania się dopiero, gdy okaże się, że ok. 5 klientów potrzebuje dokładnie tego samego.
+
 ## Kontekst decyzji
 
 Przegląd portfolio (RAG, Argus, VINhunter, Hermes, Selfmadeagent, trading-app) wykazał: silna inżynieria, brak klientów — technologia szukająca rynku. Dwa realne sygnały popytu:
@@ -40,13 +44,15 @@ Własny frontend, multi-tenant, KSeF, automatyczne wysyłanie czegokolwiek. To w
 
 ### Kryterium sukcesu
 
-Po 4 tygodniach od wdrożenia obaj klienci nadal używają (skoroszyt rośnie, faktury generowane) i płacą abonament. Miernik pomocniczy: czy sami proszą o więcej / polecają dalej.
+Po 4 tygodniach od wdrożenia: minimum 30 przetworzonych maili tygodniowo, minimum 5 wygenerowanych faktur, klient zagląda do systemu minimum 3 dni w tygodniu, opłacony drugi miesiąc abonamentu. Progi są wartościami domyślnymi — kalibrowane przy gate zero do realnego wolumenu klienta (firma z 10 mailami/tydz. dostaje proporcjonalnie niższy próg). Miernik pomocniczy: czy sami proszą o więcej / polecają dalej.
 
 ## Tor 2 — Strażnik terminów dla kancelarii (produkt)
 
 ### Krok 1 — discovery z Borzewskim (bez kodu)
 
 Godzinna rozmowa wg scenariusza: jak wpływa korespondencja (e-Doręczenia / papier / skan), kto i jak wylicza terminy, gdzie jest kalendarz kancelarii, historia "prawie przegapionego" terminu, czy zapłaciłby i ile. Wynik spisany. Jeśli discovery pokaże, że problem jest u niego marginalny — pytamy 2–3 inne kancelarie (polecenia od niego), zanim porzucimy kierunek.
+
+Zasada prowadzenia rozmowy: nie pytać "czy to byłoby przydatne?" — zamiast tego "pokaż mi ostatnie pismo", potem "co robisz dalej?" i obserwować. Obserwacja realnego procesu ujawnia problemy, których klient sam nie nazywa.
 
 ### Krok 2 — MVP tylko jeśli discovery potwierdzi ból
 
@@ -59,9 +65,25 @@ Godzinna rozmowa wg scenariusza: jak wpływa korespondencja (e-Doręczenia / pap
 
 Kancelaria po miesiącu wprowadza pisma sama, bez przypominania, i potwierdza "nie chcę tego oddać". To sygnał do budowy SaaS.
 
+## Metryki od pierwszego dnia
+
+Tor 1: liczba maili, ile AI sklasyfikowało poprawnie, ile odpowiedzi zaakceptowano bez zmian, ile poprawiono, czas wykonania.
+
+Tor 2: liczba pism, ile terminów AI znalazło, ile poprawił człowiek, ile minut zajęło przetworzenie.
+
+Uzasadnienie: to przyszły materiał marketingowy — "AI poprawnie wyciągnęło termin w 94% z 430 dokumentów" jest mocniejszym argumentem niż "wykorzystujemy AI".
+
+### Log błędów
+
+Każdy przypadek pomyłki AI zapisywany — nie po to, żeby karać model, tylko żeby wiedzieć czego nie umie, co poprawić, które przypadki obsłużyć regułami. Za pół roku taki zbiór to przewaga konkurencyjna.
+
+### Gate: pytanie po 2 tygodniach
+
+Niezależnie od 4-/12-tygodniowych kryteriów sukcesu: ~2 tygodnie po starcie wdrożenia (w obu torach) zadać klientowi pytanie "Gdybym jutro wyłączył ten system, czego najbardziej by Ci brakowało?" — NIE "czy Ci się podoba?" (prowadzi do uprzejmych odpowiedzi). Odpowiedź wskazuje realną wartość, wcześnie i tanio.
+
 ## Bramka decyzyjna (~połowa października 2026)
 
-Porównanie torów po faktach: retencja, kto sam wraca i prosi o więcej, kto poleca, realna skłonność do płacenia. Zwycięski wertykał dostaje pełne zaangażowanie i osobny brainstorming produktu SaaS.
+Porównanie torów po faktach: retencja, kto sam wraca i prosi o więcej, kto poleca, realna skłonność do płacenia. Zwycięski wertykał dostaje pełne zaangażowanie; brainstorming produktu SaaS dopiero gdy powtarzalność potwierdzona u kolejnych klientów (patrz Concierge AI w sekcji Cel).
 
 Możliwe uczciwe wyniki:
 - Oba słabe — szukamy dalej, taniej o 3 miesiące błędu.
