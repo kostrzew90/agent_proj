@@ -162,6 +162,7 @@ class LLMReranker:
             self._client = OpenRouterClient(
                 api_key=settings.ai.openrouter_api_key,
                 model=settings.ai.openrouter_judge_model,
+                base_url=settings.ai.openrouter_base_url or None,
             )
         else:
             self._client = AsyncLLMClient(

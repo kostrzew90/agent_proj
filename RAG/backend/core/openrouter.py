@@ -26,10 +26,11 @@ class OpenRouterClient:
         api_key: str,
         model: str,
         timeout: float = 120.0,
+        base_url: str | None = None,
     ):
         self.model = model
         self._client = httpx.AsyncClient(
-            base_url=OPENROUTER_BASE,
+            base_url=(base_url or OPENROUTER_BASE),
             headers={
                 "Authorization": f"Bearer {api_key}",
                 "HTTP-Referer": "http://localhost:3003",

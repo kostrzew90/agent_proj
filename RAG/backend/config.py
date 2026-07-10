@@ -44,6 +44,7 @@ class AISettings(BaseSettings):
     openrouter_api_key: str = ""
     openrouter_model: str = "google/gemini-2.0-flash-001"
     openrouter_judge_model: str = "google/gemini-2.0-flash-001"
+    openrouter_base_url: str = ""  # puste = openrouter.ai; np. Gemini OpenAI-compat endpoint
 
     # Groq (optional — fast Whisper API, free tier 7200s/day)
     groq_api_key: str = ""
