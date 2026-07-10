@@ -2,72 +2,73 @@
 
 **Data:** 2026-07-10
 **Status:** Zaakceptowany
-**Projekt:** `jarvis/` (nowy, VPS obok Argusa)
+**Projekt:** `jarvis/` (nowy, VPS obok Argusa) + `RAG/` (przenoszony na VPS jako GUI)
 
 ## Cel
 
-Jarvis = autonomiczny obserwator/reporter na Oracle VPS (niezależny od laptopa usera), który zbiera stan systemów i strategii walidacji, wysyła digesty na Telegram i przypomina o bramkach. Zasada nadrzędna: **read-only** — raportuje i przypomina, NIGDY nie wykonuje akcji samodzielnie. Autonomia wykonawcza rozważana dopiero, gdy raporty okażą się trafne (wzorzec z Argusa: najpierw zmierz wiarygodność, potem ufaj).
+Jarvis = autonomiczny obserwator/reporter na Oracle VPS (niezależny od laptopa usera), który zbiera stan systemów i strategii walidacji, wysyła digesty/alerty i przypomina o bramkach. Zasada nadrzędna: **read-only** — raportuje i przypomina, NIGDY nie wykonuje akcji samodzielnie. Autonomia wykonawcza rozważana dopiero, gdy raporty okażą się trafne (wzorzec z Argusa: najpierw zmierz wiarygodność, potem ufaj).
 
 ## Kontekst decyzji
 
 - User chciał "autonomicznego Jarvisa"; zakres zawężony do obserwatora-reportera w służbie strategii walidacji dwutorowej (patrz `docs/superpowers/specs/2026-07-10-walidacja-dwutorowa-design.md` — Jarvis służy tej strategii).
 - Hermes (laptop, 9 kontenerów) ODRZUCONY jako platforma — Jarvis musi działać 24/7 niezależnie od laptopa. Zamiast tego: lekki osobny serwis na VPS obok Argusa, sklejony ze sprawdzonych klocków Argusa.
-- Baza wektorowa / PDF-y w v0 ODRZUCONE: kontekst usera to kilka plików markdown ładowanych do prompta w całości; "nauka" = pętla feedbacku (wzorzec samonauki Argusa), nie dokumenty; pytania o PDF-y = projekt RAG, osobna decyzja, nie mieszać do reportera. Gdy pojawi się udowodniona potrzeba — pgvector stoi na tym samym VPS (migracja SQLite→Postgres to popołudnie).
-- GUI przeglądarkowe ODRZUCONE w v0: Telegram = pełny interfejs (telefon, desktop, web.telegram.org, dwukierunkowy, push). Read-only strona statusowa możliwa w v1 (wzorzec dashboardu Argusa :8080). Pełne GUI chatowe — poza scope całkowicie.
+- **2026-07-10 — decyzja usera po review: GUI-first zamiast Telegram-only.** Rekomendacja była reporter-first (Telegram, szybszy pierwszy działający element); user świadomie wybrał GUI mimo tej rekomendacji i mimo ~miesiąca wieczorów do pierwszego działającego elementu. Powód: GUI nie jest budowane od zera — **istniejący projekt RAG (`RAG/`) zostaje przeniesiony na VPS i staje się "domem" Jarvisa**. RAG ma już gotowe: login/JWT, czat z historią i streamingiem SSE, upload dokumentów drag-and-drop, parsowanie Docling, pgvector. Budowa własnego GUI od zera byłaby odrzucona jako over-engineering; reużycie gotowego stacku zmienia kalkulację.
+- Telegram zdegradowany do roli dzwonka: push o digeście/alercie (własny token bota nadal wymagany — telefon/laptop, przeglądarka sama nie powiadomi). Rozmowa i dokumenty żyją w GUI, nie w Telegramie.
+- Dostęp do GUI przez **Tailscale** (VPS dołącza do istniejącego tailnetu usera; telefon/laptop z appką Tailscale) — zero publicznego wystawiania portów, zero własnego HTTPS/auth-hardeningu ponad istniejący JWT RAG-a.
 
-## Architektura v0
+## Struktura faz
 
-- Nowy katalog `jarvis/` w repo, 1 kontener Python na VPS (docker compose, obok stacka Argusa).
-- APScheduler (wzorzec z Argusa): job dzienny ~07:30 (digest operacyjny) + job tygodniowy (digest Argusa), job pollingu Telegram.
-- `router.py` — KOPIA sprawdzonego modułu z Argusa (Gemini free → Groq free → OpenRouter free; sliding-window RPM, circuit breaker, backoff 429/503, log każdego calla). W v0 LLM praktycznie nieużywany — digesty są deterministyczne (szablony); router czeka na v0.5.
-- Telegram: WŁASNY token bota (od BotFather) — NIE token Hermesa (konflikt getUpdates z telegram-watcherem na laptopie). Wysyłka digestów + polling getUpdates dla komend.
-- Stan: SQLite (bramki walidacji, snapshoty rankingów Argusa tydzień-do-tygodnia, log uruchomień jobów, później: widziane pomysły i feedback).
-- Wiedza kontekstowa: pliki markdown w `jarvis/context/` (profil usera, streszczenie strategii walidacji, lista odrzuconych kierunków) — ładowane do promptów w całości w v0.5.
+### Faza 1 — RAG na VPS (fundament GUI)
 
-## Kolektory v0 (wszystkie deterministyczne, zero LLM)
+- Deploy stacka RAG na Oracle VPS obok Argusa: backend FastAPI + frontend + Postgres/pgvector + Redis + Celery workers.
+- Adaptacje wymagane:
+  - **Generacja LLM przez API zamiast lokalnego Ollamy** — router wzorowany na `argus/llm/router.py` (Gemini free → Groq free → OpenRouter free) wpięty w `RAG/backend/core/llm.py`.
+  - **Embeddingi**: qwen3-embedding:0.6b na CPU VPS (mały model, wolumen niski) LUB API embeddings — decyzja przy implementacji po teście wydajności na 4 vCPU.
+  - Tailscale na VPS.
+- PREREQUISITE: uporządkować ~20 niezacommitowanych plików w `RAG/` (commit lub świadome odrzucenie) PRZED deployem.
+- Kryterium: user loguje się z telefonu przez Tailscale, prowadzi czat z historią, wgrywa PDF i pyta o niego.
 
-1. **Bramki walidacji**: stan w SQLite (daty wdrożeń, statusy gate zero/discovery/2-tygodniowe pytanie), arytmetyka dat → przypomnienia w digeście (np. "14 dni od wdrożenia u klienta X → czas na pytanie o wyłączenie systemu"). Aktualizacja przez komendy Telegram.
-2. **Infra**: docker health kontenerów Argusa (docker socket read-only mount lub `docker ps` via host), zajętość dysku, grep błędów w logach 24h. Odchylenie = alert natychmiast, norma = linijka w digeście. NIE duplikuje guardiana Argusa (guardian pilnuje wnętrza Argusa; Jarvis dokłada bramki/digesty/radar i patrzy szerzej na VPS).
-3. **Argus digest (tygodniowy)**: API Argusa po localhost (koniec z SSH, port 8080 zamknięty na firewallu ale localhost dostępny) — /api/sources, /api/wallets, /api/llm/usage → porównanie ze snapshotem z zeszłego tygodnia → zmiany rankingów źródeł, nowe sygnały, dojrzewające outcome'y, anomalie (backlog llm_queue, fail-rate).
+### Faza 2 — Reporter (kolektory Jarvisa)
 
-## Komendy Telegram v0
+- Jak w pierwotnym planie: bramki walidacji (arytmetyka dat), infra (docker health, dysk, logi), Argus digest tygodniowy (API localhost) — wszystko deterministyczne, zero LLM w digestach.
+- **NOWE:** digesty i alerty zapisywane jako dokumenty w RAG (przeszukiwalne archiwum: "co Jarvis mówił o rankingu w czerwcu?") + push na Telegram.
+- Stan Jarvisa (bramki, snapshoty, log jobów): tabele w Postgresie RAG-a (zamiast SQLite — baza już stoi na VPS).
+- Aktualizacja bramek: komendy Telegram (`/jarvis gate <nazwa> <status> [data]`) — GUI-owy panel bramek to nice-to-have, nie blokuje.
+- Kolektory:
+  1. **Bramki walidacji**: stan w Postgresie RAG-a (daty wdrożeń, statusy gate zero/discovery/2-tygodniowe pytanie), arytmetyka dat → przypomnienia w digeście (np. "14 dni od wdrożenia u klienta X → czas na pytanie o wyłączenie systemu").
+  2. **Infra**: docker health kontenerów Argusa (docker socket read-only mount lub `docker ps` via host), zajętość dysku, grep błędów w logach 24h. Odchylenie = alert natychmiast, norma = linijka w digeście. NIE duplikuje guardiana Argusa (guardian pilnuje wnętrza Argusa; Jarvis dokłada bramki/digesty/radar i patrzy szerzej na VPS).
+  3. **Argus digest (tygodniowy)**: API Argusa po localhost (koniec z SSH, port 8080 zamknięty na firewallu ale localhost dostępny) — /api/sources, /api/wallets, /api/llm/usage → porównanie ze snapshotem z zeszłego tygodnia → zmiany rankingów źródeł, nowe sygnały, dojrzewające outcome'y, anomalie (backlog llm_queue, fail-rate).
+- Komendy Telegram: `/jarvis status` (ostatnie uruchomienia jobów, błędy, stan kolektorów), `/jarvis gate <nazwa> <status> [data]`. Dead-man switch naturalny: brak porannego digestu = sygnał awarii.
+- Kryteria: digest/alert przychodzi regularnie przez 2 tygodnie + minimum 1 realna akcja usera wywołana digestem + źródło, które tylko szumi, wycinane zamiast dokładania kolejnych.
 
-- `/jarvis status` — ostatnie uruchomienia jobów, błędy, stan kolektorów (monitoring samego Jarvisa).
-- `/jarvis gate <nazwa> <status> [data]` — aktualizacja bramek walidacji.
-- Dead-man switch naturalny: brak porannego digestu = sygnał awarii.
+### Faza 3 — Radar pomysłów na zarobek (dawne v0.5, bez zmian merytorycznych; dopiero gdy Faza 2 działa ≥1 tydzień)
 
-## v0.5 — Radar pomysłów na zarobek (dopiero gdy v0 działa ≥1 tydzień)
-
-- Reddit RSS (feedparser — wzorzec z Argusa, działa bez blokad; lista subredditów do ustalenia przy implementacji, np. r/SaaS, r/smallbusiness + polskie źródła) → dedup po URL/hash → batch do LLM przez router (filtr pod profil usera z `jarvis/context/`: wzorzec dokument→decyzja→akcja, self-hosted, rynek PL) → top 3–5 tygodniowo w digeście z linkami.
-- Pętla feedbacku OD PIERWSZEGO DNIA radaru: `/jarvis good <n>` / `/jarvis meh <n>` → zapis do SQLite → radar raportuje własną trafność (ile good/meh miesięcznie) i preferencje wpływają na filtr. To jest "nauka" Jarvisa — wzorzec samonauki z Argusa, nie baza wektorowa.
+- Reddit RSS (feedparser — wzorzec z Argusa, działa bez blokad; lista subredditów do ustalenia przy implementacji, np. r/SaaS, r/smallbusiness + polskie źródła) → dedup po URL/hash → batch do LLM przez router (filtr pod profil usera z `jarvis/context/`: wzorzec dokument→decyzja→akcja, self-hosted, rynek PL) → top 3–5 tygodniowo.
+- Pętla feedbacku OD PIERWSZEGO DNIA radaru: `good`/`meh` przez Telegram (`/jarvis good <n>` / `/jarvis meh <n>`) lub przez GUI → zapis do Postgresa RAG-a → radar raportuje własną trafność (ile good/meh miesięcznie) i preferencje wpływają na filtr. To jest "nauka" Jarvisa — wzorzec samonauki z Argusa, nie baza wektorowa.
+- Znaleziska zapisywane też do RAG jako dokumenty (przeszukiwalne, jak digesty z Fazy 2).
 - Wolumen LLM: ~100–300 postów/tydzień batchowane = kilkanaście calls/tydzień — mieści się w darmowych limitach z zapasem. Lekcje z Argusa: batchowanie, cache po hashu, log każdego calla.
 - Nowości AI/API (zmiany w narzędziach których user używa) — w tym samym tygodniowym raporcie, ograniczone.
 - Uwaga kontekstowa: istnieje pokrewny, nigdy nie zaczęty spec income-radar w Hermesie (`docs/superpowers/specs/2026-05-24-hermes-autonomous-developer-income-radar-design.md`) — radar Jarvisa go zastępuje (superseded).
 
-## v1 (odroczone — tylko po udowodnionej potrzebie)
+## Odroczone (tylko po udowodnionej potrzebie)
 
-- pgvector / pamięć wektorowa (np. fuzzy-dedup pomysłów po miesiącach)
-- read-only strona statusowa (wzorzec dashboardu Argusa)
-- przeniesienie RAG na VPS (osobna decyzja)
-- jakiekolwiek akcje autonomiczne
-
-## Kryteria sukcesu v0
-
-- Digest przychodzi regularnie przez 2 tygodnie (dead-man: brak digestu zauważalny od razu).
-- Minimum 1 realna akcja usera wywołana digestem (przypomnienie bramki, wykryta awaria).
-- Źródło, które tylko szumi (user je przewija) — wycinane, zamiast dokładania kolejnych.
+- Akcje autonomiczne (deploy, restart, transakcje, odpowiadanie komukolwiek poza userem).
+- Multi-user.
+- Publiczne wystawienie GUI (poza Tailscale).
 
 ## Ograniczenia i ryzyka
 
 - VPS bez GPU → LLM wyłącznie przez API (router, darmowe tiery).
-- RAM budget: Oracle A1 15GB, Argus zajmuje część — Jarvis ma być lekki (1 kontener, SQLite, bez Ollama).
-- Free tiery LLM współdzielone z Argusem (te same klucze Gemini/Groq) — wolumen Jarvisa mały, ale logować i obserwować.
+- ~Miesiąc wieczorów zanim cokolwiek działa (świadoma decyzja usera, patrz Kontekst decyzji); bramki walidacji w tym czasie bez automatycznych przypomnień — pilnowane ręcznie.
+- RAM budget: Oracle A1 15GB. Stack RAG (Postgres+Redis+Celery+backend+frontend) + Argus na tym samym budżecie — do zważenia przy deployu: ograniczenie workerów Celery do 1, bez LangFuse na VPS w Fazie 1.
+- Embeddingi CPU: wydajność do przetestowania na 4 vCPU zanim decyzja CPU vs API.
+- Generacja przez darmowe API współdzielone z Argusem (te same klucze Gemini/Groq) — czat GUI może być wolny/limitowany w godzinach szczytu; jakość odpowiedzi czatu zależy od darmowych modeli (nie qwen3:4b lokalnie jak wcześniej w RAG). Wolumen Jarvisa mały, ale logować i obserwować.
+- Chat RAG odpowiada Z BAZY WIEDZY (dokumenty + digesty) — to NIE jest kanał komend do Jarvisa; komendy idą przez Telegram.
 - Docker socket mount = dostęp do wszystkich kontenerów — tylko read-only, tylko do health checków.
 
 ## Poza zakresem
 
-- Hermes na VPS, migracja czegokolwiek z laptopa
-- Baza wektorowa i ingest PDF w v0
-- GUI przeglądarkowe (chat)
-- Wykonywanie akcji (deploy, restart, transakcje, odpowiadanie komukolwiek poza userem)
-- Multi-user
+- Budowa własnego frontendu czatu od zera (reużywamy RAG).
+- Hermes na VPS, migracja czegokolwiek z laptopa (w tym migracja Hermesa).
+- Wykonywanie akcji (deploy, restart, transakcje, odpowiadanie komukolwiek poza userem).
+- Multi-user.
