@@ -16,6 +16,7 @@ class QueryRewriter:
             self.llm = OpenRouterClient(
                 api_key=settings.ai.openrouter_api_key,
                 model=settings.ai.openrouter_model,
+                base_url=settings.ai.openrouter_base_url or None,
             )
         else:
             self.llm = AsyncLLMClient(

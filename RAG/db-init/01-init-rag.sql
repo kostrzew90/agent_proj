@@ -158,6 +158,7 @@ CREATE TABLE IF NOT EXISTS chat_context (
     chat_id INTEGER REFERENCES chat_sessions(id) ON DELETE CASCADE,
     folder_id INTEGER REFERENCES folders(id) ON DELETE SET NULL,
     tag_id INTEGER REFERENCES tags(id) ON DELETE SET NULL,
+    document_id INTEGER REFERENCES documents(id) ON DELETE SET NULL,
     CHECK (folder_id IS NOT NULL OR tag_id IS NOT NULL)
 );
 
