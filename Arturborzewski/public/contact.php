@@ -33,22 +33,6 @@ if (
 // Invalidate token after use
 unset($_SESSION['csrf_token']);
 
-// Turnstile verification
-$turnstileSecret = 'YOUR_TURNSTILE_SECRET_KEY'; // Replace after registering at dash.cloudflare.com
-$turnstileToken = $_POST['cf-turnstile-response'] ?? '';
-$verify = file_get_contents('https://challenges.cloudflare.com/turnstile/v0/siteverify', false, stream_context_create([
-    'http' => [
-        'method' => 'POST',
-        'header' => 'Content-Type: application/x-www-form-urlencoded',
-        'content' => http_build_query(['secret' => $turnstileSecret, 'response' => $turnstileToken]),
-        'timeout' => 5,
-    ],
-]));
-$verifyData = json_decode($verify, true);
-if (empty($verifyData['success'])) {
-    respond(false, 'Weryfikacja antyspamowa nieudana.');
-}
-
 // Field validation
 $imie = trim(strip_tags($_POST['imie'] ?? ''));
 $email = filter_var(trim($_POST['email'] ?? ''), FILTER_VALIDATE_EMAIL);
@@ -70,15 +54,17 @@ use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\SMTP;
 use PHPMailer\PHPMailer\Exception;
 
+$secrets = require __DIR__ . '/secrets.php';
+
 $mail = new PHPMailer(true);
 try {
     $mail->isSMTP();
-    $mail->Host       = 'smtp.home.pl';     // Or kancelaria SMTP
+    $mail->Host       = 'localhost';     // Or kancelaria SMTP
     $mail->SMTPAuth   = true;
     $mail->Username   = 'Kancelaria@borzewski-kancelaria.com'; // Replace
-    $mail->Password   = 'SMTP_PASSWORD';              // Replace
-    $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-    $mail->Port       = 587;
+    $mail->Password   = $secrets['smtp_password'];
+    $mail->SMTPAutoTLS = false;
+    $mail->Port       = 25;
     $mail->Timeout    = 10;
     $mail->SMTPDebug  = SMTP::DEBUG_OFF;
     $mail->CharSet    = 'UTF-8';

@@ -97,18 +97,31 @@ Po każdej zmianie: `npm run build` → `node --env-file=.env scripts/deploy.mjs
 
 ---
 
-## 5. Formularz kontaktowy (etap „później", jeszcze nieaktywny)
+## 5. Formularz kontaktowy (DZIAŁA)
 
-Formularz (`public/contact.php`) wysyła maile przez SMTP home.pl. Do uruchomienia potrzeba:
-1. **Skrzynka e-mail** kancelarii w home.pl (login = mail, np. `Kancelaria@borzewski-kancelaria.com`).
-2. W `public/contact.php` uzupełnij:
-   - `$mail->Username` — login skrzynki (już wpisany mail kancelarii),
-   - `$mail->Password` — **hasło skrzynki** (obecnie placeholder `SMTP_PASSWORD`),
-   - `$mail->addAddress(...)` — dokąd trafiają zapytania (już ustawione na mail kancelarii).
-3. **PHPMailer** na serwerze: przez SSH `composer install --no-dev` (w katalogu z `composer.json`) lub wgrać ręcznie do `public/vendor/`.
-4. **Cloudflare Turnstile**: utwórz widget, wstaw `secret` do `contact.php` i `sitekey` przed buildem (`NEXT_PUBLIC_TURNSTILE_SITEKEY`) lub w `app/ContactForm.tsx`.
+Formularz (`public/contact.php`) działa end-to-end: rate-limit (3/10 min) + honeypot + CSRF + wysyłka mailem przez **lokalny MTA home.pl**. Turnstile **usunięto** (uproszczenie). Konfiguracja, która realnie działa:
 
-> Przy deployu formularza **nie używaj** trybu kasującego — `vendor/` żyje tylko na serwerze i deploy go nie dotyka (i dobrze).
+**SMTP (klucz):** home.pl **nie udostępnia** `smtp.home.pl` z poziomu serwera (DNS się nie rozwiązuje). Poczta idzie przez **lokalny MTA na `localhost`**, ale **z autoryzacją** skrzynki. Działające ustawienia w `contact.php`:
+```php
+$mail->Host       = 'localhost';
+$mail->SMTPAuth   = true;             // localhost i tak wymaga auth (inaczej "Sender address rejected")
+$mail->Username   = 'Kancelaria@borzewski-kancelaria.com';
+$mail->Password   = $secrets['smtp_password'];
+$mail->SMTPAutoTLS = false;           // brak STARTTLS do localhost
+$mail->Port       = 25;
+```
+
+**Sekrety:** hasło skrzynki jest w **`public/secrets.php`** (gitignored, chroniony w `.htaccess`, wgrywany przez deploy). W repo jest tylko `secrets.php.example` z placeholderem.
+```bash
+cp public/secrets.php.example public/secrets.php   # potem wpisz realne haslo do secrets.php
+```
+> ⚠️ **PUŁAPKA (zdarzyła się 2×):** wpisz hasło do **`secrets.php`**, NIE do `secrets.php.example`. Ten sam błąd co przy `.env` — plik `.example` idzie do repo. Analogicznie `.env` vs `.env.example`.
+
+**PHPMailer:** złożony lokalnie w `public/vendor/` (gitignored, deployowany z `public/`) — bez potrzeby composera/SSH na serwerze. Odtworzenie: pobrać PHPMailer 6.9 (`src/{Exception,PHPMailer,SMTP}.php`) do `public/vendor/phpmailer/phpmailer/src/` + `public/vendor/autoload.php` requiruje te 3 pliki.
+
+**Zmiana odbiorcy/nadawcy:** `contact.php` → `setFrom(...)` (nadawca = musi = login skrzynki) i `addAddress(...)` (dokąd trafiają zapytania).
+
+> Przy deployu **nie używaj** trybu kasującego — `vendor/` i `secrets.php` są tylko na serwerze/lokalnie, deploy ich nie kasuje (i dobrze).
 
 ---
 
@@ -118,6 +131,8 @@ Formularz (`public/contact.php`) wysyła maile przez SMTP home.pl. Do uruchomien
 - **Deploy zrywa się w połowie: `Server sent FIN packet unexpectedly`** → home.pl ubija sesję FTPS po kilkunastu plikach. Skrypt sam to obsługuje: **reconnect z kontynuacją** + proaktywny reconnect co 8 plików. Jeśli i tak pada — uruchom deploy ponownie (jest idempotentny, dokończy resztę).
 - **Deploy staje na pliku 0-bajtowym (`.gitkeep`)** → puste pliki wywalają FTPS home.pl. Skrypt **automatycznie pomija pliki 0-bajtowe** (i tak są bez znaczenia na serwerze).
 - **Strona działa, ale BRAK ANIMACJI / sekcje „martwe"** → to CSP. Next wstrzykuje inline'owe skrypty hydratacji; nagłówek `Content-Security-Policy` w `.htaccess` **musi** mieć `'unsafe-inline'` w `script-src`. Bez tego React się nie hydratuje → framer-motion nie startuje → sekcje zostają na `opacity:0`.
+- **Formularz: `Błąd wysyłania` / `Could not connect to SMTP host`** → `smtp.home.pl` NIE rozwiązuje się z serwera home.pl. Użyj `Host='localhost'`, `Port=25`, `SMTPAutoTLS=false`. Diagnoza: `fsockopen` z serwera (patrz historia — `localhost:25` = OK, `smtp.home.pl` = getaddrinfo failed).
+- **Formularz: `Sender address rejected, please authenticate`** → lokalny MTA (localhost) i tak wymaga auth. Ustaw `SMTPAuth=true` + login/hasło skrzynki (nadawca `setFrom` MUSI = login skrzynki).
 - **Zła domena w canonical / sitemap** → wszystko bierze się z `content/site.json` → `kancelaria.url`. Dodatkowo sprawdź `public/sitemap.xml`, `public/robots.txt`, `public/.well-known/security.txt` (mają domenę wpisaną na sztywno).
 - **Build wywala błąd SSL przy pobieraniu Google Fonts** → tylko na maszynie za firmowym proxy przechwytującym SSL. Obejście: `NODE_TLS_REJECT_UNAUTHORIZED=0 npm run build`. Na czystej sieci niepotrzebne. **Nie** wpisuj tego na stałe.
 - **Zmiany niewidoczne po deployu** → cache przeglądarki. Twardy refresh **Ctrl+F5**. Pliki `_next/*` mają `Cache-Control: immutable` (1 rok), ale ich nazwy zmieniają się przy każdym buildzie, więc realnie cache nie przeszkadza; problem dotyczy głównie `index.html`.
