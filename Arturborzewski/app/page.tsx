@@ -6,6 +6,10 @@ import { AnimatedSection } from './AnimatedSection'
 import { AnimatedCardGrid, AnimatedCardItem } from './AnimatedCards'
 import { AnimatedHeroContainer, AnimatedHeroLine } from './AnimatedHero'
 
+// Slugi specjalizacji, ktore maja dedykowana podstrone. Pozostale karty prowadza
+// do /w-przygotowaniu/ zamiast 404. Dodajac nowa podstrone, dopisz tu jej slug.
+const SPEC_PAGES = new Set(['prawo-karne', 'prawo-gospodarcze'])
+
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-black text-white font-sans overflow-x-hidden">
@@ -171,7 +175,7 @@ export default function HomePage() {
             {site.specjalizacje.map((item) => (
               <AnimatedCardItem key={item.slug}>
                 <a
-                  href={`/${item.slug}/`}
+                  href={SPEC_PAGES.has(item.slug) ? `/${item.slug}/` : '/w-przygotowaniu/'}
                   className="group rounded-[30px] border border-white/10 bg-white/[0.02] p-10 hover:border-yellow-500/30 hover:-translate-y-2 transition duration-500 block h-full"
                 >
                   <div className="w-14 h-14 rounded-2xl bg-yellow-500/10 border border-yellow-500/20 mb-8 flex items-center justify-center text-yellow-400 text-xl">
