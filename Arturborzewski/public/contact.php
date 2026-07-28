@@ -75,7 +75,7 @@ try {
     $mail->isSMTP();
     $mail->Host       = 'smtp.home.pl';     // Or kancelaria SMTP
     $mail->SMTPAuth   = true;
-    $mail->Username   = 'kontakt@borzewski-legal.pl'; // Replace
+    $mail->Username   = 'Kancelaria@borzewski-kancelaria.com'; // Replace
     $mail->Password   = 'SMTP_PASSWORD';              // Replace
     $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
     $mail->Port       = 587;
@@ -83,8 +83,8 @@ try {
     $mail->SMTPDebug  = SMTP::DEBUG_OFF;
     $mail->CharSet    = 'UTF-8';
 
-    $mail->setFrom('kontakt@borzewski-legal.pl', 'Formularz — Kancelaria Borzewski');
-    $mail->addAddress('kontakt@borzewski-legal.pl', 'Kancelaria Borzewski');
+    $mail->setFrom('Kancelaria@borzewski-kancelaria.com', 'Formularz — Kancelaria Borzewski');
+    $mail->addAddress('Kancelaria@borzewski-kancelaria.com', 'Kancelaria Borzewski');
     $mail->addReplyTo($email, $imie);
 
     $mail->Subject = "Zapytanie ze strony — {$imie}";

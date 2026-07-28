@@ -1,15 +1,15 @@
 {
   "kancelaria": {
     "nazwa": "Kancelaria Adwokacka Artur Borzewski",
-    "email": "kontakt@borzewski-legal.pl",
-    "biuro": "biuro@borzewski-legal.pl",
+    "email": "Kancelaria@borzewski-kancelaria.com",
+    "biuro": "Kancelaria@borzewski-kancelaria.com",
     "telefon": "+48 000 000 000",
     "telefonRaw": "+48000000000",
     "nip": "000-000-00-00",
     "adres": "ul. Przykładowa 1, 00-000 Warszawa",
     "miasto": "Warszawa",
     "godziny": "Pon–Pt 9:00–17:00",
-    "url": "https://borzewski-legal.pl",
+    "url": "https://borzewski-kancelaria.com",
     "lat": 52.2297,
     "lng": 21.0122,
     "godzinySchema": "Mo-Fr 09:00-17:00"
@@ -19,6 +19,7 @@
     { "slug": "prawo-gospodarcze", "nazwa": "Prawo gospodarcze", "opis": "Obsługa prawna przedsiębiorców, spory gospodarcze, umowy handlowe, restrukturyzacje." },
     { "slug": "prawo-cywilne", "nazwa": "Prawo cywilne", "opis": "Sprawy majątkowe, odszkodowania, spory z zakresu prawa cywilnego." },
     { "slug": "negocjacje-i-umowy", "nazwa": "Negocjacje i umowy", "opis": "Przygotowanie i opiniowanie umów, negocjacje kontraktów, ugody pozasądowe." },
+    { "slug": "mediacje", "nazwa": "Mediacje", "opis": "Prowadzenie mediacji sądowych i pozasądowych, polubowne rozwiązywanie sporów cywilnych i gospodarczych, wypracowanie ugody bez długotrwałego i kosztownego procesu." },
     { "slug": "compliance", "nazwa": "Compliance", "opis": "Wdrożenia procedur compliance, AML, RODO, audyty prawne przedsiębiorstw." }
   ],
   "oAdwokacie": {
