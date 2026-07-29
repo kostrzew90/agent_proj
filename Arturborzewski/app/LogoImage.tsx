@@ -6,7 +6,7 @@ interface Props {
   className?: string
 }
 
-export default function LogoImage({ alt, src = '/images/logo-pelne.png', className = 'h-14 w-auto object-contain' }: Props) {
+export default function LogoImage({ alt, src = '/images/logo-pelne.webp', className = 'h-14 w-auto object-contain' }: Props) {
   return (
     <img
       src={src}

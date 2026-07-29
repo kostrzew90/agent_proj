@@ -107,7 +107,7 @@ export default function HomePage() {
               <div className="absolute bottom-8 left-8 right-8">
                 <LogoImage
                   alt={site.kancelaria.nazwa}
-                  src="/images/logo-mono.png"
+                  src="/images/logo-mono.webp"
                   className="w-full max-w-xs object-contain"
                 />
               </div>
@@ -301,7 +301,7 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-6 text-sm">
           <LogoImage
             alt={site.kancelaria.nazwa}
-            src="/images/logo-skrocone.png"
+            src="/images/logo-skrocone.webp"
             className="h-12 w-auto object-contain opacity-70"
           />
           <div>© {new Date().getFullYear()} {site.kancelaria.nazwa}</div>

@@ -17,7 +17,7 @@ export default function HeroImage({ src, alt, className }: Props) {
       <div className={`${className} flex items-center justify-center bg-gradient-to-br from-zinc-900 via-black to-zinc-950`}>
         <LogoImage
           alt={alt}
-          src="/images/logo-mono.png"
+          src="/images/logo-mono.webp"
           className="w-2/3 max-w-[220px] object-contain opacity-80"
         />
       </div>
