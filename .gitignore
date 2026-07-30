@@ -31,3 +31,5 @@ postgres-data/
 VIN OSINT/vinhunter/.git/
 
 RAG/graphify-out/
+
+.worktrees/
