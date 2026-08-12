@@ -6,6 +6,7 @@ Personal OSINT tool for verifying ~20-year-old used cars from EU before purchase
 
 - **Stack**: FastAPI + Vue 3 + PostgreSQL + Playwright (Chromium + Firefox)
 - **Docker**: `docker compose up -d --build` in `VIN OSINT/vinhunter/`
+- **VPS deploy (Phase 1, prywatny)**: `docker-compose.vps.yml` + `DEPLOY.md` w tym samym katalogu; dostęp wyłącznie przez Tailscale, bez publicznej ekspozycji
 - **Ports**: frontend **3010**, backend **8200**, DB **5436**
 - **Full spec**: `VIN_osint.MD`
 - **Progress**: `PROGRESS.md` (READ THIS FIRST in new sessions)
