@@ -38,6 +38,15 @@ potwierdź. Jeśli zapasu RAM brakuje — STOP, wróć do sekcji "Ryzyka" w
 `docs/superpowers/specs/2026-08-12-vinhunter-vps-deploy-design.md` zamiast
 kontynuować.
 
+Sprawdź też, czy porty 3010/8200/5436 nie są już zajęte przez Argusa/RAG na tym
+samym VPS — kolizja portów ujawniłaby się dopiero jako myląca porażka
+`docker compose up -d` w połowie builda (po ściągnięciu obrazu Playwright ~2-3GB),
+więc lepiej złapać to teraz:
+
+```bash
+ssh root@169.58.146.162 "ss -tlnp | grep -E ':(3010|8200|5436)' || echo 'porty wolne'"
+```
+
 ## 2a. Wariant: mono-repo już sklonowane na VPS
 
 ```bash
@@ -57,6 +66,15 @@ rsync -avz --exclude 'node_modules' --exclude '.env' \
 
 (`.env` celowo wykluczony z rsync — trafia tam ręcznie w kroku 3, nigdy przez
 sync/git.)
+
+Uwaga: `rsync` nie jest domyślnie dostępny w Git Bash na Windows. Doinstaluj go
+(np. przez MSYS2/Git for Windows z pakietem rsync) albo użyj fallbacku `scp`
+(mniej precyzyjny — brak `--exclude`, więc `node_modules` trzeba usunąć ręcznie
+przed wysyłką albo posprzątać po stronie VPS):
+
+```bash
+scp -r "VIN OSINT/vinhunter" root@169.58.146.162:~/vinhunter
+```
 
 ## 3. Przygotuj `.env` na VPS
 
@@ -80,6 +98,11 @@ cd ~/vinhunter   # lub odpowiednik ścieżki z kroku 0
 docker compose -f docker-compose.vps.yml up -d --build
 ```
 
+Dla wariantu 2a (mono-repo) ta ścieżka to podkatalog `VIN OSINT/vinhunter` w
+klonie mono-repo, NIE `~/vinhunter` — to WAŻNE, bo stamtąd compose czyta `.env`
+(czyli `TAILSCALE_IP`); pomyłka w katalogu daje cichy fallback na `127.0.0.1`
+(błąd, który spec już nazwał jako główny foot-gun).
+
 ## 5. Zweryfikuj
 
 ```bash
@@ -98,7 +121,7 @@ curl -X POST http://100.71.197.18:8200/api/scan \
 # lokalnie, jeśli chcesz porównać wynik)
 ```
 
-Z maszyny podłączonej do tej samej sieci Tailscale, sprawdź publiczny IP NIE
+Z maszyny POZA tailnetem (np. telefon na LTE, nie urządzenie z Tailscale), sprawdź publiczny IP NIE
 odpowiada (potwierdzenie, że binding na `TAILSCALE_IP` faktycznie działa, tak jak
 zweryfikowano dla Argusa/RAG):
 

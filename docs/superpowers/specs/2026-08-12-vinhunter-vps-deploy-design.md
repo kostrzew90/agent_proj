@@ -90,15 +90,21 @@ jej uruchomienia):
 
 ## Deploy — przebieg
 
-1. Na VPS: `git pull` w istniejącym klonie mono-repo (ten sam, z którego działa Argus).
+1. Na VPS: sprawdzić najpierw, jak kod dla Argusa/RAG trafił na VPS (patrz "Otwarte
+   pytania" niżej — nie jest to pewne z góry). Dwa warianty, dokładnie jak rozwiązano
+   w `VIN OSINT/vinhunter/DEPLOY.md` (sekcja "0. Sprawdź, jak kod trafił na VPS..."):
+   - Jeśli `~/argus`/`~/rag` to podkatalogi jednego sklonowanego mono-repo — `git pull`
+     w tym klonie i praca w podkatalogu `VIN OSINT/vinhunter/`.
+   - Jeśli to osobne drzewa bez `.git`/remote (kod trafił przez `scp`/`rsync`) —
+     przesłać `VIN OSINT/vinhunter/` na VPS tym samym sposobem (`rsync`/`scp`), nie
+     `git pull`.
 2. `scp` pliku `.env` z sekretami do `VIN OSINT/vinhunter/.env` na VPS (ręcznie, nigdy
    przez git) — musi zawierać `TAILSCALE_IP` (patrz Architektura, punkt 1).
 3. Przed buildem: sprawdzić `free -h` **i** `df -h` na VPS. `df` jest tu tak samo
    istotny jak `free` — obraz backendu z Playwright + Chromium + Firefox to rząd
-   wielkości 2-3GB, a VPS ma dziś tylko 45GB dysku (10% zajęte wg ostatniej weryfikacji
-   z projektu Argus), więc zapas prawdopodobnie jest, ale trzeba to potwierdzić, nie
-   założyć.
-4. `docker compose -f "VIN OSINT/vinhunter/docker-compose.yml" up -d --build`.
+   wielkości 2-3GB, a VPS ma dziś 193GB dysku, więc zapas prawdopodobnie jest, ale
+   trzeba to potwierdzić, nie założyć.
+4. `docker compose -f "VIN OSINT/vinhunter/docker-compose.vps.yml" up -d --build`.
 5. Weryfikacja (patrz niżej).
 6. Jeśli po deployu VINhunter zaczyna dławić Argusa (RAM/CPU) — rollback to
    `docker compose -f "VIN OSINT/vinhunter/docker-compose.yml" down`, Argus działa
