@@ -6,10 +6,15 @@ VINhunter (`VIN OSINT/vinhunter/`) to osobiste narzędzie OSINT do weryfikacji ~
 aut sprowadzanych z UE. Obecnie działa lokalnie na Windows/Docker Desktop — dostępne
 tylko gdy laptop użytkownika jest włączony.
 
-Cel tego etapu: przenieść VINhuntera na istniejący VPS (Contabo, `84.235.174.129`,
-x86_64, 4 vCPU, 15GB RAM, Ubuntu 22.04 — hostname `ai-kosrv`), na którym już działa
-Argus (`argus-app`, `argus-liq-listener`, `argus-guardian`, Grafana), żeby narzędzie
-działało 24/7 niezależnie od laptopa.
+Cel tego etapu: przenieść VINhuntera na istniejący VPS (Contabo, publiczny IP
+`169.58.146.162`, tailnet IP `100.71.197.18`, 6 vCPU, 11GB RAM, 193GB dysk, Ubuntu
+24.04.4 LTS — patrz `reference_contabo_vps` w pamięci projektowej), na którym już
+działa Argus (`~/argus`) i RAG (`~/rag`), żeby narzędzie działało 24/7 niezależnie od
+laptopa.
+
+**Uwaga:** ten VPS to migracja z 2026-08-11/12 — poprzedni Oracle VPS
+(`84.235.174.129`) jest utracony i nieaktualny. Jeśli w tym repo lub pamięci pojawi
+się ten stary adres, to martwy ślad, nie cel deploymentu.
 
 To jest **Phase 1: deployment prywatny**, dostępny wyłącznie przez Tailscale, dokładnie
 tak jak dziś działa `argus-app`. Publiczne udostępnienie (domena, TLS, auth,
@@ -101,13 +106,22 @@ jej uruchomienia):
 
 ## Ryzyka i decyzje
 
-- **Zasoby współdzielone z Argusem.** VPS ma 4 vCPU/15GB, na których już działają
-  Argus + Guardian + Grafana + ich Postgres. Playwright z dwoma silnikami przeglądarki
+- **Zasoby współdzielone z Argusem i RAG.** VPS ma 6 vCPU/11GB, na których już
+  działają Argus (app+db+liq-listener+guardian+grafana) i RAG (api+worker+postgres+
+  redis+ollama+langfuse) — to więcej współlokatorów niż wcześniej zakładano. 11GB to
+  mniej niż pierwotnie sądzone 15GB. Playwright z dwoma silnikami przeglądarki
   (Chromium + Firefox) jest relatywnie ciężki pamięciowo. **Przed buildem** trzeba
   sprawdzić na żywo (`free -h`, `docker stats`) czy jest zapas — nie zakładamy tego
-  z góry. Jeśli zapasu brakuje, opcje do rozważenia w Build: ograniczenie do jednego
-  silnika przeglądarki, albo limity pamięci w compose (`mem_limit`) — decyzja
-  odroczona do czasu zmierzenia realnego zużycia.
+  z góry, i przy 11GB dzielonych między trzy projekty ryzyko braku zapasu jest wyższe
+  niż w pierwszej wersji tego dokumentu. Jeśli zapasu brakuje, opcje do rozważenia w
+  Build: ograniczenie do jednego silnika przeglądarki, albo limity pamięci w compose
+  (`mem_limit`) — decyzja odroczona do czasu zmierzenia realnego zużycia.
+- **ufw + Docker.** Firewall VPS (`ufw`) domyślnie blokuje ruch przychodzący poza
+  SSH i interfejs `tailscale0` — ale Docker publikuje porty przez iptables z
+  pominięciem ufw (`DOCKER` chain ma pierwszeństwo). Bindowanie portów na
+  `${TAILSCALE_IP:-127.0.0.1}` (patrz Architektura) nie jest tu "dodatkową ostrożnością",
+  tylko **jedynym realnym zabezpieczeniem** — bez tego port wycieka publicznie mimo
+  ufw. Ten sam wzorzec jest już wymuszony dla Argusa i RAG na tym VPS.
 - **Cloudflare i IP datacenter.** 6 z 16 pluginów jest dziś zablokowanych na domowym
   IP użytkownika. IP datacenter (Contabo) statystycznie ma gorszą reputację niż IP
   domowe u dostawcy residential/ISP — nie oczekujemy poprawy wykrywalności, może być
@@ -146,7 +160,15 @@ jej uruchomienia):
 
 ## Otwarte pytania (do zmierzenia w Build, nie do zgadywania teraz)
 
-- Realny wolny RAM/CPU **i dysk** na VPS po uruchomieniu VINhuntera obok Argusa.
+- **Mechanizm dostarczenia kodu na VPS.** Argus (`~/argus`) i RAG (`~/rag`) leżą jako
+  osobne katalogi na nowym VPS — z zapisów w pamięci projektowej nie wynika jasno,
+  czy to sklonowane mono-repo (`git clone` całego `agent_proj`, z którego działa się
+  tylko w podkatalogu), czy osobno wgrane/rsync'owane drzewa per projekt. Przed
+  Buildem: sprawdzić `ls ~` na VPS i czy `~/argus`/`~/rag` mają `.git` wskazujący na
+  mono-repo, czy są samodzielnymi drzewami — to determinuje, czy VINhunter trafia do
+  `~/vinhunter` przez `git clone`/`sparse-checkout`, czy przez `rsync`/`scp` całego
+  katalogu `VIN OSINT/vinhunter/`.
+- Realny wolny RAM/CPU **i dysk** na VPS po uruchomieniu VINhuntera obok Argusa i RAG.
 - Czy `.env` produkcyjny (Vincario key) już istnieje gotowy do `scp`, czy trzeba go
   odtworzyć.
 - `frontend/` nie ma commitowanego `package-lock.json` — build na VPS robi
