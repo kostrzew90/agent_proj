@@ -1,4 +1,4 @@
-from telegram.ext import Application, CommandHandler, MessageHandler, filters
+from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from tresrv.config import load_settings
@@ -7,6 +7,7 @@ from tresrv.bot.onboarding import build_onboarding_handler
 from tresrv.bot.profile import profil_command, cel_command
 from tresrv.bot.weight import waga_command
 from tresrv.bot.meals import text_message_handler, photo_message_handler
+from tresrv.bot.correction import popraw_command, correction_callback_handler, correction_value_handler
 from tresrv.llm import GeminiClient
 from tresrv.scheduler.jobs import run_pending_parse_drain_job, run_heartbeat_job, run_evening_summary_job
 
@@ -23,7 +24,10 @@ def build_application() -> Application:
     application.add_handler(CommandHandler("profil", profil_command))
     application.add_handler(CommandHandler("cel", cel_command))
     application.add_handler(CommandHandler("waga", waga_command))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_message_handler))
+    application.add_handler(CommandHandler("popraw", popraw_command))
+    application.add_handler(CallbackQueryHandler(correction_callback_handler, pattern=r"^popraw:"))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, correction_value_handler), group=0)
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_message_handler), group=1)
     application.add_handler(MessageHandler(filters.PHOTO, photo_message_handler))
 
     scheduler = AsyncIOScheduler()
