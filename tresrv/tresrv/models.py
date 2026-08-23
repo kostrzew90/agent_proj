@@ -36,7 +36,7 @@ class UserProfile(Base):
 class WeightLog(Base):
     __tablename__ = "weight_logs"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     chat_id: Mapped[int] = mapped_column(BigInteger)
     waga_kg: Mapped[float] = mapped_column(Numeric(5, 1))
     logged_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
@@ -50,7 +50,7 @@ class WeightLog(Base):
 class Meal(Base):
     __tablename__ = "meals"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     chat_id: Mapped[int] = mapped_column(BigInteger)
     logged_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     consumed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
@@ -70,7 +70,7 @@ class Meal(Base):
     llm_model: Mapped[str | None] = mapped_column(String(50), nullable=True)
     status: Mapped[str] = mapped_column(String(12), default="parsed")
     corrected_from_id: Mapped[int | None] = mapped_column(
-        BigInteger, ForeignKey("meals.id"), nullable=True
+        Integer, ForeignKey("meals.id"), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
@@ -89,7 +89,7 @@ class Meal(Base):
 class PendingParse(Base):
     __tablename__ = "pending_parse"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     chat_id: Mapped[int] = mapped_column(BigInteger)
     raw_input_type: Mapped[str] = mapped_column(String(10))
     raw_text: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -102,7 +102,7 @@ class PendingParse(Base):
     next_attempt_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     last_error: Mapped[str | None] = mapped_column(String, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="pending")
-    meal_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("meals.id"), nullable=True)
+    meal_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("meals.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
     __table_args__ = (
