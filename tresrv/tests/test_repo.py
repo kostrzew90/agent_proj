@@ -12,7 +12,7 @@ from tresrv import repo
 def session():
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
-    with Session(engine) as s:
+    with Session(engine, expire_on_commit=False) as s:
         yield s
 
 
