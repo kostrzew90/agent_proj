@@ -59,7 +59,8 @@ from datetime import datetime, timezone
 
 from telegram import Update
 from telegram.ext import (
-    ContextTypes, ConversationHandler, CommandHandler, MessageHandler, filters,
+    ApplicationHandlerStop, ContextTypes, ConversationHandler, CommandHandler,
+    MessageHandler, filters,
 )
 
 from tresrv import repo
@@ -78,9 +79,9 @@ async def receive_plec(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         context.user_data["plec"] = parse_plec(update.message.text)
     except ValueError as exc:
         await update.message.reply_text(str(exc))
-        return PLEC
+        raise ApplicationHandlerStop(PLEC)
     await update.message.reply_text("Podaj wiek (lata):")
-    return WIEK
+    raise ApplicationHandlerStop(WIEK)
 
 
 async def receive_wiek(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -88,9 +89,9 @@ async def receive_wiek(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         context.user_data["wiek"] = parse_wiek(update.message.text)
     except ValueError as exc:
         await update.message.reply_text(str(exc))
-        return WIEK
+        raise ApplicationHandlerStop(WIEK)
     await update.message.reply_text("Podaj wzrost (cm):")
-    return WZROST
+    raise ApplicationHandlerStop(WZROST)
 
 
 async def receive_wzrost(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -98,9 +99,9 @@ async def receive_wzrost(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         context.user_data["wzrost_cm"] = parse_wzrost(update.message.text)
     except ValueError as exc:
         await update.message.reply_text(str(exc))
-        return WZROST
+        raise ApplicationHandlerStop(WZROST)
     await update.message.reply_text("Podaj wagę (kg):")
-    return WAGA
+    raise ApplicationHandlerStop(WAGA)
 
 
 async def receive_waga(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -108,11 +109,11 @@ async def receive_waga(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         context.user_data["waga_kg"] = parse_waga(update.message.text)
     except ValueError as exc:
         await update.message.reply_text(str(exc))
-        return WAGA
+        raise ApplicationHandlerStop(WAGA)
     await update.message.reply_text(
         "Poziom aktywności (sedentary/light/moderate/active/very_active):"
     )
-    return AKTYWNOSC
+    raise ApplicationHandlerStop(AKTYWNOSC)
 
 
 async def receive_aktywnosc(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -120,9 +121,9 @@ async def receive_aktywnosc(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         context.user_data["poziom_aktywnosci"] = parse_aktywnosc(update.message.text)
     except ValueError as exc:
         await update.message.reply_text(str(exc))
-        return AKTYWNOSC
+        raise ApplicationHandlerStop(AKTYWNOSC)
     await update.message.reply_text("Cel (reduction/mass/maintenance):")
-    return CEL
+    raise ApplicationHandlerStop(CEL)
 
 
 async def receive_cel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -130,7 +131,7 @@ async def receive_cel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         cel = parse_cel(update.message.text)
     except ValueError as exc:
         await update.message.reply_text(str(exc))
-        return CEL
+        raise ApplicationHandlerStop(CEL)
 
     chat_id = update.effective_chat.id
     now = datetime.now(timezone.utc)
@@ -150,7 +151,7 @@ async def receive_cel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         session.close()
 
     await update.message.reply_text("Profil zapisany. Możesz teraz logować posiłki i wagę.")
-    return ConversationHandler.END
+    raise ApplicationHandlerStop(ConversationHandler.END)
 
 
 def build_onboarding_handler() -> ConversationHandler:
