@@ -23,4 +23,9 @@ def load_settings() -> Settings:
         database_url=os.environ.get(
             "DATABASE_URL", "postgresql+psycopg2://tresrv:tresrv@db:5432/tresrv"
         ),
+        evening_summary_hour=int(os.environ.get("EVENING_SUMMARY_HOUR", 21)),
+        evening_summary_minute=int(os.environ.get("EVENING_SUMMARY_MINUTE", 0)),
+        pending_parse_interval_minutes=int(os.environ.get("PENDING_PARSE_INTERVAL_MINUTES", 2)),
+        heartbeat_interval_minutes=int(os.environ.get("HEARTBEAT_INTERVAL_MINUTES", 5)),
+        max_pending_attempts=int(os.environ.get("MAX_PENDING_ATTEMPTS", 5)),
     )
