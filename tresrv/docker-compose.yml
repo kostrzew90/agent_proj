@@ -1,0 +1,29 @@
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tresrv
+      POSTGRES_PASSWORD: tresrv
+      POSTGRES_DB: tresrv
+    volumes:
+      - tresrv-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tresrv"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - tresrv-meals:/data/meals
+
+volumes:
+  tresrv-db:
+  tresrv-meals:
