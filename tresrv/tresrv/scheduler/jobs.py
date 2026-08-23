@@ -79,3 +79,49 @@ def run_heartbeat_job(session_factory) -> None:
         session.commit()
     finally:
         session.close()
+
+
+def build_summary_text(day_summary, target) -> str:
+    return (
+        f"Szacunkowo {day_summary.kcal:.0f}/{target.kcal:.0f} kcal, "
+        f"białko {day_summary.protein_g:.0f}/{target.protein_g:.0f}g "
+        f"({day_summary.meal_count} posiłków dziś)."
+    )
+
+
+def build_evening_summary(session, chat_id: int, today) -> str | None:
+    from tresrv.domain.aggregation import MealRow, aggregate_day
+    from tresrv.domain.targets import daily_target
+
+    profile = repo.get_profile(session, chat_id)
+    if profile is None:
+        return None
+
+    meals = repo.get_active_meals_for_day(session, chat_id, today)
+    meal_rows = [
+        MealRow(kcal=float(m.kcal), protein_g=float(m.protein_g),
+                fat_g=float(m.fat_g), carbs_g=float(m.carbs_g), status=m.status)
+        for m in meals
+    ]
+    day_summary = aggregate_day(meal_rows)
+    target = daily_target(
+        profile.plec, float(profile.waga_kg), float(profile.wzrost_cm),
+        profile.wiek, profile.poziom_aktywnosci, profile.cel,
+    )
+    return build_summary_text(day_summary, target)
+
+
+def run_evening_summary_job(session_factory, bot, chat_id: int) -> None:
+    from datetime import timezone
+    from tresrv.domain.daytime import local_date
+
+    session = session_factory()
+    try:
+        today = local_date(datetime.now(timezone.utc))
+        text = build_evening_summary(session, chat_id, today)
+    finally:
+        session.close()
+
+    if text is not None:
+        import asyncio
+        asyncio.run(bot.send_message(chat_id=chat_id, text=text))

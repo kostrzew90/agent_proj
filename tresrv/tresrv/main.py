@@ -8,7 +8,7 @@ from tresrv.bot.profile import profil_command, cel_command
 from tresrv.bot.weight import waga_command
 from tresrv.bot.meals import text_message_handler, photo_message_handler
 from tresrv.llm import GeminiClient
-from tresrv.scheduler.jobs import run_pending_parse_drain_job, run_heartbeat_job
+from tresrv.scheduler.jobs import run_pending_parse_drain_job, run_heartbeat_job, run_evening_summary_job
 
 
 def build_application() -> Application:
@@ -36,6 +36,12 @@ def build_application() -> Application:
     scheduler.add_job(
         run_heartbeat_job, "interval", minutes=settings.heartbeat_interval_minutes,
         args=[session_factory],
+    )
+    scheduler.add_job(
+        run_evening_summary_job, "cron",
+        hour=settings.evening_summary_hour, minute=settings.evening_summary_minute,
+        timezone="Europe/Warsaw",
+        args=[session_factory, application.bot, settings.telegram_chat_id],
     )
     application.bot_data["scheduler"] = scheduler
     scheduler.start()
