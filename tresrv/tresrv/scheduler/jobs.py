@@ -1,9 +1,14 @@
 from datetime import datetime, timedelta, timezone
 import logging
+import uuid
 
 from tresrv import repo
-from tresrv.bot.meals import build_meal_fields
-from tresrv.llm import NotFoodError, ParseError
+from tresrv.bot.meals import MEALS_DIR, build_meal_fields
+from tresrv.llm import NotFoodError, ParseError, TransientLLMError
+
+FAILED_PERMANENTLY_MESSAGE = (
+    "Nie mogę policzyć jednego z Twoich wpisów — spróbuj /popraw lub zaloguj ten posiłek ponownie."
+)
 
 logger = logging.getLogger("tresrv.scheduler")
 
@@ -16,10 +21,42 @@ def next_backoff_seconds(attempts: int) -> int:
     return _BACKOFF_SCHEDULE[-1]
 
 
-def drain_pending_parse(session, llm_client, now: datetime, max_attempts: int) -> dict:
+async def _retry_or_fail_permanently(
+    session, pending, error: str, max_attempts: int, now: datetime, counts: dict, bot,
+) -> None:
+    if pending.attempts + 1 >= max_attempts:
+        repo.mark_pending_failed_permanently(session, pending, error)
+        counts["failed_permanently"] += 1
+        if bot is not None:
+            await bot.send_message(chat_id=pending.chat_id, text=FAILED_PERMANENTLY_MESSAGE)
+    else:
+        next_attempt_at = now + timedelta(seconds=next_backoff_seconds(pending.attempts))
+        repo.mark_pending_retry(session, pending, error, next_attempt_at)
+        counts["retried"] += 1
+
+
+async def drain_pending_parse(session, llm_client, now: datetime, max_attempts: int, bot=None) -> dict:
     counts = {"resolved": 0, "retried": 0, "failed_permanently": 0}
 
     for pending in repo.fetch_due_pending(session, now):
+        if (
+            pending.raw_input_type == "photo"
+            and pending.storage_path is None
+            and pending.telegram_file_id is not None
+        ):
+            try:
+                MEALS_DIR.mkdir(parents=True, exist_ok=True)
+                new_path = str(MEALS_DIR / f"{uuid.uuid4()}.jpg")
+                telegram_file = await bot.get_file(pending.telegram_file_id)
+                await telegram_file.download_to_drive(new_path)
+                pending.storage_path = new_path
+                session.commit()
+            except Exception as exc:
+                await _retry_or_fail_permanently(
+                    session, pending, f"download failed: {exc}", max_attempts, now, counts, bot,
+                )
+                continue
+
         try:
             if pending.raw_input_type == "text":
                 parsed = llm_client.parse_text(pending.raw_text)
@@ -28,16 +65,26 @@ def drain_pending_parse(session, llm_client, now: datetime, max_attempts: int) -
         except NotFoodError:
             repo.mark_pending_failed_permanently(session, pending, "not_food")
             counts["failed_permanently"] += 1
+            if bot is not None:
+                await bot.send_message(chat_id=pending.chat_id, text=FAILED_PERMANENTLY_MESSAGE)
             continue
         except ParseError as exc:
             repeated_parse_error = (pending.last_error is not None and pending.attempts >= 1)
-            if repeated_parse_error or pending.attempts + 1 >= max_attempts:
+            if repeated_parse_error:
                 repo.mark_pending_failed_permanently(session, pending, str(exc))
                 counts["failed_permanently"] += 1
+                if bot is not None:
+                    await bot.send_message(chat_id=pending.chat_id, text=FAILED_PERMANENTLY_MESSAGE)
             else:
-                next_attempt_at = now + timedelta(seconds=next_backoff_seconds(pending.attempts))
-                repo.mark_pending_retry(session, pending, str(exc), next_attempt_at)
-                counts["retried"] += 1
+                await _retry_or_fail_permanently(
+                    session, pending, str(exc), max_attempts, now, counts, bot,
+                )
+            continue
+        except TransientLLMError as exc:
+            await _retry_or_fail_permanently(session, pending, str(exc), max_attempts, now, counts, bot)
+            continue
+        except Exception as exc:
+            await _retry_or_fail_permanently(session, pending, str(exc), max_attempts, now, counts, bot)
             continue
 
         fields = build_meal_fields(
@@ -53,11 +100,12 @@ def drain_pending_parse(session, llm_client, now: datetime, max_attempts: int) -
     return counts
 
 
-def run_pending_parse_drain_job(session_factory, llm_client, max_attempts: int) -> None:
-    from datetime import timezone
+async def run_pending_parse_drain_job(session_factory, llm_client, max_attempts: int, bot) -> None:
     session = session_factory()
     try:
-        counts = drain_pending_parse(session, llm_client, datetime.now(timezone.utc), max_attempts)
+        counts = await drain_pending_parse(
+            session, llm_client, datetime.now(timezone.utc), max_attempts, bot,
+        )
         if counts["resolved"] or counts["retried"] or counts["failed_permanently"]:
             logger.info("pending_parse drain: %s", counts)
     finally:

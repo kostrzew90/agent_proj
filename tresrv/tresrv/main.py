@@ -12,11 +12,20 @@ from tresrv.llm import GeminiClient
 from tresrv.scheduler.jobs import run_pending_parse_drain_job, run_heartbeat_job, run_evening_summary_job
 
 
+async def _start_scheduler(application: Application) -> None:
+    application.bot_data["scheduler"].start()
+
+
 def build_application() -> Application:
     settings = load_settings()
     session_factory = make_session_factory(settings.database_url)
 
-    application = Application.builder().token(settings.telegram_bot_token).build()
+    application = (
+        Application.builder()
+        .token(settings.telegram_bot_token)
+        .post_init(_start_scheduler)
+        .build()
+    )
     application.bot_data["session_factory"] = session_factory
     application.bot_data["settings"] = settings
     application.bot_data["llm_client"] = GeminiClient(api_key=settings.gemini_api_key)
@@ -34,7 +43,10 @@ def build_application() -> Application:
     scheduler.add_job(
         run_pending_parse_drain_job,
         "interval", minutes=settings.pending_parse_interval_minutes,
-        args=[session_factory, application.bot_data["llm_client"], settings.max_pending_attempts],
+        args=[
+            session_factory, application.bot_data["llm_client"],
+            settings.max_pending_attempts, application.bot,
+        ],
         max_instances=1, coalesce=True,
     )
     scheduler.add_job(
@@ -48,7 +60,6 @@ def build_application() -> Application:
         args=[session_factory, application.bot, settings.telegram_chat_id],
     )
     application.bot_data["scheduler"] = scheduler
-    scheduler.start()
 
     return application
 
