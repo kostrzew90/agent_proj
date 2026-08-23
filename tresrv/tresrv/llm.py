@@ -38,6 +38,10 @@ class ParseError(Exception):
     pass
 
 
+class TransientLLMError(Exception):
+    pass
+
+
 class GeminiClient:
     def __init__(self, api_key: str, model_name: str = "gemini-2.5-flash", model=None):
         self.model_name = model_name
@@ -49,13 +53,19 @@ class GeminiClient:
             self._model = genai.GenerativeModel(model_name)
 
     def parse_text(self, text: str) -> ParsedMeal:
-        response = self._model.generate_content(PROMPT_TEXT.format(text=text))
+        try:
+            response = self._model.generate_content(PROMPT_TEXT.format(text=text))
+        except Exception as exc:
+            raise TransientLLMError(str(exc)) from exc
         return self._parse_response(response.text)
 
     def parse_photo(self, image_path: str) -> ParsedMeal:
         import PIL.Image
         image = PIL.Image.open(image_path)
-        response = self._model.generate_content([PROMPT_PHOTO, image])
+        try:
+            response = self._model.generate_content([PROMPT_PHOTO, image])
+        except Exception as exc:
+            raise TransientLLMError(str(exc)) from exc
         return self._parse_response(response.text)
 
     def _parse_response(self, raw_text: str) -> ParsedMeal:

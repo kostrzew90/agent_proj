@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 from tresrv.domain.confirmation import needs_confirmation
-from tresrv.domain.daytime import resolve_consumed_at
+from tresrv.domain.daytime import local_date, resolve_consumed_at
 from tresrv.llm import ParsedMeal
 
 
@@ -19,7 +19,7 @@ def build_meal_fields(
         "chat_id": chat_id,
         "logged_at": logged_at,
         "consumed_at": consumed_at,
-        "consumed_date": consumed_at.date(),
+        "consumed_date": local_date(consumed_at),
         "raw_input_type": raw_input_type,
         "raw_text": raw_text,
         "storage_path": storage_path,
@@ -61,7 +61,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from tresrv import repo
-from tresrv.llm import NotFoodError, ParseError
+from tresrv.llm import NotFoodError, ParseError, TransientLLMError
 
 MEALS_DIR = Path("/data/meals")
 
@@ -78,7 +78,7 @@ async def text_message_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         except NotFoodError:
             await update.message.reply_text("To nie wygląda na jedzenie — spróbuj inaczej.")
             return
-        except ParseError as exc:
+        except (ParseError, TransientLLMError) as exc:
             repo.save_pending_parse(
                 session, chat_id=chat_id, raw_input_type="text", raw_text=text,
                 logged_at=logged_at, consumed_at=logged_at, next_attempt_at=logged_at,
@@ -134,7 +134,7 @@ async def photo_message_handler(update: Update, context: ContextTypes.DEFAULT_TY
         except NotFoodError:
             await update.message.reply_text("To nie wygląda na jedzenie — spróbuj inaczej.")
             return
-        except ParseError as exc:
+        except (ParseError, TransientLLMError) as exc:
             repo.save_pending_parse(
                 session, chat_id=chat_id, raw_input_type="photo", storage_path=resolved_path,
                 telegram_file_id=resolved_file_id, logged_at=logged_at, consumed_at=logged_at,

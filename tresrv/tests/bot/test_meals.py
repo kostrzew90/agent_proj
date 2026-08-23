@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from tresrv.bot.meals import build_meal_fields, resolve_photo_storage, format_meal_reply
 from tresrv.llm import ParsedMeal
@@ -20,6 +20,21 @@ def test_build_meal_fields_defaults_consumed_at_to_logged_at():
     assert fields["needs_confirmation"] is False
     assert fields["value_source"] == "llm"
     assert fields["status"] == "parsed"
+
+
+def test_build_meal_fields_uses_warsaw_local_date_not_utc_date():
+    # 2026-08-23 22:30 UTC is 2026-08-24 00:30 in Warsaw (CEST, UTC+2) —
+    # this crosses the day boundary, so consumed_date must be the Warsaw date.
+    logged_at = datetime(2026, 8, 23, 22, 30, tzinfo=timezone.utc)
+    parsed = ParsedMeal(kcal=450, protein_g=30, fat_g=15, carbs_g=40,
+                         opis="kurczak z ryzem", confidence=0.9, when_hint=None)
+
+    fields = build_meal_fields(
+        chat_id=1, parsed=parsed, raw_input_type="text", raw_text="kurczak z ryzem",
+        storage_path=None, telegram_file_id=None, logged_at=logged_at,
+    )
+
+    assert fields["consumed_date"] == date(2026, 8, 24)
 
 
 def test_build_meal_fields_applies_when_hint():
