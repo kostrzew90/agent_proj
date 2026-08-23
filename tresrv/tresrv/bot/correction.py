@@ -1,5 +1,5 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import ContextTypes
+from telegram.ext import ApplicationHandlerStop, ContextTypes
 
 from tresrv import repo
 from tresrv.bot.meals import format_meal_reply
@@ -88,18 +88,18 @@ async def correction_value_handler(update: Update, context: ContextTypes.DEFAULT
         value = float(update.message.text.replace(",", "."))
     except ValueError:
         await update.message.reply_text("Wartość musi być liczbą, spróbuj ponownie.")
-        return
+        raise ApplicationHandlerStop()
 
     session = context.bot_data["session_factory"]()
     try:
         corrected = repo.correct_meal(session, meal_id, **{field: value})
+        context.user_data.pop("correction_meal_id", None)
+        context.user_data.pop("correction_field", None)
+        await update.message.reply_text(format_meal_reply({
+            "kcal": corrected.kcal, "protein_g": corrected.protein_g,
+            "fat_g": corrected.fat_g, "carbs_g": corrected.carbs_g,
+            "value_source": corrected.value_source,
+        }))
     finally:
         session.close()
-
-    context.user_data.pop("correction_meal_id", None)
-    context.user_data.pop("correction_field", None)
-    await update.message.reply_text(format_meal_reply({
-        "kcal": corrected.kcal, "protein_g": corrected.protein_g,
-        "fat_g": corrected.fat_g, "carbs_g": corrected.carbs_g,
-        "value_source": corrected.value_source,
-    }))
+    raise ApplicationHandlerStop()
