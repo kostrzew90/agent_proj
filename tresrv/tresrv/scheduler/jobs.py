@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 
 from tresrv import repo
@@ -111,8 +111,7 @@ def build_evening_summary(session, chat_id: int, today) -> str | None:
     return build_summary_text(day_summary, target)
 
 
-def run_evening_summary_job(session_factory, bot, chat_id: int) -> None:
-    from datetime import timezone
+async def run_evening_summary_job(session_factory, bot, chat_id: int) -> None:
     from tresrv.domain.daytime import local_date
 
     session = session_factory()
@@ -123,5 +122,4 @@ def run_evening_summary_job(session_factory, bot, chat_id: int) -> None:
         session.close()
 
     if text is not None:
-        import asyncio
-        asyncio.run(bot.send_message(chat_id=chat_id, text=text))
+        await bot.send_message(chat_id=chat_id, text=text)
