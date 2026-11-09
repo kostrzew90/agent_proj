@@ -1,0 +1,109 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: argus
+      POSTGRES_PASSWORD: argus
+      POSTGRES_DB: argus
+    volumes: ["argus-pg:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U argus"]
+      interval: 5s
+      retries: 10
+  app:
+    build: .
+    container_name: argus-app
+    env_file: .env
+    depends_on:
+      db: {condition: service_healthy}
+    ports: ["${TAILSCALE_IP:-127.0.0.1}:8080:8080"]
+    restart: unless-stopped
+    networks:
+      - default
+      - llmops-shared
+    volumes:
+      - "/var/lib/straznik:/straznik:ro"
+    environment:
+      LLMOPS_URL: ${LLMOPS_URL:-}
+      LLMOPS_TOKEN: ${LLMOPS_TOKEN:-}
+      LLMOPS_PROJECT: argus
+      LLMOPS_SERVICE: app
+      LLMOPS_ENV: production
+      LLMOPS_HOST: contabo-vps
+  liq-listener:
+    build: .
+    container_name: argus-liq-listener
+    env_file: .env
+    depends_on:
+      db: {condition: service_healthy}
+    command: ["python", "-m", "argus.liquidations.hl_listener"]
+    restart: unless-stopped
+    environment:
+      LLMOPS_URL: ${LLMOPS_URL:-}
+      LLMOPS_TOKEN: ${LLMOPS_TOKEN:-}
+      LLMOPS_PROJECT: argus
+      LLMOPS_SERVICE: liq-listener
+      LLMOPS_ENV: production
+      LLMOPS_HOST: contabo-vps
+  grafana:
+    image: grafana/grafana:latest
+    container_name: argus-grafana
+    restart: unless-stopped
+    ports: ["${TAILSCALE_IP:-127.0.0.1}:3000:3000"]
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
+      GF_SERVER_ROOT_URL: http://${TAILSCALE_IP:-127.0.0.1}:3000
+      NEON_POOL_HOST: ${NEON_POOL_HOST}
+      NEON_POOL_DB: ${NEON_POOL_DB}
+      NEON_POOL_USER: ${NEON_POOL_USER}
+      NEON_POOL_PASSWORD: ${NEON_POOL_PASSWORD}
+      LLMOPS_DB_USER: ${LLMOPS_DB_USER}
+      LLMOPS_DB_PASSWORD: ${LLMOPS_DB_PASSWORD}
+      LLMOPS_DB_NAME: ${LLMOPS_DB_NAME}
+    networks:
+      - default
+      - llmops-shared
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+      - ../llmops/grafana/datasource-llmops.yml:/etc/grafana/provisioning/datasources/llmops.yml:ro
+      - ../llmops/grafana/dashboards-provider-llmops.yml:/etc/grafana/provisioning/dashboards/llmops.yml:ro
+      - ../llmops/grafana/dashboards:/var/lib/grafana/dashboards/llmops:ro
+    depends_on:
+      db: {condition: service_healthy}
+  argus-guardian:
+    build:
+      context: ./guardian
+    container_name: argus-guardian
+    restart: unless-stopped
+    depends_on:
+      - app
+      - db
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      ARGUS_DB_URL: postgresql://argus:argus@db:5432/argus
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL: ${ARGUS_GEMINI_MODEL:-gemini-2.5-flash}
+      CHECK_INTERVAL_SECONDS: "300"
+      ARGUS_APP_CONTAINER: argus-app
+      ARGUS_LIQ_CONTAINER: argus-liq-listener
+      ARGUS_HEALTH_URL: http://app:8080/health
+      LLMOPS_URL: ${LLMOPS_URL:-}
+      LLMOPS_TOKEN: ${LLMOPS_TOKEN:-}
+      LLMOPS_PROJECT: argus
+      LLMOPS_SERVICE: guardian
+      LLMOPS_ENV: production
+      LLMOPS_HOST: contabo-vps
+volumes:
+  argus-pg:
+  grafana-data:
+
+networks:
+  llmops-shared:
+    external: true

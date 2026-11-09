@@ -1,0 +1,19 @@
+# Direction rule per asset, decided by docs/superpowers/plans backtest (Task 6).
+# "contrarian": long_liq cascade -> bull, short_liq cascade -> bear
+# "continuation": long_liq cascade -> bear, short_liq cascade -> bull
+# An asset with no entry here gets NO claims emitted (insufficient backtest data) — see Task 6.
+#
+# Backtest 2026-06-24 (633 historical liquidation rows, scripts/backtest_liq_cascades.py):
+# BTC: "contrarian" wins consistently at the 24h horizon (the horizon check_liquidation_signals
+#   actually gates on) — 52-61% across all 7 (window,min_notional) configs with n>=25,
+#   never below 50%. 1h shows the same direction (51-63%). NOTE: 7d horizon flips to favor
+#   "continuation" (42-47% contrarian) — read as an immediate bounce that fades into the
+#   pre-existing trend over a week, not a contradiction; 24h is what's live, so contrarian stands.
+# ETH: no entry — every (window,min_notional,horizon) combo had n<25 (max n=13), insufficient
+#   data to pick a rule. Revisit once more ETH liquidations accumulate.
+# intensity/momentum variants (review pkt 4/5): never reached n>=25 for either asset at any
+#   config — not enough data yet to adopt either pre-filter live. Re-run this backtest after
+#   more cascades accumulate; see plan Task 6's final note for how to wire a filter in if it
+#   turns out to matter.
+direction_rule:
+  BTC: contrarian

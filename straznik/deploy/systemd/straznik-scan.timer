@@ -1,0 +1,9 @@
+[Unit]
+Description=Strażnik: skan Trivy
+
+[Timer]
+OnCalendar=Sun *-*-* 03:00:00 Europe/Warsaw
+Persistent=false
+
+[Install]
+WantedBy=timers.target

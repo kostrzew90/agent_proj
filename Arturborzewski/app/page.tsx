@@ -1,9 +1,14 @@
 import site from '../content/site.json'
 import ContactForm from './ContactForm'
 import LogoImage from './LogoImage'
+import HeroImage from './HeroImage'
 import { AnimatedSection } from './AnimatedSection'
 import { AnimatedCardGrid, AnimatedCardItem } from './AnimatedCards'
 import { AnimatedHeroContainer, AnimatedHeroLine } from './AnimatedHero'
+
+// Slugi specjalizacji, ktore maja dedykowana podstrone. Pozostale karty prowadza
+// do /w-przygotowaniu/ zamiast 404. Dodajac nowa podstrone, dopisz tu jej slug.
+const SPEC_PAGES = new Set(['prawo-karne', 'prawo-gospodarcze'])
 
 export default function HomePage() {
   return (
@@ -93,7 +98,7 @@ export default function HomePage() {
           <AnimatedSection className="relative flex justify-center">
             <div className="absolute w-96 h-96 bg-yellow-500/10 blur-3xl rounded-full"></div>
             <div className="relative border border-yellow-500/20 bg-white/5 backdrop-blur-2xl rounded-[40px] p-6 shadow-2xl max-w-xl w-full hover:scale-[1.01] transition duration-700">
-              <img
+              <HeroImage
                 src="/images/hero-lawyer.jpg"
                 alt={site.kancelaria.nazwa}
                 className="rounded-[32px] w-full h-[700px] object-cover"
@@ -102,7 +107,7 @@ export default function HomePage() {
               <div className="absolute bottom-8 left-8 right-8">
                 <LogoImage
                   alt={site.kancelaria.nazwa}
-                  src="/images/logo-mono.png"
+                  src="/images/logo-mono.webp"
                   className="w-full max-w-xs object-contain"
                 />
               </div>
@@ -124,7 +129,7 @@ export default function HomePage() {
             <div className="space-y-8 text-zinc-400 leading-8 text-lg">
               <p>Kancelaria została zaprojektowana z myślą o klientach oczekujących skuteczności, transparentności i sprawnej komunikacji.</p>
               <p>Wykorzystujemy nowoczesne rozwiązania technologiczne wspierające analizę dokumentów oraz bezpieczny obieg informacji.</p>
-              <div className="text-zinc-500 text-sm space-y-1">
+              <div className="text-zinc-400 text-sm space-y-1">
                 <div>{site.kancelaria.adres}</div>
                 <div>{site.kancelaria.godziny}</div>
                 <div>NIP: {site.kancelaria.nip}</div>
@@ -149,7 +154,7 @@ export default function HomePage() {
           <AnimatedCardGrid className="space-y-4">
             {site.oAdwokacie.doswiadczenie.map((item) => (
               <AnimatedCardItem key={item}>
-                <div className="flex items-start gap-4 rounded-[20px] border border-white/5 bg-white/[0.02] p-6">
+                <div className="flex items-start gap-4 rounded-[20px] border border-white/10 bg-white/[0.02] p-6">
                   <div className="text-yellow-400 text-xl mt-1 shrink-0">✦</div>
                   <p className="text-zinc-300 leading-7">{item}</p>
                 </div>
@@ -170,8 +175,8 @@ export default function HomePage() {
             {site.specjalizacje.map((item) => (
               <AnimatedCardItem key={item.slug}>
                 <a
-                  href={`/${item.slug}/`}
-                  className="group rounded-[30px] border border-white/5 bg-white/[0.02] p-10 hover:border-yellow-500/30 hover:-translate-y-2 transition duration-500 block h-full"
+                  href={SPEC_PAGES.has(item.slug) ? `/${item.slug}/` : '/w-przygotowaniu/'}
+                  className="group rounded-[30px] border border-white/10 bg-white/[0.02] p-10 hover:border-yellow-500/30 hover:-translate-y-2 transition duration-500 block h-full"
                 >
                   <div className="w-14 h-14 rounded-2xl bg-yellow-500/10 border border-yellow-500/20 mb-8 flex items-center justify-center text-yellow-400 text-xl">
                     ✦
@@ -197,7 +202,7 @@ export default function HomePage() {
           <AnimatedCardGrid className="grid md:grid-cols-2 xl:grid-cols-4 gap-6">
             {site.klienci.map((item) => (
               <AnimatedCardItem key={item.nazwa}>
-                <div className="rounded-[28px] border border-white/5 bg-white/[0.02] p-8 h-full">
+                <div className="rounded-[28px] border border-white/10 bg-white/[0.02] p-8 h-full">
                   <div className="text-3xl mb-6">{item.ikona}</div>
                   <h3 className="text-xl font-serif mb-3">{item.nazwa}</h3>
                   <p className="text-zinc-400 leading-7 text-sm">{item.opis}</p>
@@ -218,7 +223,7 @@ export default function HomePage() {
           <AnimatedCardGrid className="grid md:grid-cols-2 xl:grid-cols-3 gap-8">
             {site.wyroznienia.map((item) => (
               <AnimatedCardItem key={item.tytul}>
-                <div className="rounded-[30px] border border-white/5 bg-white/[0.02] p-10 h-full">
+                <div className="rounded-[30px] border border-white/10 bg-white/[0.02] p-10 h-full">
                   <div className="text-2xl mb-6">{item.ikona}</div>
                   <h3 className="text-2xl font-serif mb-4">{item.tytul}</h3>
                   <p className="text-zinc-400 leading-7">{item.opis}</p>
@@ -239,7 +244,7 @@ export default function HomePage() {
           <AnimatedCardGrid className="grid lg:grid-cols-3 gap-8">
             {site.realizacje.map((item, index) => (
               <AnimatedCardItem key={item}>
-                <div className="rounded-[30px] overflow-hidden border border-white/5 bg-black h-full">
+                <div className="rounded-[30px] overflow-hidden border border-white/10 bg-black h-full">
                   <img
                     src={`/images/cases/case-${index + 1}.jpg`}
                     alt={item}
@@ -296,7 +301,7 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-6 text-sm">
           <LogoImage
             alt={site.kancelaria.nazwa}
-            src="/images/logo-skrocone.png"
+            src="/images/logo-skrocone.webp"
             className="h-12 w-auto object-contain opacity-70"
           />
           <div>© {new Date().getFullYear()} {site.kancelaria.nazwa}</div>

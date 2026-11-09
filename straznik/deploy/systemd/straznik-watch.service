@@ -1,0 +1,7 @@
+[Unit]
+Description=Strażnik: kontrola co 5 minut
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/straznik
+ExecStart=/usr/bin/python3 -m straznik.watch

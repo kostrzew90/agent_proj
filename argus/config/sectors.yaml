@@ -1,0 +1,20 @@
+natural_gas:
+  aliases: ["natural gas", "nat gas", "lng", "henry hub", "lng shipping", "gas carriers"]
+  tickers: [NFE, DLNG]
+  confidence: 0.3
+agriculture:
+  aliases: ["fertilizer", "fertiliser", "potash", "nitrogen", "agriculture", "crop prices", "farm"]
+  tickers: [NTR]
+  confidence: 0.3
+ev_auto:
+  aliases: ["electric vehicle", "ev demand", "ev sales", "lucid"]
+  tickers: [LCID]
+  confidence: 0.3
+plant_based_food:
+  aliases: ["plant-based", "plant based", "alt protein", "alternative protein", "beyond meat", "meatless"]
+  tickers: [BYND]
+  confidence: 0.3
+precious_metals:
+  aliases: ["platinum", "palladium", "pgm", "precious metals"]
+  tickers: [PLG]
+  confidence: 0.3

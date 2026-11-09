@@ -9,10 +9,14 @@ writes replies to /audit/outbox/, moves processed files to
 from __future__ import annotations
 
 import asyncio
+import collections
+import contextlib
 import csv
 import json
 import os
+import re
 import signal
+import subprocess
 import threading
 import time
 from datetime import datetime, timezone
@@ -141,6 +145,22 @@ _CRON_JOBS: dict[str, dict] = {
         "enabled": True,
         "last_run": 0.0,
         "description": "Research new VIN data sources (weekly, 10:00)",
+        "notify": "always",
+    },
+    "project-digest-morning": {
+        "interval_s": 86400,
+        "run_at_hour": 8,
+        "enabled": True,
+        "last_run": 0.0,
+        "description": "Project digest (morning, 8:00 UTC)",
+        "notify": "always",
+    },
+    "project-digest-evening": {
+        "interval_s": 86400,
+        "run_at_hour": 20,
+        "enabled": True,
+        "last_run": 0.0,
+        "description": "Project digest (evening, 20:00 UTC)",
         "notify": "always",
     },
 }
@@ -2131,6 +2151,8 @@ def _cron_execute_skill(skill_name: str) -> str:
         return _handle_pool_monitor()
     if skill_name == "scrape-autocentrum":
         return _handle_scrape_autocentrum()
+    if skill_name in ("project-digest-morning", "project-digest-evening"):
+        return _handle_project_digest(skill_name)
     if skill_name == "vinhunter-researcher":
         return _handle_vinhunter_researcher()
     return f"[cron] skill '{skill_name}' not supported for cron."
@@ -2899,6 +2921,9 @@ def _make_reply(text: str) -> str:
             return _handle_review_learn()
         if skill_name in ("scrape-autocentrum",):
             return _handle_scrape_autocentrum(skill_args)
+        if skill_name in ("project-digest-morning", "project-digest-evening", "project-digest"):
+            target = skill_name if skill_name != "project-digest" else "project-digest-morning"
+            return _handle_project_digest(target)
         if skill_name in ("vinhunter-research", "vinhunter-researcher"):
             return _handle_vinhunter_researcher()
         if skill_name in ("vinhunter-write-plugin", "vinhunter-plugin-writer"):
@@ -3071,3 +3096,500 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+# ---------------------------------------------------------------------------
+# Project Digest (skill) — helpers prefixed _pd_*
+# ---------------------------------------------------------------------------
+
+_PD_SECRET_PATTERNS: list[tuple] = [
+    (re.compile(r"sk-[A-Za-z0-9_-]{16,}"), "sk-***REDACTED***"),
+    (re.compile(r"Bearer\s+[A-Za-z0-9._-]{16,}", re.IGNORECASE), "Bearer ***REDACTED***"),
+    (re.compile(r"(api[_-]?key|token|secret)\s*[=:]\s*[^\s,;]+", re.IGNORECASE), r"\1=***REDACTED***"),
+    (re.compile(r"eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+"), "***JWT-REDACTED***"),
+    (re.compile(r"\b[a-f0-9]{40,}\b"), "***HEX-REDACTED***"),
+    (re.compile(r"\b(OPENAI_API_KEY|ANTHROPIC_API_KEY|GROQ_API_KEY|TELEGRAM_BOT_TOKEN)\b"), "***ENV-VAR***"),
+]
+
+
+def _pd_sanitize(text: str) -> str:
+    """Mask secrets in any string before sending to Telegram (external boundary)."""
+    for pat, repl in _PD_SECRET_PATTERNS:
+        text = pat.sub(repl, text)
+    return text
+
+
+def _pd_to_epoch(ts) -> float:
+    """Convert ISO string or numeric timestamp to epoch seconds. 0.0 on failure."""
+    if isinstance(ts, (int, float)):
+        return float(ts)
+    if isinstance(ts, str):
+        try:
+            return datetime.fromisoformat(ts.replace("Z", "+00:00")).timestamp()
+        except (ValueError, TypeError):
+            return 0.0
+    return 0.0
+
+
+def _pd_parse_costs(since_hours: int) -> dict:
+    """Aggregate costs.jsonl entries newer than cutoff. Robust to malformed lines."""
+    assert isinstance(since_hours, int), "since_hours must be int"
+    cutoff = time.time() - since_hours * 3600
+    by_model: dict[str, float] = {}
+    total = 0.0
+    entries = 0
+
+    path = _AUDIT_DIR / "costs.jsonl"
+    if not path.exists():
+        return {"total_usd": 0.0, "by_model": {}, "entries": 0}
+
+    MAX_LINE = 16384
+    try:
+        with path.open("r", encoding="utf-8", errors="ignore") as f:
+            lines = collections.deque(f, maxlen=5000)
+    except OSError:
+        return {"total_usd": 0.0, "by_model": {}, "entries": 0}
+
+    for line in lines:
+        if len(line) > MAX_LINE:
+            continue
+        try:
+            e = json.loads(line)
+        except (json.JSONDecodeError, ValueError):
+            continue
+        if not isinstance(e, dict):
+            continue
+        ts = _pd_to_epoch(e.get("timestamp") or e.get("ts") or 0)
+        if ts < cutoff:
+            continue
+        model = str(e.get("model", "unknown"))
+        try:
+            cost = float(e.get("cost_usd", 0) or 0)
+        except (TypeError, ValueError):
+            cost = 0.0
+        by_model[model] = by_model.get(model, 0.0) + cost
+        total += cost
+        entries += 1
+
+    return {"total_usd": total, "by_model": by_model, "entries": entries}
+
+
+_PD_REPO_ROOT: str = "/workspace/ro"
+
+_PD_PROJECTS: dict[str, str] = {
+    "RAG": "RAG",
+    "Selfmadeagent": "Selfmadeagent",
+    "VINhunter": "VIN OSINT/vinhunter",
+    "trading-app": "trading-app",
+    "hermes": "hermes",
+}
+
+
+def _pd_parse_git_log(stdout: str) -> dict:
+    """Best-effort parser for `git log --pretty=format:%h %s --shortstat`."""
+    commits: list[str] = []
+    files_changed = 0
+    for line in stdout.splitlines():
+        try:
+            if re.match(r"^[a-f0-9]{7,40}\s", line):
+                commits.append(line)
+            elif " file" in line and "changed" in line:
+                m = re.search(r"(\d+)\s+files?\s+changed", line)
+                if m:
+                    files_changed += int(m.group(1))
+        except Exception:
+            continue
+    return {"commits": commits, "files_changed": files_changed}
+
+
+def _pd_git_log_since(hours: int) -> dict:
+    """Run `git log --since=<hours> hours ago -- <subpath>` per project (monorepo). Soft-fail."""
+    assert isinstance(hours, int), "hours must be int (subprocess safety)"
+    out: dict[str, dict] = {}
+    repo_root = Path(_PD_REPO_ROOT)
+    if not repo_root.exists() or not (repo_root / ".git").exists():
+        return {n: {"error": "monorepo not found"} for n in _PD_PROJECTS}
+
+    for name, subpath in _PD_PROJECTS.items():
+        full_path = repo_root / subpath
+        if not full_path.exists():
+            out[name] = {"error": "subpath missing"}
+            continue
+        try:
+            r = subprocess.run(
+                ["git", "log", f"--since={hours} hours ago",
+                 "--pretty=format:%h %s", "--shortstat",
+                 "--", subpath],
+                cwd=str(repo_root), timeout=10, capture_output=True, text=True,
+            )
+            if r.returncode != 0:
+                out[name] = {"error": f"git rc={r.returncode}"}
+                continue
+            out[name] = _pd_parse_git_log(r.stdout)
+        except subprocess.TimeoutExpired:
+            out[name] = {"error": "timeout"}
+        except Exception as exc:
+            out[name] = {"error": str(exc)[:60]}
+    return out
+
+
+_PD_HTTP_ENDPOINTS: dict[str, str] = {
+    "RAG": "http://host.docker.internal:8000/api/v1/health",
+    "Selfmadeagent": "http://host.docker.internal:8080/health",
+}
+
+
+def _pd_health_check() -> dict:
+    """Return container states (docker ps -a) + HTTP /health pings."""
+    containers: dict[str, str] = {}
+    try:
+        r = subprocess.run(
+            ["docker", "ps", "-a", "--format", "{{.Names}}\t{{.Status}}"],
+            timeout=5, capture_output=True, text=True,
+        )
+        if r.returncode == 0:
+            for line in r.stdout.splitlines():
+                name, _, status = line.partition("\t")
+                if not name:
+                    continue
+                if status.startswith("Up"):
+                    containers[name] = "up"
+                elif status.startswith("Exited"):
+                    containers[name] = "exited"
+                elif status.startswith("Restarting"):
+                    containers[name] = "restarting"
+                else:
+                    containers[name] = "unknown"
+    except FileNotFoundError:
+        containers["_note"] = "docker socket not mounted"
+    except Exception as exc:
+        containers["_error"] = str(exc)[:60]
+
+    http: dict[str, dict] = {}
+    for name, url in _PD_HTTP_ENDPOINTS.items():
+        t0 = time.monotonic()
+        try:
+            with httpx.Client(timeout=3.0) as client:
+                resp = client.get(url)
+            http[name] = {
+                "ok": resp.status_code == 200,
+                "latency_ms": int((time.monotonic() - t0) * 1000),
+            }
+        except Exception as exc:
+            http[name] = {"ok": False, "error": str(exc)[:40]}
+
+    return {"containers": containers, "http": http}
+
+
+_PD_ALLOW_PATTERNS: tuple = ("*.log", "*.jsonl")
+_PD_DENY_FILES: set = {
+    "auth.log", "secrets.json", ".env",
+    "cdp.log", "cdp_readonly.log",
+    "costs.jsonl", "review-learn.log", "cron.log",
+    "research.log", "watcher-heartbeat.txt",
+    "llm-proxy.jsonl",
+    "self-learn.log",
+}
+
+
+def _pd_scan_extras(since_hours: int) -> list[dict]:
+    """Scan /audit for recent log/jsonl files not handled elsewhere."""
+    assert isinstance(since_hours, int)
+    cutoff = time.time() - since_hours * 3600
+    extras: list[dict] = []
+    MAX_LINE = 16384
+
+    candidates: set = set()
+    for pat in _PD_ALLOW_PATTERNS:
+        candidates.update(_AUDIT_DIR.glob(pat))
+
+    for path in sorted(candidates):
+        if path.name in _PD_DENY_FILES or not path.is_file():
+            continue
+        try:
+            if path.stat().st_mtime < cutoff:
+                continue
+        except OSError:
+            continue
+        try:
+            with path.open("r", encoding="utf-8", errors="ignore") as f:
+                tail = collections.deque(f, maxlen=1)
+        except OSError:
+            continue
+        if not tail:
+            continue
+        line = tail[-1].strip()
+        if len(line) > MAX_LINE:
+            continue
+
+        display = line[:180]
+        if path.suffix == ".jsonl":
+            try:
+                obj = json.loads(line)
+                if isinstance(obj, dict):
+                    for key in ("message", "event", "type", "msg", "summary"):
+                        if key in obj:
+                            display = f"{key}={obj[key]}"[:180]
+                            break
+            except (json.JSONDecodeError, ValueError):
+                pass
+
+        extras.append({"file": path.name, "last": display})
+        if len(extras) >= 10:
+            break
+
+    return extras
+
+
+@contextlib.contextmanager
+def _pd_digest_lock(name: str):
+    """Singleton execution lock with atomic stale-reclaim. Yields bool (acquired)."""
+    lock_path = _AUDIT_DIR / f".digest-{name}.lock"
+    flags = os.O_CREAT | os.O_EXCL | os.O_RDWR
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+
+    def _acquire() -> int | None:
+        try:
+            fd = os.open(str(lock_path), flags, 0o600)
+            os.write(fd, str(os.getpid()).encode())
+            return fd
+        except FileExistsError:
+            return None
+
+    fd = _acquire()
+    if fd is None:
+        try:
+            stale_pid = int(lock_path.read_text().strip())
+            os.kill(stale_pid, 0)
+            yield False
+            return
+        except (ProcessLookupError, ValueError, PermissionError, FileNotFoundError, OSError):
+            try:
+                lock_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+            fd = _acquire()
+            if fd is None:
+                yield False
+                return
+
+    try:
+        yield True
+    finally:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+        try:
+            lock_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
+# ---------------------------------------------------------------------------
+# Task 7: review-learn queue / highlights + research log helpers
+# ---------------------------------------------------------------------------
+
+
+def _pd_iter_jsonl_recent(path: Path, since_hours: int) -> list[dict]:
+    """Read JSONL, return parsed dicts within window. Robust to malformed lines."""
+    if not path.exists():
+        return []
+    cutoff = time.time() - since_hours * 3600
+    entries: list[dict] = []
+    MAX_LINE = 16384
+    try:
+        with path.open("r", encoding="utf-8", errors="ignore") as f:
+            lines = collections.deque(f, maxlen=5000)
+    except OSError:
+        return []
+    for line in lines:
+        if len(line) > MAX_LINE:
+            continue
+        try:
+            e = json.loads(line)
+        except (json.JSONDecodeError, ValueError):
+            continue
+        if not isinstance(e, dict):
+            continue
+        ts = _pd_to_epoch(e.get("timestamp") or e.get("ts") or 0)
+        if ts < cutoff:
+            continue
+        entries.append(e)
+    return entries
+
+
+def _pd_review_learn_queue() -> dict:
+    """Stats: how many reviews in last 24h."""
+    log_path = _AUDIT_DIR / "review-learn.log"
+    entries = _pd_iter_jsonl_recent(log_path, since_hours=24)
+    return {"new_last_24h": len(entries)}
+
+
+def _pd_review_learn_highlights(last_n: int = 2) -> list[dict]:
+    """Return last N entries with file + preview."""
+    log_path = _AUDIT_DIR / "review-learn.log"
+    entries = _pd_iter_jsonl_recent(log_path, since_hours=24)
+    entries.sort(
+        key=lambda e: _pd_to_epoch(e.get("timestamp") or e.get("ts") or 0),
+        reverse=True,
+    )
+    out: list[dict] = []
+    for e in entries[:last_n]:
+        out.append({
+            "file": str(e.get("file", "?"))[:60],
+            "preview": str(e.get("preview", ""))[:80],
+        })
+    return out
+
+
+def _pd_research_log_since(hours: int) -> dict:
+    """Count research.log entries in window + last topic."""
+    log_path = _AUDIT_DIR / "research.log"
+    entries = _pd_iter_jsonl_recent(log_path, since_hours=hours)
+    if not entries:
+        return {"count": 0, "last_topic": ""}
+    entries.sort(
+        key=lambda e: _pd_to_epoch(e.get("timestamp") or e.get("ts") or 0),
+        reverse=True,
+    )
+    last = entries[0].get("topic") or entries[0].get("query") or entries[0].get("question") or ""
+    return {"count": len(entries), "last_topic": str(last)[:100]}
+
+
+def _pd_append_section(lines: list[str], section: list[str], budget_remaining: int) -> int:
+    """Append section if it fits; truncate with marker if not. Returns new budget."""
+    section_size = sum(len(s) + 1 for s in section)
+    if section_size <= budget_remaining:
+        lines.extend(section)
+        return budget_remaining - section_size
+    used = 0
+    for i, s in enumerate(section):
+        if used + len(s) + 1 > budget_remaining - 30:
+            lines.append(f"… (+{len(section) - i} more)")
+            return 0
+        lines.append(s)
+        used += len(s) + 1
+    return budget_remaining - used
+
+
+def _pd_format_digest(mode: str, data: dict) -> str:
+    """Build digest string ≤3800 chars, sanitized."""
+    BUDGET = 3800
+    header_icon = "🌅" if mode == "morning" else "🌙"
+    title = "Morning" if mode == "morning" else "Evening"
+    date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    lines: list[str] = [
+        f"{header_icon} Project Digest — {title} ({date_str})",
+        "",
+    ]
+    budget = BUDGET - sum(len(s) + 1 for s in lines)
+
+    costs = data.get("costs", {})
+    window_label = "last 24h" if mode == "morning" else "today"
+    cost_lines = [
+        f"💰 Costs ({window_label})",
+        f"  Total: ${costs.get('total_usd', 0.0):.2f}  (entries: {costs.get('entries', 0)})",
+    ]
+    for model, v in sorted(costs.get("by_model", {}).items(), key=lambda x: -x[1])[:5]:
+        cost_lines.append(f"  {model}: ${v:.2f}")
+    cost_lines.append("")
+    budget = _pd_append_section(lines, cost_lines, budget)
+
+    if mode == "morning":
+        health = data.get("health", {})
+        h_lines = ["📊 Health", "  Containers:"]
+        for name, state in sorted(health.get("containers", {}).items()):
+            if name.startswith("_"):
+                h_lines.append(f"    ℹ {name[1:]}: {state}")
+                continue
+            icon = "🟢" if state == "up" else "🔴"
+            h_lines.append(f"    {icon} {name} ({state})")
+        h_lines.append("  HTTP:")
+        for name, info in sorted(health.get("http", {}).items()):
+            if info.get("ok"):
+                h_lines.append(f"    🟢 {name} ({info.get('latency_ms', 0)}ms)")
+            else:
+                h_lines.append(f"    🔴 {name} ({info.get('error', 'down')})")
+        h_lines.append("")
+        budget = _pd_append_section(lines, h_lines, budget)
+
+        queue = data.get("queue", {})
+        q_lines = [
+            "🔍 Review-learn queue",
+            f"  new last 24h: {queue.get('new_last_24h', 0)}",
+            "",
+        ]
+        budget = _pd_append_section(lines, q_lines, budget)
+    else:
+        git = data.get("git", {})
+        g_lines = ["📦 Git activity (last 12h)"]
+        for proj, info in sorted(git.items()):
+            if "error" in info:
+                g_lines.append(f"  ⚠️ {proj}: {info['error']}")
+                continue
+            commits = info.get("commits", [])
+            files = info.get("files_changed", 0)
+            g_lines.append(f"  {proj}: {len(commits)} commits, {files} files")
+            for c in commits[:2]:
+                g_lines.append(f"    🔝 {c[:80]}")
+        g_lines.append("")
+        budget = _pd_append_section(lines, g_lines, budget)
+
+        highlights = data.get("highlights", [])
+        if highlights:
+            h_lines = ["🎯 Review-learn highlights"]
+            for h in highlights:
+                h_lines.append(f"  • {h.get('file', '?')} — {h.get('preview', '')}")
+            h_lines.append("")
+            budget = _pd_append_section(lines, h_lines, budget)
+
+        research = data.get("research", {})
+        if research.get("count", 0) > 0:
+            r_lines = [
+                "🔬 Research (last 12h)",
+                f"  {research['count']} entries, last: {research.get('last_topic', '')[:80]}",
+                "",
+            ]
+            budget = _pd_append_section(lines, r_lines, budget)
+
+    extras = data.get("extras", [])
+    if extras:
+        e_lines = ["📋 Extras"]
+        for e in extras:
+            e_lines.append(f"  [{e['file']}] {e['last']}")
+        e_lines.append("")
+        budget = _pd_append_section(lines, e_lines, budget)
+
+    lines.append("🚨 Signals: (none)")
+
+    result = "\n".join(lines)
+    if len(result) > BUDGET:
+        result = result[:BUDGET - 20] + "\n… (truncated)"
+    return _pd_sanitize(result)
+
+
+def _handle_project_digest(skill_name: str) -> str:
+    """Main entry point. skill_name = project-digest-morning | project-digest-evening."""
+    mode = "morning" if "morning" in skill_name else "evening"
+    cutoff_h = 24 if mode == "morning" else 12
+
+    with _pd_digest_lock(skill_name) as acquired:
+        if not acquired:
+            return f"⏭️ digest {skill_name} already running, skipping"
+
+        data: dict = {
+            "costs": _pd_parse_costs(since_hours=cutoff_h),
+        }
+        if mode == "morning":
+            data["health"] = _pd_health_check()
+            data["queue"] = _pd_review_learn_queue()
+        else:
+            data["git"] = _pd_git_log_since(hours=12)
+            data["highlights"] = _pd_review_learn_highlights(last_n=2)
+            data["research"] = _pd_research_log_since(hours=12)
+        data["extras"] = _pd_scan_extras(since_hours=cutoff_h)
+
+        return _pd_format_digest(mode, data)

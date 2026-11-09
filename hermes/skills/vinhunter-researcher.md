@@ -5,7 +5,7 @@ Every 7 days at 10:00 (cron) or manually via `/skill vinhunter-research`.
 
 ## Steps
 1. List existing plugins via mcp-fs-vinhunter `fs_list_dir("backend/plugins")` — see what categories exist
-2. Brave Search (3 queries, deduplicated by domain):
+2. Search — Brave API (jeśli BRAVE_API_KEY ustawiony) lub browser-mcp Google Search (fallback). 3 queries, deduplicated by domain:
    - `"VIN API EU free 2026"`
    - `"car history database API Europe"`
    - `"vehicle registry open data API"`
@@ -20,13 +20,14 @@ Every 7 days at 10:00 (cron) or manually via `/skill vinhunter-research`.
 
 ## Tools needed
 - `fs_list_dir` (mcp-fs-vinhunter)
-- `_brave_search` (bridge built-in)
+- `_brave_search` lub `browser_google_search` (bridge built-in, auto-fallback)
 - `llm_client.call_llm(prompt, tier="medium", skill="vinhunter-research")`
 
 ## Watch out for
 - Deduplicate search results by domain (same URL from multiple queries)
 - Report filename must use ISO date YYYY-MM-DD (plugin-writer finds latest by glob sort)
-- If Brave Search returns 0 results, report error and skip LLM
+- Jeśli brak BRAVE_API_KEY — automatyczny fallback na browser_google_search (CDP)
+- If both Brave and Google return 0 results, report error and skip LLM
 
 ## Example
 Cron trigger: 10:00

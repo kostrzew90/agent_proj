@@ -1,0 +1,7 @@
+[Unit]
+Description=Strażnik: cotygodniowy skan Trivy
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/straznik
+ExecStart=/usr/bin/python3 -m straznik.scan

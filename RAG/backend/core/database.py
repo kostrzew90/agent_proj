@@ -177,6 +177,7 @@ class ChatContext(Base):
     chat_id = Column(Integer, ForeignKey("chat_sessions.id", ondelete="CASCADE"))
     folder_id = Column(Integer, ForeignKey("folders.id", ondelete="SET NULL"))
     tag_id = Column(Integer, ForeignKey("tags.id", ondelete="SET NULL"))
+    document_id = Column(Integer, ForeignKey("documents.id", ondelete="SET NULL"))
 
     chat_session = relationship("ChatSession", back_populates="contexts")
 
@@ -192,11 +193,28 @@ class ChatMessage(Base):
     groundedness_score = Column(Float)
     completeness_score = Column(Float)
     relevance_score = Column(Float)
+    would_retry_shadow = Column(Boolean)  # Faza 0 self-correction: czy groundedness < judge_retry_threshold
     token_count = Column(Integer)
     latency_ms = Column(Integer)
     created_at = Column(DateTime(timezone=True), default=utcnow)
 
     chat_session = relationship("ChatSession", back_populates="messages")
+
+
+class LlmCall(Base):
+    """One LLM/embedding call that went into producing a chat message (rewrite/embed/rerank/generate/judge)."""
+    __tablename__ = "llm_calls"
+
+    id = Column(Integer, primary_key=True)
+    message_id = Column(Integer, ForeignKey("chat_messages.id", ondelete="CASCADE"))
+    call_type = Column(String(20), nullable=False)  # rewrite, embed, rerank, generate, judge
+    provider = Column(String(20), nullable=False)   # openrouter, ollama
+    model = Column(String(100))
+    tokens_in = Column(Integer, default=0)
+    tokens_out = Column(Integer, default=0)
+    cost_usd = Column(Float, default=0.0)
+    latency_ms = Column(Integer)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
 
 
 class ProcessingTask(Base):

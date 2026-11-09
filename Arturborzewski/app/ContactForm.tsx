@@ -1,9 +1,6 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import Script from 'next/script'
-
-const TURNSTILE_SITEKEY = process.env.NEXT_PUBLIC_TURNSTILE_SITEKEY ?? '0x4AAAAAAA_REPLACE_WITH_REAL_SITEKEY'
 
 export default function ContactForm() {
   const csrfRef = useRef<HTMLInputElement>(null)
@@ -87,12 +84,6 @@ export default function ContactForm() {
             />
           </div>
 
-          <div
-            className="cf-turnstile"
-            data-sitekey={TURNSTILE_SITEKEY}
-            data-theme="dark"
-          ></div>
-
           <label className="flex items-start gap-3 text-sm text-zinc-400 cursor-pointer">
             <input type="checkbox" name="rodo" required className="mt-1 accent-yellow-500" />
             <span>
@@ -120,11 +111,6 @@ export default function ContactForm() {
           </button>
         </form>
       )}
-
-      <Script
-        src="https://challenges.cloudflare.com/turnstile/v0/api.js"
-        strategy="lazyOnload"
-      />
     </div>
   )
 }

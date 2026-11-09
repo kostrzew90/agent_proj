@@ -1,0 +1,342 @@
+Co bym zmienił
+
+Tutaj jest kilka rzeczy, które moim zdaniem warto dopisać zanim projekt urośnie.
+
+1. Monitoring aplikacji
+
+Masz już Grafanę dla Argusa.
+
+Ja od początku zrobiłbym:
+
+CallGuard
+
+↓
+
+Prometheus metrics
+
+↓
+
+Grafana
+
+Na przykład:
+
+requests_total
+
+lookup_duration
+
+reports_total
+
+blocked_calls
+
+backend_errors
+
+cache_hits
+
+cache_misses
+
+Już po tygodniu będziesz wiedział:
+
+ile zapytań dziennie
+ile timeoutów
+ile zgłoszeń
+jaki jest czas odpowiedzi
+2. Health endpoint
+
+Dodałbym
+
+GET /health
+
+zwracający
+
+{
+    status:"ok"
+}
+
+oraz
+
+GET /ready
+
+który sprawdza
+
+bazę
+redis (jeżeli będzie)
+migracje
+
+To później bardzo ułatwia deployment.
+
+3. Logowanie
+
+Obecnie plan mówi głównie o logach Dockera.
+
+Ja od razu zrobiłbym logowanie strukturalne:
+
+timestamp
+
+device_id
+
+request_id
+
+endpoint
+
+status
+
+duration_ms
+
+w JSON.
+
+Wtedy Grafana Loki albo Elasticsearch będą gotowe praktycznie od ręki.
+
+4. Request ID
+
+Każde zapytanie powinno dostać
+
+X-Request-ID
+
+Dzięki temu:
+
+telefon
+
+↓
+
+backend
+
+↓
+
+postgres
+
+↓
+
+logi
+
+będzie można prześledzić jedną operację.
+
+Przy debugowaniu to ogromna oszczędność czasu.
+
+5. Rate limiting
+
+Masz zapisane jako późniejszy etap.
+
+Ja dodałbym to wcześniej.
+
+Na przykład
+
+100 requestów/min/IP
+
+oraz
+
+20 reportów/godzina/device
+
+To ograniczy spam i przypadkowe przeciążenia.
+
+6. Cache
+
+To według mnie największa rzecz, której jeszcze brakuje.
+
+Numer
+
++48123456789
+
+będzie sprawdzany setki razy.
+
+Nie ma sensu:
+
+telefon
+
+↓
+
+backend
+
+↓
+
+postgres
+
+za każdym razem.
+
+Lepiej:
+
+telefon
+
+↓
+
+backend
+
+↓
+
+Redis
+
+↓
+
+postgres
+
+TTL
+
+10 minut
+
+albo
+
+1 godzina
+
+To później pozwoli obsłużyć dziesiątki tysięcy lookupów praktycznie bez obciążenia bazy.
+
+7. Migracje
+
+Nie widzę wzmianki o migracjach.
+
+Jeżeli używasz SQLAlchemy:
+
+Alembic
+
+Powinien być standardem.
+
+Deployment:
+
+docker compose up
+
+↓
+
+alembic upgrade head
+
+↓
+
+start app
+8. Backup
+
+Masz backup wspomniany na końcu.
+
+Ja zrobiłbym go jako obowiązkowy element deploymentu.
+
+Cron:
+
+2:00
+
+↓
+
+pg_dump
+
+↓
+
+gzip
+
+↓
+
+retain 7 days
+
+To powinno istnieć zanim pojawi się pierwszy użytkownik.
+
+9. Secrets
+
+Teraz masz
+
+.env
+
+Na MVP jest OK.
+
+Później rozważyłbym:
+
+Docker Secrets
+
+albo
+
+Vault
+
+Nie jest to pilne.
+
+10. CI/CD
+
+To będzie bardzo potrzebne.
+
+Obecnie wygląda to mniej więcej tak:
+
+git pull
+
+docker compose up
+
+Ja docelowo zrobiłbym:
+
+GitHub
+
+↓
+
+GitHub Actions
+
+↓
+
+tests
+
+↓
+
+build image
+
+↓
+
+push
+
+↓
+
+deploy VPS
+
+↓
+
+health check
+
+↓
+
+notify
+
+To pozwoli wdrażać zmiany praktycznie jednym kliknięciem.
+
+Co jeszcze dodałbym do roadmapy
+
+Ja podzieliłbym rozwój na etapy:
+
+MVP
+backend
+Android
+HTTPS
+staging
+produkcja
+zgłoszenia
+whitelist
+blacklist
+Beta (30 znajomych)
+monitoring
+Grafana
+backup
+rate limiting
+cache
+logowanie JSON
+Public Beta
+CI/CD
+Redis
+migracje
+eksport danych
+panel administratora
+statystyki
+Wersja 1.0
+wiele języków
+reputacja zgłoszeń
+scoring numerów
+analiza AI
+OCR SMS scam
+phishing URLs
+federacja danych
+Największa uwaga architektoniczna
+
+Patrząc na nasze wcześniejsze rozmowy o Argusie, OpenWebUI, Dockerze, Grafanie i lokalnych modelach AI, mam jedną sugestię strategiczną.
+
+Nie traktowałbym CallGuard jako osobnego projektu.
+
+Zaprojektowałbym go jako pierwszy moduł większej platformy bezpieczeństwa, np.:
+
+Platforma
+
+├── CallGuard
+├── SMSGuard
+├── MailGuard
+├── URLGuard
+├── Scam AI
+├── Reputation Engine
+├── Admin Portal
+└── API
+
+Wtedy CallGuard stanie się pierwszym produktem w ekosystemie, a kolejne moduły będą korzystać z tej samej infrastruktury (autoryzacja, monitoring, baza, API, deployment). To znacząco ułatwi rozwój i pozwoli uniknąć przebudowy architektury, gdy pojawią się nowe funkcje.

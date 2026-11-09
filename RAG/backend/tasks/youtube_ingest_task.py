@@ -33,7 +33,7 @@ async def _ingest_pipeline(url: str, user_id: int, task_id: int, languages: list
     from core.database import Document, ProcessingTask, DocumentChunk
     from core.chunker import chunk_document
     from core.embeddings import EmbeddingClient
-    from ingestion.youtube import extract_video_id, fetch_video_metadata, fetch_transcript, download_audio, segments_to_markdown
+    from ingestion.youtube import extract_video_id, fetch_video_metadata, fetch_transcript, download_audio, segments_to_markdown, YouTubeBlockedError
 
     engine = create_async_engine(settings.database.async_url)
     Session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
@@ -63,16 +63,30 @@ async def _ingest_pipeline(url: str, user_id: int, task_id: int, languages: list
                 segments = fetch_transcript(video_id, languages)
                 markdown = segments_to_markdown(segments, title)
                 logger.info("Transcript via subtitles: %d segments, %d chars", len(segments), len(markdown))
+            except YouTubeBlockedError as blocked_err:
+                # YouTube's bot-check is IP-level, not video-specific — audio fallback would fail
+                # identically, so skip straight to a clear actionable error instead of wasting a
+                # Whisper run.
+                raise ValueError(
+                    "YouTube zablokował pobieranie z IP tego serwera (bot-check). "
+                    "Przetranskrybuj lokalnie i wgraj wynik jako zwykły dokument."
+                ) from blocked_err
             except Exception as sub_err:
                 logger.warning("Subtitles unavailable (%s), falling back to Whisper transcription", sub_err)
                 method = "whisper"
                 import tempfile
                 from ingestion.transcriber import transcribe as whisper_transcribe, segments_to_markdown as whisper_to_markdown
-                with tempfile.TemporaryDirectory() as tmpdir:
-                    audio_path = download_audio(video_id, tmpdir)
-                    whisper_lang = languages[0] if languages else None
-                    segments = whisper_transcribe(audio_path, language=whisper_lang)
-                    markdown = whisper_to_markdown(segments, title)
+                try:
+                    with tempfile.TemporaryDirectory() as tmpdir:
+                        audio_path = download_audio(video_id, tmpdir)
+                        whisper_lang = languages[0] if languages else None
+                        segments = whisper_transcribe(audio_path, language=whisper_lang)
+                        markdown = whisper_to_markdown(segments, title)
+                except YouTubeBlockedError as blocked_err:
+                    raise ValueError(
+                        "YouTube zablokował pobieranie z IP tego serwera (bot-check). "
+                        "Przetranskrybuj lokalnie i wgraj wynik jako zwykły dokument."
+                    ) from blocked_err
                 logger.info("Transcript via Whisper: %d segments, %d chars", len(segments), len(markdown))
 
             await _set_progress(db, task_id, "running", 0.4)
@@ -85,7 +99,10 @@ async def _ingest_pipeline(url: str, user_id: int, task_id: int, languages: list
 
             # --- Update document record ---
             result = await db.execute(
-                select(Document).where(Document.source_url == youtube_url)
+                select(Document).where(
+                    Document.source_url == youtube_url,
+                    Document.user_id == user_id,
+                )
             )
             doc = result.scalar_one_or_none()
             if doc is None:
@@ -105,10 +122,10 @@ async def _ingest_pipeline(url: str, user_id: int, task_id: int, languages: list
             logger.info("Chunked into %d chunks", len(chunks))
 
             # --- Embed ---
-            embed_client = EmbeddingClient(
-                base_url=settings.ai.ollama_url,
-                model=settings.ai.embedding_model,
-            )
+            # No base_url/model override — EmbeddingClient picks the provider itself.
+            # Forcing Ollama's URL while OPENROUTER_API_KEY is set made it POST
+            # /embeddings (OpenRouter path + Bearer header) at Ollama → 404 every time.
+            embed_client = EmbeddingClient()
             texts = [c.content for c in chunks]
             embeddings = embed_client.embed_batch(texts)
 
@@ -158,7 +175,7 @@ async def _mark_failed(task_id: int, error: str):
     from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
     from sqlalchemy import select
     from config import settings
-    from core.database import ProcessingTask
+    from core.database import ProcessingTask, Document
 
     engine = create_async_engine(settings.database.async_url)
     Session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
@@ -169,6 +186,12 @@ async def _mark_failed(task_id: int, error: str):
             if pt:
                 pt.status = "failed"
                 pt.error_message = error[:500]
+                if pt.document_id:
+                    doc_result = await db.execute(select(Document).where(Document.id == pt.document_id))
+                    doc = doc_result.scalar_one_or_none()
+                    if doc:
+                        doc.status = "error"
+                        doc.error_message = error[:500]
                 await db.commit()
     finally:
         await engine.dispose()

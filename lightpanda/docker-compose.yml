@@ -1,0 +1,19 @@
+# Lightpanda — lekka przeglądarka bez okna (CDP) dla Argusa.
+# Dostępna TYLKO w sieci dockerowej Argusa: ws://lightpanda:9222 (bez portu na zewnątrz).
+# Wdrożenie: ~/lightpanda na VPS, `docker compose up -d`.
+services:
+  lightpanda:
+    image: lightpanda/browser:${LIGHTPANDA_TAG:-nightly}
+    container_name: lightpanda
+    restart: unless-stopped
+    # --advertise-host: adres ws:// zwracany klientom (/json/version) ma wskazywać nazwę kontenera, nie 127.0.0.1
+    command: ["/bin/lightpanda", "serve", "--host", "0.0.0.0", "--port", "9222", "--advertise-host", "lightpanda", "--log_level", "info"]
+    environment:
+      LIGHTPANDA_DISABLE_TELEMETRY: "true"
+    mem_limit: 512m
+    networks: [argus]
+
+networks:
+  argus:
+    name: argus_default
+    external: true

@@ -4,3 +4,5 @@ out/
 public/vendor/
 public/mail_error.log
 tsconfig.tsbuildinfo
+.env
+public/secrets.php

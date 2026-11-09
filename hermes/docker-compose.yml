@@ -218,7 +218,7 @@ services:
     extra_hosts: ["host.docker.internal:host-gateway"]
     expose: ["8000"]
     environment:
-      CDP_BASE_URL: http://host.docker.internal:9223
+      CDP_BASE_URL: http://chrome-hermes:9223
       CDP_HOST_HEADER: localhost
       AUDIT_DIR: /audit
       MCP_TRANSPORT: sse
@@ -236,7 +236,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
-      CDP_BASE_URL: http://host.docker.internal:9223
+      CDP_BASE_URL: http://chrome-hermes:9223
       CDP_HOST_HEADER: localhost
       AUDIT_DIR: /audit
       MCP_TRANSPORT: sse

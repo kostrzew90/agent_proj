@@ -1,0 +1,7 @@
+[Unit]
+Description=Strażnik: nocna aktualizacja kontenerów
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/straznik
+ExecStart=/usr/bin/python3 -m straznik.updater

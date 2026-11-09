@@ -1,22 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://borzewski-legal.pl/</loc>
+    <loc>https://borzewski-kancelaria.com/</loc>
     <changefreq>monthly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://borzewski-legal.pl/prawo-karne/</loc>
+    <loc>https://borzewski-kancelaria.com/prawo-karne/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://borzewski-legal.pl/prawo-gospodarcze/</loc>
+    <loc>https://borzewski-kancelaria.com/prawo-gospodarcze/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://borzewski-legal.pl/kontakt/</loc>
+    <loc>https://borzewski-kancelaria.com/kontakt/</loc>
     <changefreq>yearly</changefreq>
     <priority>0.7</priority>
   </url>

@@ -1,0 +1,21 @@
+apiVersion: 1
+datasources:
+  - name: Neon Pool
+    uid: neon-pool
+    type: postgres
+    access: proxy
+    url: "${NEON_POOL_HOST}"
+    database: "${NEON_POOL_DB}"
+    user: "${NEON_POOL_USER}"
+    secureJsonData:
+      password: "${NEON_POOL_PASSWORD}"
+    jsonData:
+      database: "${NEON_POOL_DB}"
+      sslmode: require
+      maxOpenConns: 3
+      maxIdleConns: 1
+      connMaxLifetime: 300
+      postgresVersion: 1500
+      timescaledb: false
+    isDefault: false
+    editable: true

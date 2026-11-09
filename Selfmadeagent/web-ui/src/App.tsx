@@ -17,13 +17,9 @@ function App() {
   }, [])
 
   const createSession = async () => {
-    const res = await fetch('/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: 'Hello' }),
-    })
+    const res = await fetch('/sessions/create', { method: 'POST' })
     const data = await res.json()
-    setActiveSession(data.session_id)
+    setActiveSession(data.id)
     fetch('/sessions').then(r => r.json()).then(setSessions).catch(() => {})
   }
 

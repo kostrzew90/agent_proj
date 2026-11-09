@@ -1,0 +1,164 @@
+{
+  "uid": "llmops-main",
+  "title": "LLM Observability",
+  "tags": ["llmops"],
+  "timezone": "browser",
+  "editable": true,
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "1m",
+  "time": { "from": "now-30d", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "COST TODAY",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "postgres", "uid": "llmops-pg" },
+      "fieldConfig": { "defaults": { "unit": "currencyUSD" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawSql": "SELECT COALESCE(SUM(effective_cost_usd), 0) AS \"USD\"\nFROM v_llm_calls_costed\nWHERE ts >= date_trunc('day', now());"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "TOKENS TODAY",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "type": "postgres", "uid": "llmops-pg" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawSql": "SELECT COALESCE(SUM(tokens_in + tokens_out), 0) AS \"tokens\"\nFROM v_llm_calls_costed\nWHERE ts >= date_trunc('day', now());"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "LLM CALLS",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "postgres", "uid": "llmops-pg" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawSql": "SELECT count(*) AS \"calls\"\nFROM v_llm_calls_costed\nWHERE $__timeFilter(ts);"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "ERROR RATE",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "postgres", "uid": "llmops-pg" },
+      "fieldConfig": { "defaults": { "unit": "percent" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawSql": "SELECT COALESCE(100.0 * count(*) FILTER (WHERE NOT ok) / NULLIF(count(*), 0), 0) AS \"%\"\nFROM v_llm_calls_costed\nWHERE $__timeFilter(ts);"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "COST / DAY",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 4 },
+      "datasource": { "type": "postgres", "uid": "llmops-pg" },
+      "fieldConfig": { "defaults": { "unit": "currencyUSD" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawSql": "SELECT date_trunc('day', ts) AS time,\n       SUM(effective_cost_usd)  AS \"USD\"\nFROM v_llm_calls_costed\nWHERE $__timeFilter(ts)\nGROUP BY 1 ORDER BY 1;"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "bargauge",
+      "title": "COST BY PROJECT",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "datasource": { "type": "postgres", "uid": "llmops-pg" },
+      "fieldConfig": { "defaults": { "unit": "currencyUSD" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawSql": "SELECT project, SUM(effective_cost_usd) AS \"USD\"\nFROM v_llm_calls_costed\nWHERE $__timeFilter(ts)\nGROUP BY 1 ORDER BY 2 DESC NULLS LAST;"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "bargauge",
+      "title": "COST BY PROVIDER",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "datasource": { "type": "postgres", "uid": "llmops-pg" },
+      "fieldConfig": { "defaults": { "unit": "currencyUSD" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawSql": "SELECT provider, SUM(effective_cost_usd) AS \"USD\"\nFROM v_llm_calls_costed\nWHERE $__timeFilter(ts)\nGROUP BY 1 ORDER BY 2 DESC NULLS LAST;"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "table",
+      "title": "CALLS BY MODEL",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 20 },
+      "datasource": { "type": "postgres", "uid": "llmops-pg" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawSql": "SELECT model,\n       count(*)                        AS calls,\n       SUM(tokens_in + tokens_out)     AS tokens,\n       SUM(effective_cost_usd)         AS usd,\n       ROUND(AVG(latency_ms))          AS avg_ms\nFROM v_llm_calls_costed\nWHERE $__timeFilter(ts)\nGROUP BY 1 ORDER BY calls DESC;"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "table",
+      "title": "ERROR RATE BY PROJECT",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 28 },
+      "datasource": { "type": "postgres", "uid": "llmops-pg" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawSql": "SELECT project,\n       count(*)                                  AS calls,\n       count(*) FILTER (WHERE NOT ok)            AS errors,\n       ROUND(100.0 * count(*) FILTER (WHERE NOT ok) / count(*), 1) AS pct\nFROM v_llm_calls_costed\nWHERE $__timeFilter(ts)\nGROUP BY 1 ORDER BY pct DESC;"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "table",
+      "title": "WYWOLANIA BEZ CENNIKA",
+      "description": "Wywolania modeli spoza cennika — ich koszt nie jest liczony w zadnej sumie na tym dashboardzie.",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 36 },
+      "datasource": { "type": "postgres", "uid": "llmops-pg" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawSql": "SELECT provider, model, count(*) AS calls,\n       SUM(tokens_in + tokens_out) AS tokens\nFROM v_llm_calls_costed\nWHERE $__timeFilter(ts) AND pricing_missing\nGROUP BY 1, 2 ORDER BY calls DESC;"
+        }
+      ]
+    }
+  ]
+}

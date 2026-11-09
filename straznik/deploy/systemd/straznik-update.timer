@@ -1,0 +1,9 @@
+[Unit]
+Description=Strażnik: aktualizacja
+
+[Timer]
+OnCalendar=*-*-* 04:00:00 Europe/Warsaw
+Persistent=false
+
+[Install]
+WantedBy=timers.target

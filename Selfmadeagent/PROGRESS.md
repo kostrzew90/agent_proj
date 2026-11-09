@@ -27,8 +27,8 @@
 | langfuse-db | 5433 |
 
 ### Langfuse credentials (w .env):
-- Public: pk-lf-9dcf78a2-4fc5-418f-8721-8383ea279590
-- Secret: sk-lf-dd789e8d-8265-49ca-8ff0-d18ea3ab1dc1
+- Public: (w .env)
+- Secret: (w .env)
 
 ## Phase 2: Agent Core — DONE
 

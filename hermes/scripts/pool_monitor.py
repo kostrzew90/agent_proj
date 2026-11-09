@@ -21,7 +21,7 @@ HOURS_CSV = Path(__file__).parent.parent / "config" / "pool_hours.csv"
 
 
 def bucket_ts(now: datetime) -> datetime:
-    minute = 30 if now.minute >= 30 else 0
+    minute = (now.minute // 10) * 10
     return now.replace(minute=minute, second=0, microsecond=0)
 
 
@@ -77,19 +77,22 @@ def main() -> None:
     count, ok, ms, error = scrape()
     print(f"Scraped: count={count} ok={ok} ms={ms} error={error}", flush=True)
 
-    conn = psycopg2.connect(dsn)
+    conn = psycopg2.connect(dsn, connect_timeout=10)
     conn.autocommit = True
     try:
         cur = conn.cursor()
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS hermes_pool_occupancy (
-                recorded_at    timestamptz PRIMARY KEY,
-                people_count   int,
-                scrape_ok      bool,
-                scrape_ms      int,
-                error          text
-            )
-        """)
+        try:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS hermes_pool_occupancy (
+                    recorded_at    timestamptz PRIMARY KEY,
+                    people_count   int,
+                    scrape_ok      bool,
+                    scrape_ms      int,
+                    error          text
+                )
+            """)
+        except Exception:
+            conn.rollback()
         if not is_open(ts):
             print(f"Pool closed at {ts.strftime('%H:%M')} — skipping insert", flush=True)
             return
@@ -99,7 +102,7 @@ def main() -> None:
             VALUES (%s, %s, %s, %s, %s)
             ON CONFLICT DO NOTHING
         """, (ts, count, ok, ms, error))
-        print(f"Written to Neon: {ts.isoformat()}", flush=True)
+        print(f"Written to Postgres: {ts.isoformat()}", flush=True)
     finally:
         conn.close()
 

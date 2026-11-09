@@ -1,0 +1,62 @@
+allowed_public_ports:
+  - "22/tcp"
+  - "8096/tcp"
+  - "41641/udp"
+
+allowed_funnel:
+  - url: "https://vmi3495713.tailce2ab5.ts.net"
+    target: "http://127.0.0.1:8300"
+
+crowdsec_whitelist:
+  - "100.64.0.0/10"
+  - "127.0.0.0/8"
+  - "172.16.0.0/12"
+  - "fd7a:115c:a1e0::/48"
+  - "::1/128"
+
+# obraz skanera Trivy - przypięty do digestu. Obrazy Trivy 0.69.4-0.69.6 oraz `latest` na Docker Hub
+# zostały skompromitowane w marcu 2026 (GHSA-69fq-xp46-6x23); przypinać tylko po digeście.
+trivy_image: "aquasec/trivy:0.76.2@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb"
+
+categories:
+  # A: auto-aktualizacja (tag przypięty do wersji głównej)
+  A:
+    - {container: argus-db-1, image: "postgres:16-alpine", postgres: true}
+    - {container: llmops-postgres, image: "postgres:16-alpine", postgres: true}
+    - {container: wgniotka-postgres, image: "postgres:16-alpine", postgres: true}
+    - {container: widok-db-1, image: "postgres:16-alpine", postgres: true}
+    - {container: langfuse-postgres, image: "postgres:17", postgres: true}
+    - {container: rag-postgres, image: "pgvector/pgvector:pg16", postgres: true}
+    - {container: rag-redis, image: "redis:7-alpine"}
+    - {container: langfuse-redis, image: "redis:7"}
+    - {container: wgniotka-caddy, image: "caddy:2"}
+    - {container: langfuse-clickhouse, image: "clickhouse/clickhouse-server:25.12"}
+  # B: tylko zgłaszaj nową wersję
+  B:
+    # langfuse-web i -worker aktualizują się razem (migracje) - ręcznie
+    - {container: langfuse-web, image: "docker.langfuse.com/langfuse/langfuse:4", http_check: "http://100.71.197.18:3001/api/public/health"}
+    - {container: langfuse-worker, image: "docker.langfuse.com/langfuse/langfuse-worker:4"}
+    - {container: litellm, image: "ghcr.io/berriai/litellm:v1.106.6", github_repo: "BerriAI/litellm", http_check: "http://100.71.197.18:4000/health/liveliness"}
+    - {container: mac-prometheus, image: "prom/prometheus:v3.15.1", github_repo: "prometheus/prometheus"}
+    - {container: mac-alertmanager, image: "prom/alertmanager:v0.34.2", github_repo: "prometheus/alertmanager"}
+    - {container: mac-json-exporter, image: "prometheuscommunity/json-exporter:v0.8.0", github_repo: "prometheus-community/json_exporter"}
+    - {container: argus-grafana, image: "grafana/grafana:latest"}
+    - {container: rag-ollama, image: "ollama/ollama:latest"}
+    - {container: langfuse-minio, image: "cgr.dev/chainguard/minio"}
+    - {container: lightpanda, image: "lightpanda/browser:nightly"}
+    - {container: rag-warp, image: "caomingjun/warp"}
+  # C: obrazy budowane lokalnie, tylko stan obrazu bazowego/CVE
+  C:
+    - {container: argus-app, http_check: "http://100.71.197.18:8080/health"}
+    - {container: argus-guardian}
+    - {container: argus-liq-listener}
+    - {container: rag-api}
+    - {container: rag-ocr-worker}
+    - {container: rag-worker}
+    - {container: rag-frontend}
+    - {container: widok-app-1}
+    - {container: wgniotka-backend}
+    - {container: wgniotka-storefront}
+    - {container: korczaka-grav, http_check: "http://127.0.0.1:8096/"}
+    - {container: llmops-collector}
+    - {container: ai-flow}

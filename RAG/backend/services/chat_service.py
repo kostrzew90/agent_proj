@@ -7,15 +7,28 @@ from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
-from core.database import ChatSession, ChatMessage, ChatContext
+from core.chunker import count_tokens
+from core.database import ChatSession, ChatMessage, ChatContext, LlmCall
 from core.llm import AsyncLLMClient
 from core.retriever import get_retriever
 from core.rewriter import QueryRewriter
-from core.judge import ResponseJudge
+from core.judge import ResponseJudge, would_flag_retry
 from core.llm_reranker import LLMReranker
 from services.profile_service import ProfileService
 
 logger = logging.getLogger(__name__)
+
+# USD per 1M tokens (input, output). Only models we've verified pricing for —
+# unknown models get (0.0, 0.0) rather than a guessed number.
+_PRICING_USD_PER_1M = {
+    "google/gemini-embedding-001": (0.15, 0.0),
+    "gemini-embedding-001": (0.15, 0.0),
+}
+
+
+def _call_cost(model: str | None, tokens_in: int, tokens_out: int) -> float:
+    price_in, price_out = _PRICING_USD_PER_1M.get(model or "", (0.0, 0.0))
+    return round(tokens_in / 1_000_000 * price_in + tokens_out / 1_000_000 * price_out, 6)
 
 
 class ChatService:
@@ -30,11 +43,20 @@ class ChatService:
             self.llm = OpenRouterClient(
                 api_key=settings.ai.openrouter_api_key,
                 model=settings.ai.openrouter_model,
+                base_url=settings.ai.openrouter_base_url or None,
+                fallback_api_key=settings.ai.openrouter_fallback_api_key or None,
+                fallback_model=settings.ai.openrouter_fallback_model or None,
+                fallback_base_url=settings.ai.openrouter_fallback_base_url or None,
             )
             logger.info("LLM: OpenRouter (%s)", settings.ai.openrouter_model)
         else:
             self.llm = AsyncLLMClient()
             logger.info("LLM: Ollama (%s)", settings.ai.llm_model)
+
+    async def close(self):
+        await self.reranker.close()
+        await self.rewriter.llm.close()
+        await self.llm.close()
 
     async def create_session(
         self,
@@ -76,6 +98,67 @@ class ChatService:
         messages = result.scalars().all()
         return [{"role": msg.role, "content": msg.content} for msg in messages]
 
+    async def get_full_history(
+        self,
+        db: AsyncSession,
+        chat_id: int,
+    ) -> list[dict]:
+        """Like get_session_history but includes sources/judge_scores/usage,
+        for the frontend to restore those panels after a page reload."""
+        result = await db.execute(
+            select(ChatMessage)
+            .where(ChatMessage.chat_id == chat_id)
+            .order_by(ChatMessage.created_at)
+        )
+        messages = result.scalars().all()
+
+        message_ids = [msg.id for msg in messages]
+        calls_by_message: dict[int, list[LlmCall]] = {}
+        if message_ids:
+            calls_result = await db.execute(
+                select(LlmCall).where(LlmCall.message_id.in_(message_ids))
+            )
+            for call in calls_result.scalars().all():
+                calls_by_message.setdefault(call.message_id, []).append(call)
+
+        history = []
+        for msg in messages:
+            entry = {
+                "id": msg.id,
+                "role": msg.role,
+                "content": msg.content,
+                "created_at": msg.created_at,
+            }
+            if msg.sources:
+                entry["sources"] = msg.sources
+            if msg.groundedness_score is not None:
+                entry["judge_scores"] = {
+                    "groundedness": msg.groundedness_score,
+                    "completeness": msg.completeness_score,
+                    "relevance": msg.relevance_score,
+                }
+            calls = calls_by_message.get(msg.id, [])
+            if calls:
+                entry["usage"] = {
+                    "calls": [
+                        {
+                            "call_type": c.call_type,
+                            "provider": c.provider,
+                            "model": c.model,
+                            "tokens_in": c.tokens_in,
+                            "tokens_out": c.tokens_out,
+                            "cost_usd": c.cost_usd,
+                            "latency_ms": c.latency_ms,
+                        }
+                        for c in calls
+                    ],
+                    "total_cost_usd": round(sum(c.cost_usd for c in calls), 6),
+                    "total_tokens_in": sum(c.tokens_in for c in calls),
+                    "total_tokens_out": sum(c.tokens_out for c in calls),
+                }
+            history.append(entry)
+        return history
+
     async def query_stream(
         self,
         db: AsyncSession,
@@ -87,6 +170,8 @@ class ChatService:
         full_response = ""
         sources_list = []
         judge_scores: dict = {}
+        would_retry_shadow: bool | None = None
+        call_records: list[dict] = []  # one entry per LLM/embedding call this turn, persisted as LlmCall rows
 
         # LangFuse trace
         from core.langfuse_client import get_langfuse
@@ -121,11 +206,21 @@ class ChatService:
             # c. Rewrite query if this is a follow-up
             rewritten_query = query
             if prior_history:
+                t0 = time.monotonic()
                 try:
                     rewritten_query = await self.rewriter.rewrite(query, prior_history)
                     logger.debug("Rewritten query: %s", rewritten_query)
                 except Exception as exc:
                     logger.warning("Query rewriting failed, using original: %s", exc)
+                if self.rewriter.last_usage is not None:
+                    call_records.append({
+                        "call_type": "rewrite",
+                        "provider": self.rewriter.provider,
+                        "model": self.rewriter.model,
+                        "tokens_in": self.rewriter.last_usage.prompt_tokens,
+                        "tokens_out": self.rewriter.last_usage.completion_tokens,
+                        "latency_ms": int((time.monotonic() - t0) * 1000),
+                    })
 
             if trace:
                 try:
@@ -155,10 +250,22 @@ class ChatService:
                     folder_ids=folder_ids or None,
                     tag_ids=tag_ids or None,
                     document_ids=document_ids or None,
+                    user_id=user_id,
                 )
             except Exception as exc:
                 logger.error("Retrieval failed: %s", exc)
                 retrieval_results = []
+
+            if self.retriever.last_embed_usage is not None:
+                u = self.retriever.last_embed_usage
+                call_records.append({
+                    "call_type": "embed",
+                    "provider": u["provider"],
+                    "model": u["model"],
+                    "tokens_in": u["tokens"],
+                    "tokens_out": 0,
+                    "latency_ms": u["latency_ms"],
+                })
 
             # Rerank: 3-dim LLM scoring → hybrid merge → diversity cap → top-K
             if retrieval_results:
@@ -186,15 +293,24 @@ class ChatService:
                 except Exception:
                     pass
 
-            # f. Detect query language for explicit instruction
+            # f. Detect query language for explicit instruction. A missed-Polish
+            # false negative used to force "Answer in English." as the fallback —
+            # instead, when detection is inconclusive, give no language
+            # instruction at all and let the model mirror the query's language
+            # (which it does reliably on its own).
             polish_chars = set("ąęóśźżćńłĄĘÓŚŹŻĆŃŁ")
+            polish_words = {
+                "jak", "czy", "co", "ile", "gdzie", "kiedy", "dlaczego", "który", "która",
+                "streszcz", "streszczenie", "opowiedz", "podsumuj", "wyjaśnij", "napisz",
+                "film", "nagranie", "dokument", "tekst", "jest", "jaka", "jakie", "proszę",
+            }
             is_polish = any(c in polish_chars for c in query) or any(
-                w in query.lower() for w in ["jak", "czy", "co ", "ile", "gdzie", "kiedy", "dlaczego", "który", "która"]
+                w in query.lower().split() or w in query.lower() for w in polish_words
             )
-            lang_instruction = "Odpowiedź napisz PO POLSKU." if is_polish else "Answer in English."
+            lang_instruction = "Odpowiedź napisz PO POLSKU. " if is_polish else ""
 
             system_prompt = (
-                f"{lang_instruction} "
+                f"{lang_instruction}"
                 "Odpowiadaj WYŁĄCZNIE na podstawie dostarczonego kontekstu. "
                 "Jeśli informacji nie ma w kontekście, powiedz że nie wiesz. "
                 "Cytuj źródła jako [1], [2] itp. przy odwoływaniu się do konkretnych treści."
@@ -216,6 +332,7 @@ class ChatService:
                 user_prompt = f"Kontekst: (brak pasujących dokumentów)\n\nPytanie: {query}" if is_polish else f"Context: (no relevant documents found)\n\nQuestion: {query}"
 
             # h. Stream LLM response
+            gen_t0 = time.monotonic()
             try:
                 async for token in self.llm.generate_stream(
                     prompt=user_prompt,
@@ -227,6 +344,19 @@ class ChatService:
                 logger.error("LLM streaming error: %s", exc)
                 yield f"data: {json.dumps({'type': 'error', 'content': f'LLM error: {exc}'})}\n\n"
                 return
+
+            # Streaming responses don't return a usage payload — estimate via
+            # tiktoken instead of leaving generation untracked.
+            gen_provider = "openrouter" if settings.ai.openrouter_api_key else "ollama"
+            gen_model = settings.ai.openrouter_model if settings.ai.openrouter_api_key else settings.ai.llm_model
+            call_records.append({
+                "call_type": "generate",
+                "provider": gen_provider,
+                "model": gen_model,
+                "tokens_in": count_tokens(system_prompt + user_prompt),
+                "tokens_out": count_tokens(full_response),
+                "latency_ms": int((time.monotonic() - gen_t0) * 1000),
+            })
 
             if trace:
                 try:
@@ -261,6 +391,22 @@ class ChatService:
                     "completeness": judge_result.completeness,
                     "relevance": judge_result.relevance,
                 }
+                call_records.append({
+                    "call_type": "judge",
+                    "provider": judge.provider,
+                    "model": judge.model,
+                    "tokens_in": judge_result.prompt_tokens,
+                    "tokens_out": judge_result.completion_tokens,
+                    "latency_ms": int(judge_result.duration_ms),
+                })
+                would_retry_shadow = would_flag_retry(
+                    judge_result.groundedness, settings.ai.judge_retry_threshold
+                )
+                if would_retry_shadow:
+                    logger.info(
+                        "self-correction shadow: would retry (groundedness=%.2f < %.2f) chat_id=%s",
+                        judge_result.groundedness, settings.ai.judge_retry_threshold, chat_id,
+                    )
                 yield f"data: {json.dumps({'type': 'judge', **judge_scores})}\n\n"
             except Exception as exc:
                 logger.warning("Judge evaluation failed: %s", exc)
@@ -271,7 +417,7 @@ class ChatService:
                     trace.span(
                         name="judge",
                         input={"query": query, "response_len": len(full_response)},
-                        output=judge_scores,
+                        output={**judge_scores, "would_retry_shadow": would_retry_shadow},
                     )
                 except Exception:
                     pass
@@ -283,6 +429,11 @@ class ChatService:
                 await self.profile_service.detect_language(db, user_id, query)
             except Exception as exc:
                 logger.warning("Profile update failed: %s", exc)
+
+            # Usage summary — tokens/cost/provider per call this turn
+            for rec in call_records:
+                rec["cost_usd"] = _call_cost(rec["model"], rec["tokens_in"], rec["tokens_out"])
+            yield f"data: {json.dumps({'type': 'usage', 'calls': call_records, 'total_cost_usd': round(sum(r['cost_usd'] for r in call_records), 6), 'total_tokens_in': sum(r['tokens_in'] for r in call_records), 'total_tokens_out': sum(r['tokens_out'] for r in call_records)})}\n\n"
 
             # Final done event
             yield f"data: {json.dumps({'type': 'done'})}\n\n"
@@ -304,13 +455,31 @@ class ChatService:
                     groundedness_score=judge_scores.get("groundedness"),
                     completeness_score=judge_scores.get("completeness"),
                     relevance_score=judge_scores.get("relevance"),
+                    would_retry_shadow=would_retry_shadow,
                     latency_ms=latency_ms,
                 )
                 db.add(assistant_msg)
                 try:
                     await db.commit()
+                    await db.refresh(assistant_msg)
+                    for rec in call_records:
+                        db.add(LlmCall(
+                            message_id=assistant_msg.id,
+                            call_type=rec["call_type"],
+                            provider=rec["provider"],
+                            model=rec["model"],
+                            tokens_in=rec["tokens_in"],
+                            tokens_out=rec["tokens_out"],
+                            cost_usd=_call_cost(rec["model"], rec["tokens_in"], rec["tokens_out"]),
+                            latency_ms=rec["latency_ms"],
+                        ))
+                    if call_records:
+                        await db.commit()
                 except Exception as exc:
                     logger.error("Failed to save assistant message: %s", exc)
+
+            from core.llmops_emit import emit_llmops_calls
+            emit_llmops_calls(call_records)
 
             if trace:
                 try:

@@ -29,3 +29,11 @@ postgres-data/
 
 # Hermes-managed local git repo in VINhunter subdirectory
 VIN OSINT/vinhunter/.git/
+
+RAG/graphify-out/
+RAG/youtube-cookies.txt
+
+.worktrees/
+
+# Osobne repo (audytowalne, przekazywalne) - nie czesc repo n8n
+/widok/

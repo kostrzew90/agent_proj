@@ -82,6 +82,13 @@ services:
       CLAW_CORE_URL: http://claw-core:8080
       LANGFUSE_HOST: http://langfuse-server:3000
       WORKSPACE_PATH: /workspace
+      MODEL_OVERRIDE: ${MODEL_OVERRIDE:-}
+      LLMOPS_URL: ${LLMOPS_URL:-}
+      LLMOPS_TOKEN: ${LLMOPS_TOKEN:-}
+      LLMOPS_PROJECT: selfmadeagent
+      LLMOPS_SERVICE: orchestrator
+      LLMOPS_ENV: ${LLMOPS_ENV:-production}
+      LLMOPS_HOST: ${LLMOPS_HOST:-}
     ports:
       - "${ORCHESTRATOR_PORT:-8100}:8000"
     volumes:

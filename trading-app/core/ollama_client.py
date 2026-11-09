@@ -5,6 +5,7 @@ Obsługuje generowanie tekstu i embeddings przez Ollama API.
 Z fallback na Claude API gdy Ollama niedostępny.
 """
 import json
+import time
 from typing import List, Optional, Dict, Any
 
 import requests
@@ -44,6 +45,19 @@ class OllamaClient:
             raise OllamaError(f"Ollama timeout after {self.timeout}s")
         except requests.RequestException as e:
             raise OllamaError(f"Ollama request failed: {e}")
+
+    def _record_llmops(self, provider, model, call_type, t0,
+                       tokens_in, tokens_out, ok, error):
+        try:
+            from core import llmops_client
+            llmops_client.record(
+                provider=provider, model=model, call_type=call_type,
+                tokens_in=tokens_in or 0, tokens_out=tokens_out or 0,
+                latency_ms=int((time.monotonic() - t0) * 1000),
+                ok=ok, error=error,
+            )
+        except Exception:
+            pass
 
     def _ollama_stream(self, endpoint: str, data: Dict) -> str:
         """Make streaming request to Ollama API"""
@@ -136,10 +150,15 @@ class OllamaClient:
             if system:
                 data["system"] = system
 
+            t0 = time.monotonic()
             response = self._ollama_request("/api/generate", data)
+            self._record_llmops("ollama", model, "generate", t0,
+                                response.get("prompt_eval_count", 0),
+                                response.get("eval_count", 0), True, None)
             return response.get("response", "")
 
         except OllamaError as e:
+            self._record_llmops("ollama", model, "generate", t0, 0, 0, False, str(e))
             if use_claude_fallback and self.claude_cfg.enabled:
                 return self._claude_request(prompt, system)
             raise e
@@ -169,10 +188,15 @@ class OllamaClient:
             if system:
                 data["system"] = system
 
+            t0 = time.monotonic()
             response = self._ollama_request("/api/chat", data)
+            self._record_llmops("ollama", model, "generate", t0,
+                                response.get("prompt_eval_count", 0),
+                                response.get("eval_count", 0), True, None)
             return response.get("message", {}).get("content", "")
 
-        except OllamaError:
+        except OllamaError as e:
+            self._record_llmops("ollama", model, "generate", t0, 0, 0, False, str(e))
             # Fallback to Claude
             if self.claude_cfg.enabled:
                 # Convert to single prompt
@@ -201,8 +225,15 @@ class OllamaClient:
             "prompt": text
         }
 
-        response = self._ollama_request("/api/embeddings", data)
-        return response.get("embedding", [])
+        try:
+            t0 = time.monotonic()
+            response = self._ollama_request("/api/embeddings", data)
+            self._record_llmops("ollama", model, "embed", t0,
+                                response.get("prompt_eval_count", 0), 0, True, None)
+            return response.get("embedding", [])
+        except OllamaError as e:
+            self._record_llmops("ollama", model, "embed", t0, 0, 0, False, str(e))
+            raise
 
     def embed_batch(self, texts: List[str], model: str = None) -> List[List[float]]:
         """

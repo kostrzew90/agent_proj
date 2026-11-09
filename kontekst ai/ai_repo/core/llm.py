@@ -90,17 +90,29 @@ class LLMClient:
         success: bool = True, error: Optional[str] = None,
     ):
         """Record LLM call metrics if db is available."""
+        import time
+
+        latency_ms = (time.time() - t0) * 1000
+        # Rough token estimation (~4 chars/token)
+        input_tokens = len(prompt) // 4
+        output_tokens = len(result) // 4 if result else 0
+
+        try:
+            from ai_repo.core import llmops_client
+            llmops_client.record(
+                provider=provider, model=model, call_type=self._purpose,
+                tokens_in=input_tokens, tokens_out=output_tokens,
+                tokens_estimated=True, latency_ms=int(latency_ms),
+                ok=success, error=error,
+            )
+        except Exception:
+            pass
+
         if not self._db:
             return
-        import time
 
         try:
             from ai_repo.core.metrics import record_llm_call
-
-            latency_ms = (time.time() - t0) * 1000
-            # Rough token estimation (~4 chars/token)
-            input_tokens = len(prompt) // 4
-            output_tokens = len(result) // 4 if result else 0
 
             record_llm_call(
                 self._db,

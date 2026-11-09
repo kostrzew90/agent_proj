@@ -1,11 +1,10 @@
 name: Pool Monitor — Basen Nieporęt
 
 on:
-  schedule:
-    # co 15 min, 4:00–20:45 UTC = 6:00–22:45 Warsaw (CEST +2)
-    # GH throttluje scheduled workflows — 15 min daje faktyczne ~30-60 min
-    - cron: "0,15,30,45 4-20 * * *"
-  workflow_dispatch: {}   # ręczne uruchomienie z UI GitHub
+  # Scheduled trigger disabled 2026-06-23 — moved to VPS crontab (~/pool-monitor on
+  # Argus VPS 84.235.174.129), which runs 24/7 without GH Actions' scheduling throttle
+  # (GH gave ~4.6h real avg interval vs the 15min cron here).
+  workflow_dispatch: {}   # ręczne uruchomienie z UI GitHub (fallback/manual only)
 
 jobs:
   scrape:

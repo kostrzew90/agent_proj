@@ -10,6 +10,9 @@ This directory contains multiple independent projects. Each has its own CLAUDE.m
 | **VINhunter** | `VIN OSINT/vinhunter/` | `VIN OSINT/CLAUDE.md` | VIN OSINT tool for EU used car verification |
 | **RAG Pipeline** | `RAG/` | `RAG/CLAUDE.md` | Document processing + pgvector + AI |
 | **AI-Aware Repo** | `kontekst ai/` | `kontekst ai/CLAUDE.md` | Codebase context analyzer |
+| **Selfmadeagent** | `Selfmadeagent/` | `Selfmadeagent/CLAUDE.md` | Self-hosted AI agent (claw-code + Python + Langfuse) |
+| **CallGuard** | `callguard/` | `callguard/CLAUDE.md` | AI Phone Firewall na Androida — koncepcja, nie zaimplementowane |
+| **LLMOps** | `llmops/` | `llmops/CLAUDE.md` | Centralna obserwowalność wywołań LLM (koszty, tokeny, błędy) |
 | **n8n** | `.` | — | n8n workflow automation (Docker Compose) |
 
 ## Shared Infrastructure

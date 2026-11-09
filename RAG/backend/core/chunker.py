@@ -77,6 +77,20 @@ def _split_by_headings(markdown: str) -> list[tuple[str | None, str]]:
     return sections
 
 
+def _hard_split(text: str, max_tokens: int) -> list[str]:
+    """
+    Last-resort split of an unbreakable run of text into token-sized pieces.
+    Needed because sentence splitting does nothing when the text has no `.!?`
+    — YouTube auto-captions and markdown tables are exactly that, and without
+    this the whole run became a single chunk many times over max_size.
+    """
+    tokens = _enc.encode(text)
+    return [
+        _enc.decode(tokens[i : i + max_tokens])
+        for i in range(0, len(tokens), max_tokens)
+    ]
+
+
 def _split_large_text(
     text: str,
     max_tokens: int,
@@ -110,12 +124,31 @@ def _split_large_text(
             sentences = re.split(r"(?<=[.!?])\s+", para)
             for sent in sentences:
                 sent_tokens = count_tokens(sent)
+
+                # A single "sentence" already over the limit can't be packed —
+                # flush what we have and split it hard.
+                if sent_tokens > max_tokens:
+                    if current_parts:
+                        chunks.append(" ".join(current_parts))
+                        current_parts = []
+                        current_tokens = 0
+                    chunks.extend(_hard_split(sent, max_tokens))
+                    continue
+
                 if current_tokens + sent_tokens > max_tokens and current_parts:
                     chunks.append(" ".join(current_parts))
-                    # Keep overlap
+                    # Keep overlap — but only if it's actually small. Without this
+                    # bound, a carried-over overlap that itself becomes one element
+                    # of current_parts snowballs: each new chunk's "last 2 parts"
+                    # re-includes the whole accumulated overlap plus one sentence,
+                    # growing unboundedly instead of resetting.
                     overlap_text = " ".join(current_parts[-2:]) if len(current_parts) >= 2 else ""
-                    current_parts = [overlap_text] if overlap_text else []
-                    current_tokens = count_tokens(overlap_text) if overlap_text else 0
+                    if overlap_text and count_tokens(overlap_text) <= overlap_tokens:
+                        current_parts = [overlap_text]
+                        current_tokens = count_tokens(overlap_text)
+                    else:
+                        current_parts = []
+                        current_tokens = 0
                 current_parts.append(sent)
                 current_tokens += sent_tokens
             continue

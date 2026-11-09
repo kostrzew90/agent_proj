@@ -37,13 +37,26 @@ class AISettings(BaseSettings):
 
     llm_model: str = "qwen3:1.7b"
     embedding_model: str = "qwen3-embedding:0.6b"
-    embedding_dimension: int = 1024
+    embedding_dimension: int = 768
     judge_model: str = "qwen3:1.7b"
+    judge_retry_threshold: float = 0.5  # shadow-mode: groundedness below this would flag a retry (Faza 0 — logging only)
 
     # OpenRouter (optional — overrides Ollama for LLM/judge when set)
     openrouter_api_key: str = ""
     openrouter_model: str = "google/gemini-2.0-flash-001"
     openrouter_judge_model: str = "google/gemini-2.0-flash-001"
+    openrouter_embedding_model: str = "google/gemini-embedding-001"
+    # Embeddingi mogą używać innego klucza/endpointu niż LLM (np. prawdziwy
+    # openrouter.ai zamiast bezpośredniego Gemini, który ma bardzo niski free-tier
+    # RPM/RPD dla embeddingów). Puste = użyj openrouter_api_key/openrouter_base_url.
+    openrouter_embedding_api_key: str = ""
+    openrouter_embedding_base_url: str = ""
+    openrouter_base_url: str = ""  # puste = openrouter.ai; np. Gemini OpenAI-compat endpoint
+
+    # Fallback provider (used on primary 429/timeout/connection error)
+    openrouter_fallback_api_key: str = ""
+    openrouter_fallback_model: str = ""
+    openrouter_fallback_base_url: str = ""  # puste = openrouter.ai
 
     # Groq (optional — fast Whisper API, free tier 7200s/day)
     groq_api_key: str = ""

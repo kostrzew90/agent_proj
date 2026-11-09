@@ -19,7 +19,7 @@ Header always set X-Frame-Options "SAMEORIGIN"
 Header always set Referrer-Policy "strict-origin-when-cross-origin"
 Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
 Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
-Header set Content-Security-Policy "default-src 'self'; script-src 'self' https://challenges.cloudflare.com; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; frame-src https://challenges.cloudflare.com; connect-src 'self';"
+Header set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; connect-src 'self';"
 
 # Cache: Next.js static assets (1 year)
 <FilesMatch "\.(js|css|woff2|webp|png|jpg|jpeg|ico|svg)$">
@@ -32,7 +32,7 @@ Header set Content-Security-Policy "default-src 'self'; script-src 'self' https:
 </FilesMatch>
 
 # Protect logs and PHP config files
-<FilesMatch "(mail_error\.log|composer\.json|composer\.lock)$">
+<FilesMatch "(mail_error\.log|composer\.json|composer\.lock|secrets\.php)$">
   Order deny,allow
   Deny from all
 </FilesMatch>

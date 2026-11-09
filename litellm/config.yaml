@@ -1,0 +1,88 @@
+# LiteLLM — bramka LLM na VPS (od 2026-11-01). Tylko plik konfiguracji: bez bazy, bez panelu www.
+#
+# Grupy z kolejnością (order 1 -> 2 -> 3 -> 4) — używane przez aplikacje:
+#   argus-extract  (Argus)  Mac qwen3.6:35b -> OpenRouter free -> Gemini Flash -> Gemini Flash-Lite
+#   rag-chat       (RAG)    Mac gemma4:26b  -> OpenRouter free -> Gemini Flash -> Gemini Flash-Lite
+#   ocr            (obrazy) Mac nemotron-3.5-bolt:e4b -> Gemini Flash (OpenRouter nemotron nie czyta obrazów)
+#   straznik       (Strażnik VPS) tylko Mac qwen3-coder-next:q4_K_M — bez chmury, dane bezpieczeństwa zostają u nas
+# Kolejność OpenRouter przed Gemini — decyzja usera 2026-11-02 (konto OpenRouter doładowane = wyższy limit darmowych modeli).
+# Pojedyncze modele do bezpośredniego użycia: mac-gemma, mac-qwen, mac-ocr, gemini-flash, gemini-flash-lite, or-nemotron.
+#
+# Dlaczego kolejność w JEDNEJ grupie, a nie `fallbacks` między grupami: LiteLLM nie wstrzymuje (cooldown)
+# modelu, który jest jedynym w swojej grupie — przy wyłączonym Macu każde zapytanie czekałoby 45 s.
+# W grupie z kilkoma modelami Mac po pierwszym błędzie jest pomijany przez 120 s (test 11-01: 47,6 s, potem 0,4 s).
+#
+# Mac: myślenie domyślnie wyłączone (think: false, zapytanie może włączyć); limit 45 s (strumień 20 s) —
+# zimny start qwen3.6:35b ~15 s.
+
+x-mac: &mac
+  api_base: http://100.79.154.116:11434
+  keep_alive: "24h"
+  think: false
+  timeout: 45
+  stream_timeout: 20
+
+x-mac-info: &mac_info
+  allowed_fails: 0
+  cooldown_time: 120
+
+model_list:
+  # --- Argus ---
+  - model_name: argus-extract
+    litellm_params: {<<: *mac, model: ollama_chat/qwen3.6:35b, order: 1}
+    model_info: *mac_info
+  - model_name: argus-extract
+    litellm_params: {model: openrouter/nvidia/nemotron-3-ultra-550b-a55b:free, api_key: os.environ/OPENROUTER_API_KEY, order: 2}
+  - model_name: argus-extract
+    litellm_params: {model: gemini/gemini-2.5-flash, api_key: os.environ/GEMINI_API_KEY, order: 3}
+  - model_name: argus-extract
+    litellm_params: {model: gemini/gemini-2.5-flash-lite, api_key: os.environ/GEMINI_API_KEY, order: 4}
+
+  # --- RAG ---
+  - model_name: rag-chat
+    litellm_params: {<<: *mac, model: ollama_chat/gemma4:26b, order: 1}
+    model_info: *mac_info
+  - model_name: rag-chat
+    litellm_params: {model: openrouter/nvidia/nemotron-3-ultra-550b-a55b:free, api_key: os.environ/OPENROUTER_API_KEY, order: 2}
+  - model_name: rag-chat
+    litellm_params: {model: gemini/gemini-2.5-flash, api_key: os.environ/GEMINI_API_KEY, order: 3}
+  - model_name: rag-chat
+    litellm_params: {model: gemini/gemini-2.5-flash-lite, api_key: os.environ/GEMINI_API_KEY, order: 4}
+
+  # --- OCR / obrazy (skany, zdjęcia: paragony, faktury, opisy) — test 11-01: bolt 0% błędnych znaków, 2-4 s ---
+  # Tylko jeden model z Maca w grupie: drugi model z Maca (np. gemma4) przy wyłączonym Macu dołożyłby kolejne 45 s.
+  - model_name: ocr
+    litellm_params: {<<: *mac, model: ollama_chat/nemotron-3.5-bolt:e4b, order: 1}
+    model_info: *mac_info
+  - model_name: ocr
+    litellm_params: {model: gemini/gemini-2.5-flash, api_key: os.environ/GEMINI_API_KEY, order: 2}
+
+  # --- pojedyncze modele ---
+  # --- Strażnik (bez chmury) ---
+  - model_name: straznik
+    litellm_params: {<<: *mac, model: ollama_chat/qwen3-coder-next:q4_K_M, keep_alive: "5m", timeout: 240, stream_timeout: 240}
+    model_info: *mac_info
+  - model_name: mac-ocr
+    litellm_params: {<<: *mac, model: ollama_chat/nemotron-3.5-bolt:e4b}
+  - model_name: mac-gemma
+    litellm_params: {<<: *mac, model: ollama_chat/gemma4:26b}
+  - model_name: mac-qwen
+    litellm_params: {<<: *mac, model: ollama_chat/qwen3.6:35b}
+  - model_name: gemini-flash
+    litellm_params: {model: gemini/gemini-2.5-flash, api_key: os.environ/GEMINI_API_KEY}
+  - model_name: gemini-flash-lite
+    litellm_params: {model: gemini/gemini-2.5-flash-lite, api_key: os.environ/GEMINI_API_KEY}
+  - model_name: or-nemotron
+    litellm_params: {model: openrouter/nvidia/nemotron-3-ultra-550b-a55b:free, api_key: os.environ/OPENROUTER_API_KEY}
+
+router_settings:
+  num_retries: 0
+  allowed_fails: 0      # model wstrzymany po pierwszym błędzie (np. 429 dziennego limitu Gemini)
+  cooldown_time: 120
+  timeout: 180
+
+litellm_settings:
+  callbacks: ["prometheus", "langfuse_otel"]
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY

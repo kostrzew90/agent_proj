@@ -1,0 +1,6 @@
+# Docelowe wartości dla /etc/crowdsec/bouncers/crowdsec-firewall-bouncer.yaml.
+# install.sh odczytuje stąd listę łańcuchów i wpisuje ją do pliku bouncera.
+# DOCKER-USER jest wymagany: bez niego ruch do portów kontenerów (8096) omija blokady.
+iptables_chains:
+  - INPUT
+  - DOCKER-USER

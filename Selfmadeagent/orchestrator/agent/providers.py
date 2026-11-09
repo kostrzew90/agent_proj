@@ -1,4 +1,5 @@
 import os
+import time
 import litellm
 from dataclasses import dataclass
 from langfuse.decorators import observe
@@ -12,6 +13,7 @@ class ProviderConfig:
     model: str
     api_base: str | None = None
     api_key: str | None = None
+    provider: str = "unknown"
 
 
 def get_provider_chain() -> list[ProviderConfig]:
@@ -22,13 +24,17 @@ def get_provider_chain() -> list[ProviderConfig]:
     """
     chain = []
 
+    # Allow runtime model override without changing .env
+    model_override = os.getenv("MODEL_OVERRIDE")
+
     # Ollama (default primary)
     ollama_model = os.getenv("OLLAMA_MODEL")
     ollama_base = os.getenv("OLLAMA_API_BASE")
     if ollama_model and ollama_base:
         chain.append(ProviderConfig(
-            model=f"ollama/{ollama_model}",
+            model=f"ollama/{model_override or ollama_model}",
             api_base=ollama_base,
+            provider="ollama",
         ))
 
     # OpenRouter
@@ -38,6 +44,7 @@ def get_provider_chain() -> list[ProviderConfig]:
         chain.append(ProviderConfig(
             model=f"openrouter/{openrouter_model}",
             api_key=openrouter_key,
+            provider="openrouter",
         ))
 
     # OpenAI
@@ -47,6 +54,7 @@ def get_provider_chain() -> list[ProviderConfig]:
         chain.append(ProviderConfig(
             model=openai_model,
             api_key=openai_key,
+            provider="openai",
         ))
 
     # Anthropic
@@ -56,9 +64,28 @@ def get_provider_chain() -> list[ProviderConfig]:
         chain.append(ProviderConfig(
             model=anthropic_model,
             api_key=anthropic_key,
+            provider="anthropic",
         ))
 
     return chain
+
+
+def _record_llmops(provider: ProviderConfig, t0: float, response=None, error=None) -> None:
+    try:
+        from agent import llmops_client
+        usage = getattr(response, "usage", None)
+        llmops_client.record(
+            provider=provider.provider,
+            model=provider.model,
+            call_type="generate",
+            tokens_in=getattr(usage, "prompt_tokens", 0) or 0,
+            tokens_out=getattr(usage, "completion_tokens", 0) or 0,
+            latency_ms=int((time.monotonic() - t0) * 1000),
+            ok=error is None,
+            error=(str(error) if error else None),
+        )
+    except Exception:
+        pass
 
 
 @observe(name="llm_call")
@@ -80,6 +107,7 @@ async def call_llm(
 
     last_error = None
     for provider in provider_chain:
+        t0 = time.monotonic()
         try:
             kwargs = {
                 "model": provider.model,
@@ -93,9 +121,11 @@ async def call_llm(
                 kwargs["tools"] = tools
 
             response = await litellm.acompletion(**kwargs)
+            _record_llmops(provider, t0, response=response)
             return response
         except Exception as e:
             last_error = e
+            _record_llmops(provider, t0, error=e)
             continue
 
     raise RuntimeError(f"All LLM providers failed. Last error: {last_error}")

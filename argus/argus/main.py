@@ -1,0 +1,215 @@
+import os
+import time
+import uvicorn
+from argus.db import Base, engine, SessionLocal
+import argus.models  # noqa
+from argus.config import settings
+from argus.seed import seed_assets, seed_sources
+from argus.collectors.rss import collect_rss
+from argus.collectors.hyperliquid import collect_wallet, compute_consensus
+from argus.evaluator import evaluate_due_claims
+from argus.scorer import recompute_scores
+from argus.liquidations.cleanup import prune_liquidations
+from argus.scheduler.apscheduler_impl import APScheduler
+from argus.models import Source, Asset
+from argus.collectors.hyperstats import sync_top_traders
+from sqlalchemy import select, text
+from datetime import datetime, timedelta, timezone
+
+def _rss_job():
+    with SessionLocal() as s:
+        sources = list(s.scalars(select(Source).where(
+            Source.kind.in_(["rss", "reddit", "news"]), Source.active == True)))  # noqa: E712
+        # Reddit przepuszcza ~1 zapytanie/min z IP serwera: na koniec i z przerwa
+        sources.sort(key=lambda x: x.kind == "reddit")
+        delay = float(os.getenv("ARGUS_REDDIT_DELAY_S", "65"))
+        seen_reddit = False
+        for src in sources:
+            if src.kind == "reddit":
+                if seen_reddit:
+                    time.sleep(delay)
+                seen_reddit = True
+            collect_rss(s, src)
+
+
+def _llm_batch_job():
+    from argus.llm.batch import expire_stale_pending, process_llm_batch
+    from argus.collectors.rss import load_sector_map
+    import logging
+    batch_size = int(os.getenv("ARGUS_LLM_BATCH_SIZE", "8"))
+    with SessionLocal() as s:
+        expired = expire_stale_pending(s)
+        if expired > 0:
+            logging.getLogger(__name__).info("llm_batch: expired %d stale pending entries", expired)
+        assets = list(s.scalars(select(Asset).where(Asset.scorable == True)))  # noqa: E712
+        sector_map = load_sector_map()
+        stats = process_llm_batch(s, batch_size, assets, sector_map)
+    logging.getLogger(__name__).info("llm_batch: %s", stats)
+
+def _eval_job():
+    with SessionLocal() as s:
+        evaluate_due_claims(s, datetime.now(timezone.utc))
+
+def _score_job():
+    with SessionLocal() as s:
+        recompute_scores(s)
+        prune_liquidations(s)
+
+def _hyperliquid_job():
+    from argus.models import Source
+    with SessionLocal() as s:
+        for src in s.scalars(select(Source).where(Source.kind == "hyperliquid", Source.active == True)):  # noqa: E712
+            try:
+                collect_wallet(s, src)
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning("HL collect failed %s: %s", src.handle, e)
+            time.sleep(float(os.getenv("ARGUS_HL_WALLET_DELAY", "0.3")))
+        compute_consensus(s)
+
+def _liq_cascade_job():
+    from argus.liquidations.cascade import (
+        detect_cascades, annotate_price_context, compute_notional_p95,
+        load_direction_rules, emit_cascade_claims,
+    )
+    from argus.models import Liquidation
+    import logging
+    window_minutes = int(os.getenv("ARGUS_LIQ_CASCADE_WINDOW_MIN", "30"))
+    min_notional = float(os.getenv("ARGUS_LIQ_CASCADE_MIN_NOTIONAL", "50000"))
+    lookback = timedelta(minutes=window_minutes * 2 + 60)
+    try:
+        with SessionLocal() as s:
+            cutoff = datetime.now(timezone.utc) - lookback
+            liqs = list(s.scalars(
+                select(Liquidation).where(Liquidation.ts >= cutoff).order_by(Liquidation.ts)
+            ))
+            cascades = detect_cascades(liqs, window_minutes, min_notional)
+            if not cascades:
+                return
+            annotate_price_context(s, cascades)
+            rules = load_direction_rules()
+            p95 = compute_notional_p95(s)
+            n = emit_cascade_claims(s, cascades, rules, p95)
+            logging.getLogger(__name__).info(
+                "liq_cascade: detected %d cascades, emitted %d claims", len(cascades), n
+            )
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("liq_cascade job failed: %s", e)
+
+def _fred_job():
+    import os
+    api_key = os.getenv("FRED_API_KEY", "")
+    if not api_key:
+        import logging; logging.getLogger(__name__).warning("FRED_API_KEY not set — skipping")
+        return
+    from argus.collectors.fred import collect_fred
+    with SessionLocal() as s:
+        collect_fred(s, api_key=api_key, lookback=24)
+
+def _edgar_job():
+    from argus.collectors.edgar import collect_edgar_insider, get_cik
+    from argus.models import Asset
+    with SessionLocal() as s:
+        stocks = list(s.scalars(
+            select(Asset).where(Asset.kind == "stock", Asset.scorable == True)  # noqa: E712
+        ))
+        for asset in stocks:
+            cik = get_cik(asset.symbol)
+            if cik is None:
+                continue
+            src = s.scalar(select(Source).where(
+                Source.kind == "edgar", Source.handle == f"edgar:{asset.symbol}"
+            ))
+            if src is None:
+                src = Source(kind="edgar", handle=f"edgar:{asset.symbol}",
+                             display_name=f"{asset.symbol} SEC Form4", active=True)
+                s.add(src); s.commit(); s.refresh(src)
+            try:
+                collect_edgar_insider(s, src, asset.symbol, cik, asset)
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning("edgar job failed %s: %s", asset.symbol, e)
+
+def _hyperstats_job():
+    import os
+    with SessionLocal() as s:
+        try:
+            sync_top_traders(
+                s,
+                top_n=int(os.getenv("ARGUS_HYPERSTATS_TOP_N", "20")),
+                min_win_rate=float(os.getenv("ARGUS_HYPERSTATS_MIN_WINRATE", "0.5")),
+                min_trades=int(os.getenv("ARGUS_HYPERSTATS_MIN_TRADES", "50")),
+            )
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning("hyperstats job failed: %s", e)
+
+def _heartbeat_job():
+    try:
+        with SessionLocal() as s:
+            s.execute(
+                text(
+                    "UPDATE guardian_state SET last_heartbeat_at = now(), "
+                    "updated_at = now() WHERE id = 1"
+                )
+            )
+            s.commit()
+    except Exception:
+        pass  # guardian_state may not exist yet; harmless
+
+
+def _whale_signal_job():
+    from argus.signals import send_signals
+    with SessionLocal() as s:
+        send_signals(s)
+
+
+def _signal_outcomes_job():
+    from argus.signals import evaluate_signal_outcomes
+    import logging as _logging
+    with SessionLocal() as s:
+        n = evaluate_signal_outcomes(s)
+    _logging.getLogger(__name__).info("signal_outcomes: evaluated %d", n)
+
+
+def _fear_greed_job():
+    from argus.collectors.fear_greed import collect_fear_greed
+    with SessionLocal() as s:
+        collect_fear_greed(s)
+
+def _paper_job():
+    from argus import paper, evening_report
+    with SessionLocal() as s:
+        paper.tick(s)
+        evening_report.maybe_send_evening_report(s, datetime.now(timezone.utc))
+
+
+def bootstrap():
+    Base.metadata.create_all(engine)
+    with SessionLocal() as s:
+        seed_assets(s, settings.watchlist_path)
+        seed_sources(s, settings.sources_path)
+        if os.path.exists("config/wallets.yaml"):
+            seed_sources(s, "config/wallets.yaml")
+    sched = APScheduler()
+    sched.add_interval("rss", _rss_job, minutes=30)
+    sched.add_interval("llm_batch", _llm_batch_job, minutes=120)
+    sched.add_interval("evaluate", _eval_job, minutes=60)
+    sched.add_interval("score", _score_job, minutes=360)
+    sched.add_interval("hyperliquid", _hyperliquid_job, minutes=15)
+    sched.add_interval("hyperstats", _hyperstats_job, minutes=1440)
+    # insider (MarketBeat) wyłączony 2026-11-09: Cloudflare 403 od 09-2026; insiderów pokrywa EDGAR
+    sched.add_interval("fred", _fred_job, minutes=1440)
+    sched.add_interval("edgar", _edgar_job, minutes=360)
+    sched.add_interval("heartbeat", _heartbeat_job, minutes=5)
+    sched.add_interval("whale_signal", _whale_signal_job, minutes=10)
+    sched.add_interval("signal_outcomes", _signal_outcomes_job, minutes=360)
+    sched.add_interval("liq_cascade", _liq_cascade_job, minutes=30)
+    sched.add_interval("paper", _paper_job, minutes=15)
+    sched.add_interval("fear_greed", _fear_greed_job, minutes=180)
+    sched.start()
+
+if __name__ == "__main__":
+    bootstrap()
+    uvicorn.run("argus.api:app", host="0.0.0.0", port=8080)

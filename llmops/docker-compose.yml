@@ -1,0 +1,58 @@
+services:
+  llmops-postgres:
+    image: postgres:16-alpine
+    container_name: llmops-postgres
+    restart: unless-stopped
+    ports:
+      - "${TAILSCALE_IP:-127.0.0.1}:5436:5432"
+    environment:
+      POSTGRES_USER: ${LLMOPS_DB_USER:-llmops}
+      POSTGRES_PASSWORD: ${LLMOPS_DB_PASSWORD:-llmopspass}
+      POSTGRES_DB: ${LLMOPS_DB_NAME:-llmops}
+    volumes:
+      - llmops-postgres-data:/var/lib/postgresql/data
+      - ./db-init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${LLMOPS_DB_USER:-llmops} -d ${LLMOPS_DB_NAME:-llmops}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - default
+      - llmops-shared
+
+  llmops-collector:
+    build:
+      context: ./collector
+    container_name: llmops-collector
+    restart: unless-stopped
+    ports:
+      - "${TAILSCALE_IP:-127.0.0.1}:${LLMOPS_PORT:-8090}:8080"
+    environment:
+      LLMOPS_DSN: postgresql://${LLMOPS_DB_USER:-llmops}:${LLMOPS_DB_PASSWORD:-llmopspass}@llmops-postgres:5432/${LLMOPS_DB_NAME:-llmops}
+      LLMOPS_TOKEN: ${LLMOPS_TOKEN}
+    depends_on:
+      llmops-postgres:
+        condition: service_healthy
+
+  llmops-collector-test:
+    build:
+      context: ./collector
+    container_name: llmops-collector-test
+    restart: unless-stopped
+    profiles: ["test"]
+    ports:
+      - "${TAILSCALE_IP:-127.0.0.1}:8091:8080"
+    environment:
+      LLMOPS_DSN: postgresql://${LLMOPS_DB_USER:-llmops}:${LLMOPS_DB_PASSWORD:-llmopspass}@llmops-postgres:5432/llmops_test
+      LLMOPS_TOKEN: ${LLMOPS_TOKEN}
+    depends_on:
+      llmops-postgres:
+        condition: service_healthy
+
+volumes:
+  llmops-postgres-data:
+
+networks:
+  llmops-shared:
+    external: true

@@ -1,0 +1,4 @@
+sources:
+  - {kind: hyperliquid, handle: "0x5b5d51203a0f9079f8aeb098a6523a13f298c060", display_name: "whale-multi"}
+  - {kind: hyperliquid, handle: "0x5078c2fbea2b2ad61bc840bc023e35fce56bedb6", display_name: "whale-btc-short"}
+  - {kind: derived, handle: "whale-consensus", display_name: "Whale Consensus"}

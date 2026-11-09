@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS document_chunks (
     document_id INTEGER REFERENCES documents(id) ON DELETE CASCADE,
     chunk_index INTEGER NOT NULL,
     content TEXT NOT NULL,
-    embedding vector(1024),  -- qwen3-embedding:0.6b = 1024 dimensions
+    embedding vector(768),  -- google/gemini-embedding-001 (OpenRouter) = 768 dimensions
     page_number INTEGER,
     section_title VARCHAR(500),
     chunk_type VARCHAR(50) DEFAULT 'text'
@@ -158,7 +158,8 @@ CREATE TABLE IF NOT EXISTS chat_context (
     chat_id INTEGER REFERENCES chat_sessions(id) ON DELETE CASCADE,
     folder_id INTEGER REFERENCES folders(id) ON DELETE SET NULL,
     tag_id INTEGER REFERENCES tags(id) ON DELETE SET NULL,
-    CHECK (folder_id IS NOT NULL OR tag_id IS NOT NULL)
+    document_id INTEGER REFERENCES documents(id) ON DELETE SET NULL,
+    CHECK (folder_id IS NOT NULL OR tag_id IS NOT NULL OR document_id IS NOT NULL)
 );
 
 CREATE INDEX IF NOT EXISTS idx_chat_context_chat ON chat_context(chat_id);
@@ -172,12 +173,28 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     groundedness_score FLOAT,
     completeness_score FLOAT,
     relevance_score FLOAT,
+    would_retry_shadow BOOLEAN,
     token_count INTEGER,
     latency_ms INTEGER,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_chat_messages_chat ON chat_messages(chat_id);
+
+CREATE TABLE IF NOT EXISTS llm_calls (
+    id SERIAL PRIMARY KEY,
+    message_id INTEGER REFERENCES chat_messages(id) ON DELETE CASCADE,
+    call_type VARCHAR(20) NOT NULL,
+    provider VARCHAR(20) NOT NULL,
+    model VARCHAR(100),
+    tokens_in INTEGER DEFAULT 0,
+    tokens_out INTEGER DEFAULT 0,
+    cost_usd FLOAT DEFAULT 0.0,
+    latency_ms INTEGER,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_llm_calls_message ON llm_calls(message_id);
 
 -- =============================================================
 -- Processing Tasks (Celery job tracking)

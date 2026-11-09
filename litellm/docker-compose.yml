@@ -1,0 +1,26 @@
+# LiteLLM — bramka LLM na VPS. Port tylko na IP Tailscale (TAILSCALE_IP w .env) + sieć dockerowa llmops-shared.
+# Sekrety w .env (poza gitem): LITELLM_MASTER_KEY, GEMINI_API_KEY, OPENROUTER_API_KEY, LANGFUSE_*, TAILSCALE_IP.
+services:
+  litellm:
+    image: ghcr.io/berriai/litellm:v1.106.6
+    container_name: litellm
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    env_file: .env
+    environment:
+      DISABLE_ADMIN_UI: "True"
+      NO_DOCS: "True"
+      NO_REDOC: "True"
+      LITELLM_OTEL_LANGFUSE_SPAN_SCOPE: llm_only
+      OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT: span_only
+    ports:
+      - "${TAILSCALE_IP:-127.0.0.1}:4000:4000"
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+    networks:
+      - default
+      - llmops-shared
+    restart: unless-stopped
+
+networks:
+  llmops-shared:
+    external: true

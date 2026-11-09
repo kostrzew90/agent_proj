@@ -1,0 +1,14 @@
+apiVersion: 1
+datasources:
+  - name: llmops
+    type: postgres
+    uid: llmops-pg
+    url: llmops-postgres:5432
+    user: ${LLMOPS_DB_USER}
+    secureJsonData:
+      password: ${LLMOPS_DB_PASSWORD}
+    jsonData:
+      database: ${LLMOPS_DB_NAME}
+      sslmode: disable
+      postgresVersion: 1600
+    isDefault: false

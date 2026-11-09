@@ -42,6 +42,7 @@ class DocumentResponse(BaseModel):
     source_url: str | None
     created_at: datetime
     processed_at: datetime | None
+    error_message: str | None = None
     folder_ids: list[int] = []
     tag_ids: list[int] = []
     task_progress: float | None = None
@@ -258,11 +259,19 @@ async def upload_document_force(
     await db.commit()
     await db.refresh(doc)
 
+    # Without this dispatch the document stayed 'pending' forever — the task row
+    # was created but no worker was ever told about it.
+    from tasks.document_tasks import process_document
+    celery_result = process_document.delay(doc.id, task.id)
+    task.celery_task_id = celery_result.id
+    await db.commit()
+
     return DocumentResponse(
         id=doc.id, filename=doc.filename, file_type=doc.file_type,
         file_size=doc.file_size, page_count=doc.page_count, status=doc.status,
         source_type=doc.source_type, source_url=doc.source_url,
         created_at=doc.created_at, processed_at=doc.processed_at,
+        error_message=doc.error_message,
     )
 
 
@@ -317,6 +326,7 @@ async def list_documents(
             file_size=d.file_size, page_count=d.page_count, status=d.status,
             source_type=d.source_type, source_url=d.source_url,
             created_at=d.created_at, processed_at=d.processed_at,
+            error_message=d.error_message,
             task_progress=t.progress if t else None,
             task_status=t.status if t else None,
             task_type=t.task_type if t else None,
@@ -345,6 +355,42 @@ async def get_document(
         file_size=doc.file_size, page_count=doc.page_count, status=doc.status,
         source_type=doc.source_type, source_url=doc.source_url,
         created_at=doc.created_at, processed_at=doc.processed_at,
+        error_message=doc.error_message,
+    )
+
+
+class RenameDocumentRequest(BaseModel):
+    filename: str
+
+
+@router.patch("/{document_id}", response_model=DocumentResponse)
+async def rename_document(
+    document_id: int,
+    request: RenameDocumentRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Rename a document's display name (does not touch the file on disk)."""
+    result = await db.execute(
+        select(Document).where(Document.id == document_id, Document.user_id == user.id)
+    )
+    doc = result.scalar_one_or_none()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    new_name = request.filename.strip()
+    if not new_name:
+        raise HTTPException(status_code=400, detail="Filename cannot be empty")
+
+    doc.filename = new_name
+    await db.commit()
+    await db.refresh(doc)
+    return DocumentResponse(
+        id=doc.id, filename=doc.filename, file_type=doc.file_type,
+        file_size=doc.file_size, page_count=doc.page_count, status=doc.status,
+        source_type=doc.source_type, source_url=doc.source_url,
+        created_at=doc.created_at, processed_at=doc.processed_at,
+        error_message=doc.error_message,
     )
 
 
@@ -411,6 +457,7 @@ async def reprocess_document(
         file_size=doc.file_size, page_count=doc.page_count, status=doc.status,
         source_type=doc.source_type, source_url=doc.source_url,
         created_at=doc.created_at, processed_at=doc.processed_at,
+        error_message=doc.error_message,
     )
 
 
@@ -509,8 +556,13 @@ async def ingest_youtube(
     existing = await db.execute(
         select(Document).where(Document.source_url == youtube_url, Document.user_id == user.id)
     )
-    if existing.scalar_one_or_none():
-        raise HTTPException(status_code=409, detail="Video already indexed")
+    existing_doc = existing.scalar_one_or_none()
+    if existing_doc:
+        if existing_doc.status == "error":
+            await db.delete(existing_doc)
+            await db.flush()
+        else:
+            raise HTTPException(status_code=409, detail="Video already indexed")
 
     doc = Document(
         user_id=user.id,
@@ -544,6 +596,8 @@ async def ingest_youtube(
 
 class XPostIngestRequest(BaseModel):
     url: str
+    text: str | None = None
+    author: str | None = None
     folder_id: int | None = None
     tag_ids: list[int] = []
 
@@ -556,8 +610,8 @@ async def ingest_xpost(
 ):
     """Ingest X/Twitter post → extract GitHub repos → analyze → embed → index."""
     import re
-    # Validate URL
-    if not re.search(r"(twitter\.com|x\.com)/\w+/status/\d+", request.url):
+    # Validate URL (skip if text is provided — paste mode)
+    if not request.text and not re.search(r"(twitter\.com|x\.com)/\w+/status/\d+", request.url):
         raise HTTPException(status_code=400, detail="Invalid X/Twitter post URL")
 
     # Check duplicate
@@ -590,7 +644,7 @@ async def ingest_xpost(
     await db.refresh(task)
 
     from tasks.xpost_ingest_task import ingest_xpost as celery_ingest
-    celery_result = celery_ingest.delay(request.url, user.id, task.id)
+    celery_result = celery_ingest.delay(request.url, user.id, task.id, request.text, request.author)
     task.celery_task_id = celery_result.id
     await db.commit()
 

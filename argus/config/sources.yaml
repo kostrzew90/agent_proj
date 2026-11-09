@@ -1,0 +1,16 @@
+sources:
+  - {kind: rss, handle: "https://www.coindesk.com/arc/outboundfeeds/rss/", display_name: CoinDesk}
+  - {kind: rss, handle: "https://cointelegraph.com/rss",                   display_name: CoinTelegraph}
+  - {kind: rss, handle: "https://decrypt.co/feed",                         display_name: Decrypt}
+  - {kind: rss, handle: "https://www.theblock.co/rss.xml",                 display_name: TheBlock}
+  - {kind: reddit, handle: "https://www.reddit.com/r/CryptoCurrency/.rss", display_name: "r/CryptoCurrency"}
+  - {kind: reddit, handle: "https://www.reddit.com/r/CryptoMarkets/.rss",  display_name: "r/CryptoMarkets"}
+  - {kind: reddit, handle: "https://www.reddit.com/r/SatoshiStreetBets/.rss", display_name: "r/SatoshiStreetBets"}
+  - {kind: reddit, handle: "https://www.reddit.com/r/wallstreetbets/.rss", display_name: "r/wallstreetbets"}
+  - {kind: reddit, handle: "https://www.reddit.com/r/stocks/.rss",         display_name: "r/stocks"}
+  - {kind: reddit, handle: "https://www.reddit.com/r/StockMarket/.rss",    display_name: "r/StockMarket"}
+  - {kind: news, handle: "https://feeds.content.dowjones.io/public/rss/RSSMarketsMain",  display_name: "WSJ Markets"}
+  - {kind: news, handle: "https://www.marketwatch.com/rss/topstories",     display_name: "MarketWatch"}
+  - {kind: news, handle: "https://feeds.finance.yahoo.com/rss/2.0/headline?s=XOMA,BYND,DLNG,LCID,NFE,NTR,PLG&region=US&lang=en-US",        display_name: "Yahoo Finance"}
+  - {kind: news, handle: "https://www.cnbc.com/id/100003114/device/rss/rss.html", display_name: "CNBC"}
+  - {kind: news, handle: "https://seekingalpha.com/feed.xml",              display_name: "Seeking Alpha"}

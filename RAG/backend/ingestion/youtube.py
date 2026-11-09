@@ -14,11 +14,22 @@ import yt_dlp
 
 logger = logging.getLogger("rag.ingestion.youtube")
 
+_cookies_path = os.environ.get("YOUTUBE_COOKIES_FILE")
+COOKIES_FILE = _cookies_path if _cookies_path and os.path.exists(_cookies_path) and os.path.getsize(_cookies_path) > 0 else None
+
+PROXY = os.environ.get("YOUTUBE_PROXY")
+
+BOT_CHECK_SIGNATURE = "Sign in to confirm you"
+
+
+class YouTubeBlockedError(Exception):
+    """yt-dlp request rejected by YouTube's bot-check (IP-level, not video-specific)."""
+
 
 def extract_video_id(url: str) -> str | None:
     """Extract YouTube video ID from various URL formats."""
     patterns = [
-        r"(?:v=|youtu\.be/|embed/|shorts/)([a-zA-Z0-9_-]{11})",
+        r"(?:v=|youtu\.be/|embed/|shorts/|live/)([a-zA-Z0-9_-]{11})",
         r"^([a-zA-Z0-9_-]{11})$",
     ]
     for pattern in patterns:
@@ -65,6 +76,10 @@ def fetch_transcript(video_id: str, languages: list[str] | None = None) -> list[
             "sleep_interval": 2,
             "max_sleep_interval": 5,
         }
+        if COOKIES_FILE:
+            ydl_opts["cookiefile"] = COOKIES_FILE
+        if PROXY:
+            ydl_opts["proxy"] = PROXY
 
         last_exc = None
         for attempt in range(3):
@@ -83,6 +98,8 @@ def fetch_transcript(video_id: str, languages: list[str] | None = None) -> list[
                     break  # non-429 error, don't retry
 
         if last_exc:
+            if BOT_CHECK_SIGNATURE in str(last_exc):
+                raise YouTubeBlockedError(str(last_exc)) from last_exc
             raise ValueError(f"yt-dlp download failed after retries: {last_exc}") from last_exc
 
         # Find downloaded VTT file (try preferred lang order)
@@ -161,6 +178,10 @@ def download_audio(video_id: str, output_dir: str) -> str:
         "no_warnings": True,
         "noprogress": True,
     }
+    if COOKIES_FILE:
+        ydl_opts["cookiefile"] = COOKIES_FILE
+    if PROXY:
+        ydl_opts["proxy"] = PROXY
 
     last_exc = None
     for attempt in range(3):
@@ -179,6 +200,8 @@ def download_audio(video_id: str, output_dir: str) -> str:
                 break
 
     if last_exc:
+        if BOT_CHECK_SIGNATURE in str(last_exc):
+            raise YouTubeBlockedError(str(last_exc)) from last_exc
         raise ValueError(f"yt-dlp audio download failed: {last_exc}") from last_exc
 
     if not os.path.exists(output_path):

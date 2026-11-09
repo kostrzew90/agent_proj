@@ -62,6 +62,13 @@ async def chat(req: ChatRequest):
     return ChatResponse(session_id=session.id, response=response_text)
 
 
+@app.post("/sessions/create")
+async def session_create():
+    """Create a new empty session (instant, no LLM call)."""
+    session = await create_session(goal=None)
+    return {"id": session.id, "status": "active"}
+
+
 @app.get("/sessions")
 async def sessions_list():
     return await list_sessions()

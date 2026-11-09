@@ -20,18 +20,18 @@ PROJECT_CONTEXT = """Existing projects that tools could be integrated into:
 
 
 @celery_app.task(name="tasks.xpost_ingest_task.ingest_xpost", bind=True)
-def ingest_xpost(self, url: str, user_id: int, task_id: int):
+def ingest_xpost(self, url: str, user_id: int, task_id: int, text: str | None = None, author: str | None = None):
     """Fetch X post, extract GitHub repos, analyze, chunk, embed, store."""
-    logger.info("ingest_xpost: url=%s user_id=%s", url, user_id)
+    logger.info("ingest_xpost: url=%s user_id=%s paste=%s", url, user_id, bool(text))
     try:
-        asyncio.run(_ingest_pipeline(url, user_id, task_id))
+        asyncio.run(_ingest_pipeline(url, user_id, task_id, text, author))
     except Exception as exc:
         logger.exception("ingest_xpost failed: %s", exc)
         asyncio.run(_mark_failed(task_id, str(exc)))
         raise
 
 
-async def _ingest_pipeline(url: str, user_id: int, task_id: int):
+async def _ingest_pipeline(url: str, user_id: int, task_id: int, text: str | None = None, author: str | None = None):
     from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
     from sqlalchemy import select
     from config import settings
@@ -48,8 +48,13 @@ async def _ingest_pipeline(url: str, user_id: int, task_id: int):
             await _set_progress(db, task_id, "running", 0.1)
 
             # --- Fetch X post + GitHub READMEs ---
-            post = await process_xpost(url)
-            logger.info("X post by %s: %d chars, %d repos found", post.author, len(post.text), len(post.repos))
+            if text:
+                from ingestion.xpost import create_post_from_text
+                post = await create_post_from_text(url, text, author or "unknown")
+                logger.info("X post from paste by %s: %d chars, %d repos found", post.author, len(post.text), len(post.repos))
+            else:
+                post = await process_xpost(url)
+                logger.info("X post by %s: %d chars, %d repos found", post.author, len(post.text), len(post.repos))
 
             await _set_progress(db, task_id, "running", 0.3)
 
@@ -68,7 +73,10 @@ async def _ingest_pipeline(url: str, user_id: int, task_id: int):
 
             # --- Update document record ---
             result = await db.execute(
-                select(Document).where(Document.source_url == url)
+                select(Document).where(
+                    Document.source_url == url,
+                    Document.user_id == user_id,
+                )
             )
             doc = result.scalar_one_or_none()
             if doc is None:
@@ -93,10 +101,10 @@ async def _ingest_pipeline(url: str, user_id: int, task_id: int):
             logger.info("Chunked into %d chunks", len(chunks))
 
             # --- Embed ---
-            embed_client = EmbeddingClient(
-                base_url=settings.ai.ollama_url,
-                model=settings.ai.embedding_model,
-            )
+            # No base_url/model override — EmbeddingClient picks the provider itself.
+            # Forcing Ollama's URL while OPENROUTER_API_KEY is set made it POST
+            # /embeddings (OpenRouter path + Bearer header) at Ollama → 404 every time.
+            embed_client = EmbeddingClient()
             texts = [c.content for c in chunks]
             embeddings = embed_client.embed_batch(texts)
 
@@ -211,7 +219,7 @@ async def _mark_failed(task_id: int, error: str):
     from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
     from sqlalchemy import select
     from config import settings
-    from core.database import ProcessingTask
+    from core.database import ProcessingTask, Document
 
     engine = create_async_engine(settings.database.async_url)
     Session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
@@ -222,6 +230,16 @@ async def _mark_failed(task_id: int, error: str):
             if pt:
                 pt.status = "failed"
                 pt.error_message = error[:500]
+                # The document must fail too — left at 'pending' it looks like it is
+                # still being processed, and /reprocess refuses that status.
+                if pt.document_id:
+                    doc_result = await db.execute(
+                        select(Document).where(Document.id == pt.document_id)
+                    )
+                    doc = doc_result.scalar_one_or_none()
+                    if doc:
+                        doc.status = "error"
+                        doc.error_message = error[:500]
                 await db.commit()
     finally:
         await engine.dispose()

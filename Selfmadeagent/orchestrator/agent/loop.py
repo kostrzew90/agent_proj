@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from langfuse.decorators import observe
 from agent.providers import call_llm, get_provider_chain
 from agent.sessions import Session, Message, add_episode, get_pool
@@ -14,6 +15,25 @@ from memory.embeddings import EmbeddingClient
 from memory.pipeline import MemoryPipeline
 from tools.registry import get_tools
 from tools.claw_bridge import execute_tool, WORKSPACE
+from agent.response_cleaner import clean_response
+
+# Keywords that suggest the user wants to DO something (needs tools)
+_ACTION_PATTERNS = re.compile(
+    r'\b(read|write|edit|create|delete|list|show|find|search|run|execute|check|open|'
+    r'look at|describe|analyze|fix|change|modify|explore|install|build|test|deploy|'
+    r'plik|pliki|katalog|folder|projekt|kod|uruchom|pokaz|znajdz|sprawdz|opisz|wylistuj)\b',
+    re.IGNORECASE,
+)
+
+def _needs_tools(message: str) -> bool:
+    """Heuristic: does this message need tool access?"""
+    # Short messages without action words are probably conversational
+    if len(message.split()) <= 5 and not _ACTION_PATTERNS.search(message):
+        return False
+    # Messages with file paths or technical terms need tools
+    if '/' in message or '\\' in message or '.' in message.split()[-1] if message.split() else False:
+        return True
+    return bool(_ACTION_PATTERNS.search(message))
 
 MAX_TOOL_ROUNDS = 10
 
@@ -68,12 +88,15 @@ async def agent_step(session: Session, user_message: str, on_event=None) -> str:
                if m.role in ("user", "assistant") and m.content]
 
     provider_chain = get_provider_chain()
-    tools = get_tools()
+    all_tools = get_tools()
+    use_tools = _needs_tools(user_message)
 
     for round_num in range(MAX_TOOL_ROUNDS):
         ctx = compose_context(history, memory_text=memory_text, facts_text=facts_prompt)
+        # Only send tools if the message needs them, or if we're in a tool loop (round > 0)
+        tools_for_call = all_tools if (use_tools or round_num > 0) else None
         response = await call_llm(
-            messages=ctx.messages, tools=tools, provider_chain=provider_chain,
+            messages=ctx.messages, tools=tools_for_call, provider_chain=provider_chain,
         )
 
         choice = response.choices[0]
@@ -81,7 +104,7 @@ async def agent_step(session: Session, user_message: str, on_event=None) -> str:
 
         if not message.tool_calls:
             await emit("status", {"text": "Composing response..."})
-            content = message.content or ""
+            content = clean_response(message.content or "")
             session.messages.append(Message(role="assistant", content=content))
             await add_episode(session.id, "response", content, outcome="success")
             return content

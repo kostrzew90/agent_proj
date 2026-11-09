@@ -144,7 +144,7 @@ Add to `db-init/01-init-rag.sql` for fresh installs and run manually on existing
 Source: {url}
 Date: {date}
 
-{post text}
+{post text}te
 
 ---
 

@@ -1,0 +1,7 @@
+[Unit]
+Description=Strażnik: raport bezpieczeństwa
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/straznik
+ExecStart=/usr/bin/python3 -m straznik.report

@@ -1,0 +1,252 @@
+[
+    {
+        "query": "Jakie zwierzęta można zobaczyć w tym filmie z zoo?",
+        "language": "pl",
+        "expected_doc_ids": [14]
+    },
+    {
+        "query": "Które metale szlachetne straciły najwięcej na wartości podczas ostatniego pogromiu?",
+        "language": "pl",
+        "expected_doc_ids": [15]
+    },
+    {
+        "query": "Jaka jest sytuacja fundamentalna KGHM i czy to dobry moment na zakup akcji?",
+        "language": "pl",
+        "expected_doc_ids": [15]
+    },
+    {
+        "query": "Dlaczego srebro spadło tak mocno i jakie są prognozy dla tego metalu?",
+        "language": "pl",
+        "expected_doc_ids": [15]
+    },
+    {
+        "query": "Co się dzieje z platyną i palladem na rynkach globalnych?",
+        "language": "pl",
+        "expected_doc_ids": [15]
+    },
+    {
+        "query": "Jakie poziomy wsparcia i oporu są ważne dla srebra po ostatniej wyprzedaży?",
+        "language": "pl",
+        "expected_doc_ids": [15]
+    },
+    {
+        "query": "Czy warto teraz inwestować w KGHM biorąc pod uwagę ceny miedzi i metali szlachetnych?",
+        "language": "pl",
+        "expected_doc_ids": [15]
+    },
+    {
+        "query": "Jakie są główne przyczyny spadków na rynku metali szlachetnych?",
+        "language": "pl",
+        "expected_doc_ids": [15]
+    },
+    {
+        "query": "What is the current situation with gold prices and the KGHM mining company?",
+        "language": "en",
+        "expected_doc_ids": [15]
+    },
+    {
+        "query": "Jak wygląda analiza techniczna złota po ostatnich silnych ruchach cenowych?",
+        "language": "pl",
+        "expected_doc_ids": [15]
+    },
+    {
+        "query": "Jakie są perspektywy dla polskiego sektora wydobywczego w kontekście cen metali?",
+        "language": "pl",
+        "expected_doc_ids": [15]
+    },
+    {
+        "query": "Porównaj zachowanie złota i srebra podczas ostatniego krachu na metalach.",
+        "language": "pl",
+        "expected_doc_ids": [15]
+    },
+    {
+        "query": "Czy pallad może być lepszą inwestycją niż platyna w obecnych warunkach rynkowych?",
+        "language": "pl",
+        "expected_doc_ids": [15]
+    },
+    {
+        "query": "What are the investment opportunities in precious metals after the recent sell-off?",
+        "language": "en",
+        "expected_doc_ids": [15]
+    },
+    {
+        "query": "Jak korekta na metalach szlachetnych wpływa na wycenę KGHM na giełdzie?",
+        "language": "pl",
+        "expected_doc_ids": [15]
+    },
+    {
+        "query": "Jakie wolumeny transakcji towarzyszyły ostatnim ruchom na rynku srebra i złota?",
+        "language": "pl",
+        "expected_doc_ids": [15]
+    },
+    {
+        "query": "Kiedy według analizy technicznej można spodziewać się odbicia na metalach szlachetnych?",
+        "language": "pl",
+        "expected_doc_ids": [15]
+    },
+    {
+        "query": "Jak zainstalować Claude Code na systemie Windows lub Mac?",
+        "language": "pl",
+        "expected_doc_ids": [16]
+    },
+    {
+        "query": "Jakie są wymagania wstępne do instalacji Claude Code — Node.js, npm?",
+        "language": "pl",
+        "expected_doc_ids": [16]
+    },
+    {
+        "query": "How do I set up my API key for Claude Code?",
+        "language": "en",
+        "expected_doc_ids": [16]
+    },
+    {
+        "query": "Jak skonfigurować plik CLAUDE.md i do czego on służy?",
+        "language": "pl",
+        "expected_doc_ids": [16]
+    },
+    {
+        "query": "Jakie rozszerzenia i pluginy są dostępne dla Claude Code?",
+        "language": "pl",
+        "expected_doc_ids": [16]
+    },
+    {
+        "query": "Ile kosztuje używanie Claude Code i jak działa rozliczanie tokenów?",
+        "language": "pl",
+        "expected_doc_ids": [16]
+    },
+    {
+        "query": "What are the best practices for writing prompts in Claude Code?",
+        "language": "en",
+        "expected_doc_ids": [16]
+    },
+    {
+        "query": "Jak Claude Code różni się od innych narzędzi AI do programowania, np. GitHub Copilot?",
+        "language": "pl",
+        "expected_doc_ids": [16]
+    },
+    {
+        "query": "Jak używać Claude Code z terminala i jakie są podstawowe komendy CLI?",
+        "language": "pl",
+        "expected_doc_ids": [16]
+    },
+    {
+        "query": "What is the CLAUDE.md file and how should I structure it for my project?",
+        "language": "en",
+        "expected_doc_ids": [16]
+    },
+    {
+        "query": "Jak zarządzać kontekstem i pamięcią w Claude Code podczas długich sesji?",
+        "language": "pl",
+        "expected_doc_ids": [16]
+    },
+    {
+        "query": "Jakie praktyczne przykłady użycia Claude Code pokazano w tutorialu?",
+        "language": "pl",
+        "expected_doc_ids": [16]
+    },
+    {
+        "query": "How does Claude Code handle large codebases and context limits?",
+        "language": "en",
+        "expected_doc_ids": [16]
+    },
+    {
+        "query": "Jak Claude Code radzi sobie z refactoringiem i pisaniem testów?",
+        "language": "pl",
+        "expected_doc_ids": [16]
+    },
+    {
+        "query": "Jakie ustawienia konfiguracyjne warto zmienić po pierwszej instalacji Claude Code?",
+        "language": "pl",
+        "expected_doc_ids": [16]
+    },
+    {
+        "query": "Can Claude Code work with Docker and shell commands?",
+        "language": "en",
+        "expected_doc_ids": [16]
+    },
+    {
+        "query": "Jak Claude Code integruje się z Git i jak automatyzować commity?",
+        "language": "pl",
+        "expected_doc_ids": [16]
+    },
+    {
+        "query": "What keyboard shortcuts and productivity tips were shown in the Claude Code tutorial?",
+        "language": "en",
+        "expected_doc_ids": [16]
+    },
+    {
+        "query": "Jak debugować błędy przy użyciu Claude Code i jakie są jego ograniczenia?",
+        "language": "pl",
+        "expected_doc_ids": [16]
+    },
+    {
+        "query": "Czy Claude Code może generować całe projekty od podstaw i jak wygląda taki workflow?",
+        "language": "pl",
+        "expected_doc_ids": [16]
+    },
+    {
+        "query": "How do you use slash commands in Claude Code?",
+        "language": "en",
+        "expected_doc_ids": [16]
+    },
+    {
+        "query": "Jak wygląda live stream z użycia Claude Code i jakie zadania były realizowane?",
+        "language": "pl",
+        "expected_doc_ids": [16]
+    },
+    {
+        "query": "What model versions does Claude Code support and how do you switch between them?",
+        "language": "en",
+        "expected_doc_ids": [16]
+    },
+    {
+        "query": "Jakie struktury kontynuacyjne widać aktualnie na wykresie Bitcoina?",
+        "language": "pl",
+        "expected_doc_ids": [17]
+    },
+    {
+        "query": "Czy na BTC pojawiły się luki cenowe (gapy) i co one oznaczają dla dalszego ruchu?",
+        "language": "pl",
+        "expected_doc_ids": [17]
+    },
+    {
+        "query": "Jak wygląda analiza techniczna EUR/USD w kontekście aktualnej sytuacji makro?",
+        "language": "pl",
+        "expected_doc_ids": [17]
+    },
+    {
+        "query": "What are the key support and resistance levels for Bitcoin based on recent technical analysis?",
+        "language": "en",
+        "expected_doc_ids": [17]
+    },
+    {
+        "query": "Jak zachowuje się złoto na tle Bitcoina i czy widać korelację między tymi aktywami?",
+        "language": "pl",
+        "expected_doc_ids": [15, 17]
+    },
+    {
+        "query": "Jakie pary walutowe są omawiane i jakie mają kluczowe poziomy techniczne?",
+        "language": "pl",
+        "expected_doc_ids": [17]
+    },
+    {
+        "query": "Czy Bitcoin osiągnie nowe szczyty czy czeka nas głębsza korekta według analizy technicznej?",
+        "language": "pl",
+        "expected_doc_ids": [17]
+    },
+    {
+        "query": "Jak analiza techniczna złota z przeglądu walut koreluje z fundamentalną analizą KGHM?",
+        "language": "pl",
+        "expected_doc_ids": [15, 17]
+    },
+    {
+        "query": "Jakie narzędzia AI do programowania istnieją i czym Claude Code wyróżnia się na tle konkurencji?",
+        "language": "pl",
+        "expected_doc_ids": [16]
+    },
+    {
+        "query": "Jak inwestować w metale szlachetne i kryptowaluty jednocześnie — jakie są różnice w analizie technicznej?",
+        "language": "pl",
+        "expected_doc_ids": [15, 17]
+    }
+]
